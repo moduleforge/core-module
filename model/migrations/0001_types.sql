@@ -1,7 +1,7 @@
 CREATE TABLE types (
   id             BIGSERIAL PRIMARY KEY,
   slug           TEXT UNIQUE NOT NULL,
-  parent_id      BIGINT REFERENCES types(id),
+  parent_id      BIGINT REFERENCES types(id) CHECK (parent_id IS DISTINCT FROM id),
   concrete       BOOLEAN NOT NULL,
   name           TEXT NOT NULL,
   description    TEXT,

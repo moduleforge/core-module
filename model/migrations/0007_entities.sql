@@ -29,6 +29,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Both triggers below are scoped to fundamental_type_id changes only.
+-- The concrete-check validates that the (possibly unchanged) new value references a concrete type.
+-- The immutable-check raises if the value actually changed (i.e., the column was modified).
 CREATE TRIGGER entities_fundamental_type_concrete_check
   BEFORE INSERT OR UPDATE OF fundamental_type_id ON entities
   FOR EACH ROW EXECUTE FUNCTION entities_check_concrete_type();
@@ -44,7 +47,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER entities_fundamental_type_immutable
-  BEFORE UPDATE ON entities
+  BEFORE UPDATE OF fundamental_type_id ON entities
   FOR EACH ROW EXECUTE FUNCTION entities_immutable_type();
 
 CREATE TRIGGER entities_set_updated_at

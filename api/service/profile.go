@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -23,7 +25,10 @@ type Profile struct {
 func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID int64) (Profile, error) {
 	entity, err := q.GetEntityByID(ctx, entityID)
 	if err != nil {
-		return Profile{}, fmt.Errorf("resolve profile: entity %d not found: %w", entityID, ErrNotFound)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Profile{}, ErrNotFound
+		}
+		return Profile{}, fmt.Errorf("resolve profile: entity %d: %w", entityID, err)
 	}
 
 	profile := Profile{

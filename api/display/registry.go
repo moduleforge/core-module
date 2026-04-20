@@ -95,5 +95,7 @@ func (r *Registry) Render(ctx context.Context, tx pgx.Tx, entityID int64, fieldN
 		return "", fmt.Errorf("%w: typeSlug=%q fieldName=%q", ErrRendererNotRegistered, typeSlug, fieldName)
 	}
 
+	// The renderer is invoked after releasing the read lock to avoid holding the
+	// lock during the database round-trip performed by the renderer function.
 	return fn(ctx, tx, entityID)
 }
