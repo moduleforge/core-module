@@ -37,15 +37,15 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
   - [x] 4.5 Unit tests (service tx/audit, httpapi auth paths) — coverage service 77.1%, httpapi 71.7%
   - [x] 4.6 OpenAPI fragment `core-module/api/openapi.fragment.yaml`
 
-- [ ] **Phase 5 — Wire users-module/api to consume core-module/api** (depends on: 4 and 3)
-  - [ ] 5.1 Add `require github.com/moduleforge/core-api` to users-module/api/go.mod
-  - [ ] 5.2 `users-module/api/internal/auth/core_adapter.go` (PrincipalExtractor impl)
-  - [ ] 5.3 Make users-module/api/internal/audit satisfy core's Writer interface
-  - [ ] 5.4 main.go: construct core services + router; mount at /v1; remove /v1/self routes
-  - [ ] 5.5 Rework handlers/users.go admin-create to call core service inside pgx tx
-  - [ ] 5.6 Delete handlers/self.go
-  - [ ] 5.7 Update handlers/auditlog.go to resolve entity UUIDs via coredb or core service
-  - [ ] 5.8 Integration test: PUT /v1/self end-to-end, audit actor correct
+- [x] **Phase 5 — Wire users-module/api to consume core-module/api** (depends on: 4 and 3)
+  - [x] 5.1 Add `require github.com/moduleforge/core-api` to users-module/api/go.mod
+  - [x] 5.2 `users-module/api/internal/auth/core_adapter.go` (PrincipalExtractor impl)
+  - [x] 5.3 Make users-module/api/internal/audit satisfy core's Writer interface
+  - [x] 5.4 main.go: construct core services + router; mount at /v1; remove /v1/self routes
+  - [x] 5.5 Rework handlers/users.go admin-create to call core service inside pgx tx
+  - [x] 5.6 Delete handlers/self.go
+  - [x] 5.7 Update handlers/auditlog.go to resolve entity UUIDs via coredb or core service
+  - [x] 5.8 Integration test: PUT /v1/self end-to-end, audit actor correct
 
 - [ ] **Phase 6 — Extract UI components into core-module/gui** (depends on: 1)
   - [ ] 6.1 Extract ProfileEditor from users-module/gui/src/app/profile/page.tsx
