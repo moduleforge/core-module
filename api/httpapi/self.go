@@ -8,7 +8,7 @@ import (
 	coredb "github.com/moduleforge/core-model/db"
 )
 
-// getSelf handles GET /entities/self — returns the caller's entity profile.
+// getSelf handles GET /self — returns the caller's entity profile.
 func (h *handlers) getSelf(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.d.Principal.FromContext(r.Context())
 	if !ok {
@@ -25,13 +25,13 @@ func (h *handlers) getSelf(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, http.StatusOK, profileResponse(profile))
 }
 
-// putSelfRequest is the request body for PUT /entities/self.
+// putSelfRequest is the request body for PUT /self.
 type putSelfRequest struct {
 	GivenName  *string `json:"given_name"`
 	FamilyName *string `json:"family_name"`
 }
 
-// putSelf handles PUT /entities/self — updates the caller's natural_person fields.
+// putSelf handles PUT /self — updates the caller's natural_person fields.
 func (h *handlers) putSelf(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.d.Principal.FromContext(r.Context())
 	if !ok {

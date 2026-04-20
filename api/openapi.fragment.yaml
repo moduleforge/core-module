@@ -5,8 +5,10 @@
 # composed into a consumer's root spec via $ref. For example:
 #
 #   paths:
-#     /entities/self:
-#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1entities~1self'
+#     /self:
+#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1self'
+#     /entities/natural-persons:
+#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1entities~1natural-persons'
 #
 # The fragment intentionally omits `servers:` because the mounting path and
 # host are determined by each consuming service.
@@ -35,9 +37,9 @@ security:
 paths:
 
   # --------------------------------------------------------------------------
-  # /entities/self — caller's own entity record
+  # /self — caller's own entity record (top-level identity endpoint)
   # --------------------------------------------------------------------------
-  /entities/self:
+  /self:
     get:
       tags: [Entities]
       operationId: getSelfEntity
@@ -347,7 +349,7 @@ paths:
   # --------------------------------------------------------------------------
   # /entities/{uuid} — generic entity lookup and archive
   # Note: these paths must appear AFTER the fixed sub-collection paths above
-  # so that /entities/self and /entities/natural-persons etc. are not shadowed.
+  # so that /entities/natural-persons etc. are not shadowed.
   # --------------------------------------------------------------------------
   /entities/{uuid}:
     get:

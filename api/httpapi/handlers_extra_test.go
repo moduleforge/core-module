@@ -281,7 +281,7 @@ func TestGetServiceAccount_200(t *testing.T) {
 	}
 }
 
-// --- PUT /entities/self (non natural_person) ---
+// --- PUT /self (non natural_person) ---
 
 func TestPutSelf_400_NotNaturalPerson(t *testing.T) {
 	profile := buildCorpProfile()
@@ -291,7 +291,7 @@ func TestPutSelf_400_NotNaturalPerson(t *testing.T) {
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"given_name": "X"})
-	req := httptest.NewRequest(http.MethodPut, "/entities/self", bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPut, "/self", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)

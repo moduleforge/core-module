@@ -49,16 +49,22 @@ type handlers struct {
 	d Deps
 }
 
-// NewRouter wires all /entities/* routes and returns a mountable chi.Router.
-// Mount it under any prefix, e.g. r.Mount("/v1", core.NewRouter(deps)).
+// NewRouter wires /self and /entities/* routes and returns a mountable
+// chi.Router. Mount it under any prefix, e.g. r.Mount("/v1", core.NewRouter(deps)).
+//
+// /self is a top-level identity route (REST convention: GitHub's /user,
+// Google's /me); /entities/* is the implementation-level resource surface.
+// Keeping them as siblings avoids leaking the entity abstraction into
+// identity-oriented URLs.
 func NewRouter(d Deps) chi.Router {
 	r := chi.NewRouter()
 	h := &handlers{d: d}
 
-	r.Route("/entities", func(r chi.Router) {
-		r.Get("/self", h.getSelf)
-		r.Put("/self", h.putSelf)
+	// Identity endpoints — caller's own profile.
+	r.Get("/self", h.getSelf)
+	r.Put("/self", h.putSelf)
 
+	r.Route("/entities", func(r chi.Router) {
 		r.Post("/natural-persons", h.createNaturalPerson)
 		r.Get("/natural-persons/{uuid}", h.getNaturalPerson)
 		r.Put("/natural-persons/{uuid}", h.updateNaturalPerson)

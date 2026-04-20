@@ -28,14 +28,14 @@ func buildNaturalPersonProfile(givenName, familyName string) service.Profile {
 	}
 }
 
-// --- GET /entities/self ---
+// --- GET /self ---
 
 func TestGetSelf_401_WhenNoPrincipal(t *testing.T) {
 	ext := &fakePrincipalExtractor{ok: false}
 	d := buildTestDeps(ext, &fakeEntityService{}, nil, nil, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodGet, "/entities/self", nil)
+	req := httptest.NewRequest(http.MethodGet, "/self", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -51,7 +51,7 @@ func TestGetSelf_200_HappyPath(t *testing.T) {
 	d := buildTestDeps(ext, entSvc, nil, nil, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodGet, "/entities/self", nil)
+	req := httptest.NewRequest(http.MethodGet, "/self", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -71,7 +71,7 @@ func TestGetSelf_200_HappyPath(t *testing.T) {
 	}
 }
 
-// --- PUT /entities/self ---
+// --- PUT /self ---
 
 func TestPutSelf_400_BadJSON(t *testing.T) {
 	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, EntityID: 1}, ok: true}
@@ -81,7 +81,7 @@ func TestPutSelf_400_BadJSON(t *testing.T) {
 	d := buildTestDeps(ext, entSvc, npSvc, nil, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodPut, "/entities/self", bytes.NewBufferString("not-json{{{"))
+	req := httptest.NewRequest(http.MethodPut, "/self", bytes.NewBufferString("not-json{{{"))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -97,7 +97,7 @@ func TestPutSelf_401_WhenNoPrincipal(t *testing.T) {
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"given_name": "Bob"})
-	req := httptest.NewRequest(http.MethodPut, "/entities/self", bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPut, "/self", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
