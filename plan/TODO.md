@@ -29,13 +29,13 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
   - [x] 3.10 `make migrate.hash` on composed dir
   - [x] 3.11 `make test` green in both modules
 
-- [ ] **Phase 4 — Build core-module/api** (depends on: 2)
-  - [ ] 4.1 Define `core-module/api/audit` package (Writer interface)
-  - [ ] 4.2 Define `core-module/api/service/principal.go` (Principal + PrincipalExtractor)
-  - [ ] 4.3 Implement entity services in `core-module/api/service/` (tx-accepting CRUD for each)
-  - [ ] 4.4 Implement `core-module/api/httpapi` (NewRouter + handlers)
-  - [ ] 4.5 Unit tests (service tx/audit, httpapi auth paths)
-  - [ ] 4.6 OpenAPI fragment `core-module/api/openapi.fragment.yaml`
+- [x] **Phase 4 — Build core-module/api** (depends on: 2)
+  - [x] 4.1 Define `core-module/api/audit` package (Writer interface)
+  - [x] 4.2 Define `core-module/api/service/principal.go` (Principal + PrincipalExtractor)
+  - [x] 4.3 Implement entity services in `core-module/api/service/` (tx-accepting CRUD for each)
+  - [x] 4.4 Implement `core-module/api/httpapi` (NewRouter + handlers)
+  - [x] 4.5 Unit tests (service tx/audit, httpapi auth paths) — coverage service 77.1%, httpapi 71.7%
+  - [x] 4.6 OpenAPI fragment `core-module/api/openapi.fragment.yaml`
 
 - [ ] **Phase 5 — Wire users-module/api to consume core-module/api** (depends on: 4 and 3)
   - [ ] 5.1 Add `require github.com/moduleforge/core-api` to users-module/api/go.mod
