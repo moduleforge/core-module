@@ -12,39 +12,34 @@ import (
 )
 
 type Corporation struct {
-	ID            int64              `json:"id"`
-	LegalEntityID int64              `json:"legal_entity_id"`
-	LegalName     string             `json:"legal_name"`
-	Jurisdiction  pgtype.Text        `json:"jurisdiction"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID           int64              `json:"id"`
+	EntityID     int64              `json:"entity_id"`
+	LegalName    string             `json:"legal_name"`
+	Jurisdiction pgtype.Text        `json:"jurisdiction"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Entity struct {
-	ID         int64              `json:"id"`
-	Uuid       uuid.UUID          `json:"uuid"`
-	Kind       string             `json:"kind"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	ArchivedAt *time.Time         `json:"archived_at"`
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	FundamentalTypeID int64              `json:"fundamental_type_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt        *time.Time         `json:"archived_at"`
 }
 
 type LegalEntity struct {
-	ID          int64              `json:"id"`
-	EntityID    int64              `json:"entity_id"`
-	Kind        string             `json:"kind"`
-	DisplayName string             `json:"display_name"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	EntityID int64 `json:"entity_id"`
 }
 
 type NaturalPerson struct {
-	ID            int64              `json:"id"`
-	LegalEntityID int64              `json:"legal_entity_id"`
-	GivenName     pgtype.Text        `json:"given_name"`
-	FamilyName    pgtype.Text        `json:"family_name"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID         int64              `json:"id"`
+	EntityID   int64              `json:"entity_id"`
+	GivenName  pgtype.Text        `json:"given_name"`
+	FamilyName pgtype.Text        `json:"family_name"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ServiceAccount struct {
@@ -53,4 +48,15 @@ type ServiceAccount struct {
 	Label     string             `json:"label"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Type struct {
+	ID           int64              `json:"id"`
+	Slug         string             `json:"slug"`
+	ParentID     pgtype.Int8        `json:"parent_id"`
+	Concrete     bool               `json:"concrete"`
+	Name         string             `json:"name"`
+	Description  pgtype.Text        `json:"description"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeprecatedAt *time.Time         `json:"deprecated_at"`
 }

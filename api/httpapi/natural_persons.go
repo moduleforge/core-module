@@ -13,9 +13,8 @@ import (
 
 // createNaturalPersonRequest is the body for POST /entities/natural-persons.
 type createNaturalPersonRequest struct {
-	GivenName   string `json:"given_name"`
-	FamilyName  string `json:"family_name"`
-	DisplayName string `json:"display_name"`
+	GivenName  string `json:"given_name"`
+	FamilyName string `json:"family_name"`
 }
 
 // createNaturalPerson handles POST /entities/natural-persons (admin only).
@@ -37,9 +36,8 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	in := service.CreateNaturalPersonInput{
-		GivenName:   req.GivenName,
-		FamilyName:  req.FamilyName,
-		DisplayName: req.DisplayName,
+		GivenName:  req.GivenName,
+		FamilyName: req.FamilyName,
 	}
 
 	// Multi-table create: open a tx, pass tx-scoped querier to the service.

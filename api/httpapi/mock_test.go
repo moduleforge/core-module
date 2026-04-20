@@ -37,12 +37,21 @@ type fakeEntityService struct {
 	err     error
 }
 
-func (f *fakeEntityService) GetByUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (coredb.Entity, error) {
+func (f *fakeEntityService) GetByUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
 	return f.profile.Entity, f.err
 }
 
-func (f *fakeEntityService) GetByID(_ context.Context, _ coredb.Querier, _ int64) (coredb.Entity, error) {
-	return f.profile.Entity, f.err
+func (f *fakeEntityService) GetByID(_ context.Context, _ coredb.Querier, _ int64) (coredb.GetEntityByIDRow, error) {
+	row := coredb.GetEntityByIDRow{
+		ID:                  f.profile.Entity.ID,
+		Uuid:                f.profile.Entity.Uuid,
+		FundamentalTypeID:   f.profile.Entity.FundamentalTypeID,
+		FundamentalTypeSlug: f.profile.Entity.FundamentalTypeSlug,
+		CreatedAt:           f.profile.Entity.CreatedAt,
+		UpdatedAt:           f.profile.Entity.UpdatedAt,
+		ArchivedAt:          f.profile.Entity.ArchivedAt,
+	}
+	return row, f.err
 }
 
 func (f *fakeEntityService) GetSelf(_ context.Context, _ coredb.Querier, _ service.Principal) (service.Profile, error) {
@@ -125,12 +134,12 @@ var _ service.ServiceAccountServicer = (*fakeServiceAccountService)(nil)
 // fakeLegalEntityService satisfies the interface but is unused in handler tests.
 type fakeLegalEntityService struct{}
 
-func (f *fakeLegalEntityService) GetByEntityID(_ context.Context, _ coredb.Querier, _ int64) (coredb.LegalEntity, error) {
-	return coredb.LegalEntity{}, nil
+func (f *fakeLegalEntityService) GetByEntityID(_ context.Context, _ coredb.Querier, _ int64) (int64, error) {
+	return 0, nil
 }
 
-func (f *fakeLegalEntityService) Create(_ context.Context, _ coredb.Querier, _ coredb.CreateLegalEntityParams) (coredb.LegalEntity, error) {
-	return coredb.LegalEntity{}, nil
+func (f *fakeLegalEntityService) Create(_ context.Context, _ coredb.Querier, _ int64) (int64, error) {
+	return 0, nil
 }
 
 var _ service.LegalEntityServicer = (*fakeLegalEntityService)(nil)

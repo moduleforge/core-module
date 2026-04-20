@@ -7,8 +7,10 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const archiveEntity = `-- name: ArchiveEntity :exec
@@ -23,18 +25,18 @@ func (q *Queries) ArchiveEntity(ctx context.Context, argUuid uuid.UUID) error {
 }
 
 const createEntity = `-- name: CreateEntity :one
-INSERT INTO entities (kind)
+INSERT INTO entities (fundamental_type_id)
 VALUES ($1)
-RETURNING id, uuid, kind, created_at, updated_at, archived_at
+RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at
 `
 
-func (q *Queries) CreateEntity(ctx context.Context, kind string) (Entity, error) {
-	row := q.db.QueryRow(ctx, createEntity, kind)
+func (q *Queries) CreateEntity(ctx context.Context, fundamentalTypeID int64) (Entity, error) {
+	row := q.db.QueryRow(ctx, createEntity, fundamentalTypeID)
 	var i Entity
 	err := row.Scan(
 		&i.ID,
 		&i.Uuid,
-		&i.Kind,
+		&i.FundamentalTypeID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -43,18 +45,33 @@ func (q *Queries) CreateEntity(ctx context.Context, kind string) (Entity, error)
 }
 
 const getEntityByID = `-- name: GetEntityByID :one
-SELECT id, uuid, kind, created_at, updated_at, archived_at
-FROM entities
-WHERE id = $1
+SELECT
+  e.id, e.uuid, e.fundamental_type_id,
+  t.slug AS fundamental_type_slug,
+  e.created_at, e.updated_at, e.archived_at
+FROM entities e
+JOIN types t ON e.fundamental_type_id = t.id
+WHERE e.id = $1
 `
 
-func (q *Queries) GetEntityByID(ctx context.Context, id int64) (Entity, error) {
+type GetEntityByIDRow struct {
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	FundamentalTypeID   int64              `json:"fundamental_type_id"`
+	FundamentalTypeSlug string             `json:"fundamental_type_slug"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt          *time.Time         `json:"archived_at"`
+}
+
+func (q *Queries) GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error) {
 	row := q.db.QueryRow(ctx, getEntityByID, id)
-	var i Entity
+	var i GetEntityByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Uuid,
-		&i.Kind,
+		&i.FundamentalTypeID,
+		&i.FundamentalTypeSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -63,18 +80,33 @@ func (q *Queries) GetEntityByID(ctx context.Context, id int64) (Entity, error) {
 }
 
 const getEntityByUUID = `-- name: GetEntityByUUID :one
-SELECT id, uuid, kind, created_at, updated_at, archived_at
-FROM entities
-WHERE uuid = $1
+SELECT
+  e.id, e.uuid, e.fundamental_type_id,
+  t.slug AS fundamental_type_slug,
+  e.created_at, e.updated_at, e.archived_at
+FROM entities e
+JOIN types t ON e.fundamental_type_id = t.id
+WHERE e.uuid = $1
 `
 
-func (q *Queries) GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (Entity, error) {
+type GetEntityByUUIDRow struct {
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	FundamentalTypeID   int64              `json:"fundamental_type_id"`
+	FundamentalTypeSlug string             `json:"fundamental_type_slug"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	ArchivedAt          *time.Time         `json:"archived_at"`
+}
+
+func (q *Queries) GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error) {
 	row := q.db.QueryRow(ctx, getEntityByUUID, argUuid)
-	var i Entity
+	var i GetEntityByUUIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Uuid,
-		&i.Kind,
+		&i.FundamentalTypeID,
+		&i.FundamentalTypeSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,

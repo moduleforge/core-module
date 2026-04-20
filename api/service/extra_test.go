@@ -14,10 +14,25 @@ func TestEntityService_GetByID_NotFound(t *testing.T) {
 	q := newMockQuerier()
 	svc := &EntityService{aw: &mockAuditWriter{}}
 
-	// GetByID always returns ErrNotFound in current impl (no sqlc query for it).
 	_, err := svc.GetByID(context.Background(), q, 9999)
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestEntityService_GetByID_Found(t *testing.T) {
+	q := newMockQuerier()
+	svc := &EntityService{aw: &mockAuditWriter{}}
+
+	entityUUID := q.seedNaturalPerson("Hank", "Williams")
+	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
+
+	row, err := svc.GetByID(context.Background(), q, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: unexpected error: %v", err)
+	}
+	if row.ID != entity.ID {
+		t.Errorf("ID mismatch: got %d, want %d", row.ID, entity.ID)
 	}
 }
 

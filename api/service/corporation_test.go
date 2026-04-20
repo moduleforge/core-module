@@ -80,7 +80,6 @@ func TestCorporationService_GetByEntityUUID_Found(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	// Seed corporation into legals map by entity ID.
 	profile, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
 	if err != nil {
 		t.Fatalf("GetByEntityUUID: %v", err)

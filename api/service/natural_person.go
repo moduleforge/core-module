@@ -15,9 +15,9 @@ import (
 
 // CreateNaturalPersonInput carries the fields required to create a natural person.
 type CreateNaturalPersonInput struct {
-	GivenName   string
-	FamilyName  string
-	DisplayName string // optional; defaults to GivenName + " " + FamilyName
+	GivenName  string
+	FamilyName string
+	// DisplayName is no longer stored; display is derived via the display registry.
 }
 
 // UpdateNaturalPersonInput carries the fields that may be updated on a natural person.
@@ -65,29 +65,26 @@ func (s *NaturalPersonService) Create(
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
 	}
 
-	displayName := in.DisplayName
-	if displayName == "" {
-		displayName = in.GivenName + " " + in.FamilyName
+	// Resolve the type ID for 'natural_person' from the registry.
+	t, err := q.GetTypeBySlug(ctx, "natural_person")
+	if err != nil {
+		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create resolve type: %w", err)
 	}
 
-	entity, err := q.CreateEntity(ctx, "legal_entity")
+	entity, err := q.CreateEntity(ctx, t.ID)
 	if err != nil {
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create entity: %w", err)
 	}
 
-	le, err := q.CreateLegalEntity(ctx, coredb.CreateLegalEntityParams{
-		EntityID:    entity.ID,
-		Kind:        "natural_person",
-		DisplayName: displayName,
-	})
+	_, err = q.CreateLegalEntity(ctx, entity.ID)
 	if err != nil {
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create legal_entity: %w", err)
 	}
 
 	np, err := q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
-		LegalEntityID: le.ID,
-		GivenName:     pgtype.Text{String: in.GivenName, Valid: true},
-		FamilyName:    pgtype.Text{String: in.FamilyName, Valid: true},
+		EntityID:   entity.ID,
+		GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
+		FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
 	})
 	if err != nil {
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create natural_person: %w", err)
@@ -118,7 +115,6 @@ func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Que
 	if err != nil {
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID profile: %w", err)
 	}
-	profile.Entity = entity
 	return profile, nil
 }
 
@@ -144,15 +140,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 		return ErrForbidden
 	}
 
-	le, err := q.GetLegalEntityByEntityID(ctx, entity.ID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return ErrNotFound
-		}
-		return fmt.Errorf("natural_person.UpdateByEntityUUID legal_entity: %w", err)
-	}
-
-	np, err := q.GetNaturalPersonByLegalEntityID(ctx, le.ID)
+	np, err := q.GetNaturalPersonByEntityID(ctx, entity.ID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -175,9 +163,9 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	}
 
 	if err := q.UpdateNaturalPerson(ctx, coredb.UpdateNaturalPersonParams{
-		LegalEntityID: le.ID,
-		GivenName:     gn,
-		FamilyName:    fn,
+		EntityID:   entity.ID,
+		GivenName:  gn,
+		FamilyName: fn,
 	}); err != nil {
 		return fmt.Errorf("natural_person.UpdateByEntityUUID update: %w", err)
 	}

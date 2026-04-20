@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,10 +15,21 @@ import (
 func TestResolveProfileByEntityID_NaturalPerson(t *testing.T) {
 	q := newMockQuerier()
 	entityID := q.nextSeq()
-	leID := q.nextSeq()
-	q.legalEntities[entityID] = coredb.LegalEntity{ID: leID, EntityID: entityID, Kind: "natural_person"}
-	q.naturalPersons[leID] = coredb.NaturalPerson{
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	npTypeID := q.types["natural_person"].ID
+	row := coredb.GetEntityByUUIDRow{
+		ID:                  entityID,
+		Uuid:                uuid.New(),
+		FundamentalTypeID:   npTypeID,
+		FundamentalTypeSlug: "natural_person",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	q.entitiesByID[entityID] = row
+	q.legalEntities[entityID] = entityID
+	q.naturalPersons[entityID] = coredb.NaturalPerson{
 		ID:         q.nextSeq(),
+		EntityID:   entityID,
 		GivenName:  pgtype.Text{String: "Alice", Valid: true},
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
@@ -40,10 +52,21 @@ func TestResolveProfileByEntityID_NaturalPerson(t *testing.T) {
 func TestResolveProfileByEntityID_Corporation(t *testing.T) {
 	q := newMockQuerier()
 	entityID := q.nextSeq()
-	leID := q.nextSeq()
-	q.legalEntities[entityID] = coredb.LegalEntity{ID: leID, EntityID: entityID, Kind: "corporation"}
-	q.corporations[leID] = coredb.Corporation{
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	corpTypeID := q.types["corporation"].ID
+	row := coredb.GetEntityByUUIDRow{
+		ID:                  entityID,
+		Uuid:                uuid.New(),
+		FundamentalTypeID:   corpTypeID,
+		FundamentalTypeSlug: "corporation",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	q.entitiesByID[entityID] = row
+	q.legalEntities[entityID] = entityID
+	q.corporations[entityID] = coredb.Corporation{
 		ID:        q.nextSeq(),
+		EntityID:  entityID,
 		LegalName: "Acme Corp",
 	}
 
@@ -62,6 +85,17 @@ func TestResolveProfileByEntityID_Corporation(t *testing.T) {
 func TestResolveProfileByEntityID_ServiceAccount(t *testing.T) {
 	q := newMockQuerier()
 	entityID := q.nextSeq()
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	saTypeID := q.types["service_account"].ID
+	row := coredb.GetEntityByUUIDRow{
+		ID:                  entityID,
+		Uuid:                uuid.New(),
+		FundamentalTypeID:   saTypeID,
+		FundamentalTypeSlug: "service_account",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	q.entitiesByID[entityID] = row
 	q.serviceAccts[entityID] = coredb.ServiceAccount{
 		ID:       q.nextSeq(),
 		EntityID: entityID,
@@ -198,17 +232,15 @@ func TestLegalEntityService_Create(t *testing.T) {
 	q := newMockQuerier()
 	svc := &LegalEntityService{}
 
-	entity, _ := q.CreateEntity(context.Background(), "legal_entity")
-	le, err := svc.Create(context.Background(), q, coredb.CreateLegalEntityParams{
-		EntityID:    entity.ID,
-		Kind:        "natural_person",
-		DisplayName: "Test User",
-	})
+	// Create an entity with natural_person type first.
+	t1 := q.types["natural_person"]
+	entity, _ := q.CreateEntity(context.Background(), t1.ID)
+	id, err := svc.Create(context.Background(), q, entity.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if le.Kind != "natural_person" {
-		t.Errorf("kind: got %q, want natural_person", le.Kind)
+	if id != entity.ID {
+		t.Errorf("entity_id: got %d, want %d", id, entity.ID)
 	}
 }
 
@@ -219,12 +251,12 @@ func TestLegalEntityService_GetByEntityID_Found(t *testing.T) {
 	entityUUID := q.seedNaturalPerson("Eve", "Gray")
 	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
 
-	le, err := svc.GetByEntityID(context.Background(), q, entity.ID)
+	id, err := svc.GetByEntityID(context.Background(), q, entity.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if le.Kind != "natural_person" {
-		t.Errorf("kind: got %q, want natural_person", le.Kind)
+	if id != entity.ID {
+		t.Errorf("entity_id: got %d, want %d", id, entity.ID)
 	}
 }
 
