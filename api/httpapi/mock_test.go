@@ -1,0 +1,187 @@
+package httpapi
+
+import (
+	"context"
+	"io"
+	"log/slog"
+
+	"github.com/google/uuid"
+
+	"github.com/moduleforge/core-api/service"
+	coredb "github.com/moduleforge/core-model/db"
+)
+
+// --- fake PrincipalExtractor ---
+
+type fakePrincipalExtractor struct {
+	p  *service.Principal
+	ok bool
+}
+
+func (f *fakePrincipalExtractor) FromContext(_ context.Context) (*service.Principal, bool) {
+	return f.p, f.ok
+}
+
+// --- fake audit.Writer ---
+
+type fakeAuditWriter struct{}
+
+func (f *fakeAuditWriter) Write(_ context.Context, _, _ string, _ *int64, _, _ any) error {
+	return nil
+}
+
+// --- fake service implementations ---
+
+type fakeEntityService struct {
+	profile service.Profile
+	err     error
+}
+
+func (f *fakeEntityService) GetByUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (coredb.Entity, error) {
+	return f.profile.Entity, f.err
+}
+
+func (f *fakeEntityService) GetByID(_ context.Context, _ coredb.Querier, _ int64) (coredb.Entity, error) {
+	return f.profile.Entity, f.err
+}
+
+func (f *fakeEntityService) GetSelf(_ context.Context, _ coredb.Querier, _ service.Principal) (service.Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeEntityService) Archive(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.Principal) error {
+	return f.err
+}
+
+func (f *fakeEntityService) ResolveProfile(_ context.Context, _ coredb.Querier, _ uuid.UUID) (service.Profile, error) {
+	return f.profile, f.err
+}
+
+var _ service.EntityServicer = (*fakeEntityService)(nil)
+
+type fakeNaturalPersonService struct {
+	profile    service.Profile
+	createNP   coredb.NaturalPerson
+	createUUID uuid.UUID
+	err        error
+}
+
+func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateNaturalPersonInput) (coredb.NaturalPerson, uuid.UUID, error) {
+	return f.createNP, f.createUUID, f.err
+}
+
+func (f *fakeNaturalPersonService) GetByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (service.Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeNaturalPersonService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateNaturalPersonInput, _ service.Principal) error {
+	return f.err
+}
+
+var _ service.NaturalPersonServicer = (*fakeNaturalPersonService)(nil)
+
+type fakeCorporationService struct {
+	profile    service.Profile
+	createCorp coredb.Corporation
+	createUUID uuid.UUID
+	err        error
+}
+
+func (f *fakeCorporationService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateCorporationInput) (coredb.Corporation, uuid.UUID, error) {
+	return f.createCorp, f.createUUID, f.err
+}
+
+func (f *fakeCorporationService) GetByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (service.Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeCorporationService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateCorporationInput, _ service.Principal) error {
+	return f.err
+}
+
+var _ service.CorporationServicer = (*fakeCorporationService)(nil)
+
+type fakeServiceAccountService struct {
+	profile    service.Profile
+	createSA   coredb.ServiceAccount
+	createUUID uuid.UUID
+	err        error
+}
+
+func (f *fakeServiceAccountService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateServiceAccountInput) (coredb.ServiceAccount, uuid.UUID, error) {
+	return f.createSA, f.createUUID, f.err
+}
+
+func (f *fakeServiceAccountService) GetByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (service.Profile, error) {
+	return f.profile, f.err
+}
+
+func (f *fakeServiceAccountService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateServiceAccountInput, _ service.Principal) error {
+	return f.err
+}
+
+var _ service.ServiceAccountServicer = (*fakeServiceAccountService)(nil)
+
+// fakeLegalEntityService satisfies the interface but is unused in handler tests.
+type fakeLegalEntityService struct{}
+
+func (f *fakeLegalEntityService) GetByEntityID(_ context.Context, _ coredb.Querier, _ int64) (coredb.LegalEntity, error) {
+	return coredb.LegalEntity{}, nil
+}
+
+func (f *fakeLegalEntityService) Create(_ context.Context, _ coredb.Querier, _ coredb.CreateLegalEntityParams) (coredb.LegalEntity, error) {
+	return coredb.LegalEntity{}, nil
+}
+
+var _ service.LegalEntityServicer = (*fakeLegalEntityService)(nil)
+
+// buildTestDeps constructs a Deps with the given service overrides.
+// tb may be nil for tests that do not exercise the transaction path.
+func buildTestDeps(
+	principal *fakePrincipalExtractor,
+	entity *fakeEntityService,
+	np *fakeNaturalPersonService,
+	corp *fakeCorporationService,
+	sa *fakeServiceAccountService,
+) Deps {
+	return buildTestDepsWithTx(principal, entity, np, corp, sa, nil)
+}
+
+// buildTestDepsWithTx is like buildTestDeps but allows a custom TxBeginner.
+func buildTestDepsWithTx(
+	principal *fakePrincipalExtractor,
+	entity *fakeEntityService,
+	np *fakeNaturalPersonService,
+	corp *fakeCorporationService,
+	sa *fakeServiceAccountService,
+	tb TxBeginner,
+) Deps {
+	svcs := &service.Services{}
+	if entity != nil {
+		svcs.Entity = entity
+	}
+	if np != nil {
+		svcs.NaturalPerson = np
+	}
+	if corp != nil {
+		svcs.Corporation = corp
+	}
+	if sa != nil {
+		svcs.ServiceAccount = sa
+	}
+	svcs.LegalEntity = &fakeLegalEntityService{}
+
+	return Deps{
+		Pool:      nil, // acceptable for non-tx tests
+		Tx:        tb,
+		Services:  svcs,
+		Audit:     &fakeAuditWriter{},
+		Principal: principal,
+		Logger:    noopLogger(),
+	}
+}
+
+// noopLogger returns a slog.Logger that discards all output.
+func noopLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError + 1}))
+}
