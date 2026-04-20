@@ -2,13 +2,13 @@
 
 Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
 
-- [ ] **Phase 1 — Bootstrap core-module skeleton** (depends on: none)
-  - [ ] 1.1 Create top-level `user-components/go.work`
-  - [ ] 1.2 Scaffold `core-module/model/` (go.mod, atlas.hcl, sqlc.yaml, Makefile, .gitignore)
-  - [ ] 1.3 Scaffold `core-module/api/` (go.mod, Makefile, empty audit/service/httpapi packages)
-  - [ ] 1.4 Scaffold `core-module/gui/` (package.json, tsconfig, tsup config, empty src/index.ts)
-  - [ ] 1.5 Root `Makefile` with `link-core`, `unlink-core`, aggregated `build` / `test`
-  - [ ] 1.6 Root `README.md` documenting go.work + yalc onboarding
+- [x] **Phase 1 — Bootstrap core-module skeleton** (depends on: none)
+  - [x] 1.1 Create top-level `user-components/go.work`
+  - [x] 1.2 Scaffold `core-module/model/` (go.mod, atlas.hcl, sqlc.yaml, Makefile, .gitignore)
+  - [x] 1.3 Scaffold `core-module/api/` (go.mod, Makefile, empty audit/service/httpapi packages)
+  - [x] 1.4 Scaffold `core-module/gui/` (package.json, tsconfig, tsup config, empty src/index.ts)
+  - [x] 1.5 Root `Makefile` with `link-core`, `unlink-core`, aggregated `build` / `test`
+  - [x] 1.6 Root `README.md` documenting go.work + yalc onboarding
 
 - [ ] **Phase 2 — Extract model** (depends on: 1)
   - [ ] 2.1 Copy migrations 0000–0005 + queries into core-module/model
