@@ -1,0 +1,6 @@
+# Binaries
+*.exe
+*.test
+
+# Go tool output
+/tmp/
