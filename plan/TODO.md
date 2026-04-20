@@ -10,24 +10,24 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
   - [x] 1.5 Root `Makefile` with `link-core`, `unlink-core`, aggregated `build` / `test`
   - [x] 1.6 Root `README.md` documenting go.work + yalc onboarding
 
-- [ ] **Phase 2 — Extract model** (depends on: 1)
-  - [ ] 2.1 Copy migrations 0000–0005 + queries into core-module/model
-  - [ ] 2.2 sqlc build → core-module/model/db/
-  - [ ] 2.3 atlas migrate hash → atlas.sum
-  - [ ] 2.4 Compile-check core-module/model
+- [x] **Phase 2 — Extract model** (depends on: 1)
+  - [x] 2.1 Copy migrations 0000–0005 + queries into core-module/model
+  - [x] 2.2 sqlc build → core-module/model/db/
+  - [x] 2.3 atlas migrate hash → atlas.sum
+  - [x] 2.4 Compile-check core-module/model
 
-- [ ] **Phase 3 — Wire model into users-module, drop duplicates** (depends on: 2)
-  - [ ] 3.1 Add `require github.com/moduleforge/core-model` to users-module/api/go.mod
-  - [ ] 3.2 Switch users-module/api call sites to coredb for core tables
-  - [ ] 3.3 Delete 0000–0005 from users-module/model/migrations
-  - [ ] 3.4 Renumber users-module migrations 0006–0015 → 0100–0109 (git mv)
-  - [ ] 3.5 Delete entity-table query files from users-module/model/queries
-  - [ ] 3.6 Add `compose` Makefile target in users-module/model
-  - [ ] 3.7 Point users-module/model atlas.hcl + sqlc.yaml at composed schema/migrations
-  - [ ] 3.8 Regenerate sqlc (`omit_unused_structs: true`)
-  - [ ] 3.9 Update users-module/api/Dockerfile (go mod download + copy from $GOMODCACHE)
-  - [ ] 3.10 `make migrate.hash` on composed dir
-  - [ ] 3.11 `make test` green in both modules
+- [x] **Phase 3 — Wire model into users-module, drop duplicates** (depends on: 2)
+  - [x] 3.1 Add `require github.com/moduleforge/core-model` to users-module/api/go.mod
+  - [x] 3.2 Switch users-module/api call sites to coredb for core tables
+  - [x] 3.3 Delete 0000–0005 from users-module/model/migrations
+  - [x] 3.4 Renumber users-module migrations 0006–0015 → 0100–0109 (git mv)
+  - [x] 3.5 Delete entity-table query files from users-module/model/queries
+  - [x] 3.6 Add `compose` Makefile target in users-module/model
+  - [x] 3.7 Point users-module/model atlas.hcl + sqlc.yaml at composed schema/migrations
+  - [x] 3.8 Regenerate sqlc (`omit_unused_structs: true`)
+  - [x] 3.9 Update users-module/api/Dockerfile (go mod download + copy from $GOMODCACHE)
+  - [x] 3.10 `make migrate.hash` on composed dir
+  - [x] 3.11 `make test` green in both modules
 
 - [ ] **Phase 4 — Build core-module/api** (depends on: 2)
   - [ ] 4.1 Define `core-module/api/audit` package (Writer interface)
