@@ -12,23 +12,23 @@ import (
 )
 
 const createCorporation = `-- name: CreateCorporation :one
-INSERT INTO corporations (legal_entity_id, legal_name, jurisdiction)
+INSERT INTO corporations (entity_id, legal_name, jurisdiction)
 VALUES ($1, $2, $3)
-RETURNING id, legal_entity_id, legal_name, jurisdiction, created_at, updated_at
+RETURNING id, entity_id, legal_name, jurisdiction, created_at, updated_at
 `
 
 type CreateCorporationParams struct {
-	LegalEntityID int64       `json:"legal_entity_id"`
-	LegalName     string      `json:"legal_name"`
-	Jurisdiction  pgtype.Text `json:"jurisdiction"`
+	EntityID     int64       `json:"entity_id"`
+	LegalName    string      `json:"legal_name"`
+	Jurisdiction pgtype.Text `json:"jurisdiction"`
 }
 
 func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationParams) (Corporation, error) {
-	row := q.db.QueryRow(ctx, createCorporation, arg.LegalEntityID, arg.LegalName, arg.Jurisdiction)
+	row := q.db.QueryRow(ctx, createCorporation, arg.EntityID, arg.LegalName, arg.Jurisdiction)
 	var i Corporation
 	err := row.Scan(
 		&i.ID,
-		&i.LegalEntityID,
+		&i.EntityID,
 		&i.LegalName,
 		&i.Jurisdiction,
 		&i.CreatedAt,
@@ -37,18 +37,18 @@ func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationPa
 	return i, err
 }
 
-const getCorporationByLegalEntityID = `-- name: GetCorporationByLegalEntityID :one
-SELECT id, legal_entity_id, legal_name, jurisdiction, created_at, updated_at
+const getCorporationByEntityID = `-- name: GetCorporationByEntityID :one
+SELECT id, entity_id, legal_name, jurisdiction, created_at, updated_at
 FROM corporations
-WHERE legal_entity_id = $1
+WHERE entity_id = $1
 `
 
-func (q *Queries) GetCorporationByLegalEntityID(ctx context.Context, legalEntityID int64) (Corporation, error) {
-	row := q.db.QueryRow(ctx, getCorporationByLegalEntityID, legalEntityID)
+func (q *Queries) GetCorporationByEntityID(ctx context.Context, entityID int64) (Corporation, error) {
+	row := q.db.QueryRow(ctx, getCorporationByEntityID, entityID)
 	var i Corporation
 	err := row.Scan(
 		&i.ID,
-		&i.LegalEntityID,
+		&i.EntityID,
 		&i.LegalName,
 		&i.Jurisdiction,
 		&i.CreatedAt,
@@ -60,16 +60,16 @@ func (q *Queries) GetCorporationByLegalEntityID(ctx context.Context, legalEntity
 const updateCorporation = `-- name: UpdateCorporation :exec
 UPDATE corporations
 SET legal_name = $2, jurisdiction = $3
-WHERE legal_entity_id = $1
+WHERE entity_id = $1
 `
 
 type UpdateCorporationParams struct {
-	LegalEntityID int64       `json:"legal_entity_id"`
-	LegalName     string      `json:"legal_name"`
-	Jurisdiction  pgtype.Text `json:"jurisdiction"`
+	EntityID     int64       `json:"entity_id"`
+	LegalName    string      `json:"legal_name"`
+	Jurisdiction pgtype.Text `json:"jurisdiction"`
 }
 
 func (q *Queries) UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error {
-	_, err := q.db.Exec(ctx, updateCorporation, arg.LegalEntityID, arg.LegalName, arg.Jurisdiction)
+	_, err := q.db.Exec(ctx, updateCorporation, arg.EntityID, arg.LegalName, arg.Jurisdiction)
 	return err
 }

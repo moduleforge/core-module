@@ -1,17 +1,25 @@
 -- name: CreateEntity :one
-INSERT INTO entities (kind)
+INSERT INTO entities (fundamental_type_id)
 VALUES ($1)
-RETURNING id, uuid, kind, created_at, updated_at, archived_at;
+RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at;
 
 -- name: GetEntityByUUID :one
-SELECT id, uuid, kind, created_at, updated_at, archived_at
-FROM entities
-WHERE uuid = $1;
+SELECT
+  e.id, e.uuid, e.fundamental_type_id,
+  t.slug AS fundamental_type_slug,
+  e.created_at, e.updated_at, e.archived_at
+FROM entities e
+JOIN types t ON e.fundamental_type_id = t.id
+WHERE e.uuid = $1;
 
 -- name: GetEntityByID :one
-SELECT id, uuid, kind, created_at, updated_at, archived_at
-FROM entities
-WHERE id = $1;
+SELECT
+  e.id, e.uuid, e.fundamental_type_id,
+  t.slug AS fundamental_type_slug,
+  e.created_at, e.updated_at, e.archived_at
+FROM entities e
+JOIN types t ON e.fundamental_type_id = t.id
+WHERE e.id = $1;
 
 -- name: ArchiveEntity :exec
 UPDATE entities

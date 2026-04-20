@@ -8,8 +8,10 @@ import (
 )
 
 // Profile is a composite view of any entity with its sub-type data populated.
+// Entity holds the entity row together with its resolved fundamental_type_slug.
+// Kind is populated from Entity.FundamentalTypeSlug for convenience.
 type Profile struct {
-	Entity         coredb.Entity
+	Entity         coredb.GetEntityByUUIDRow
 	Kind           string // "natural_person" | "corporation" | "service_account"
 	NaturalPerson  *coredb.NaturalPerson
 	Corporation    *coredb.Corporation
@@ -17,40 +19,50 @@ type Profile struct {
 }
 
 // ResolveProfileByEntityID loads an entity's sub-type records from the database
-// and returns a populated Profile. This is the logic extracted from
-// users-module's buildEntityInfo helper.
+// and returns a populated Profile. Dispatches via fundamental_type_slug.
 func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID int64) (Profile, error) {
-	// Try legal_entity path first (natural_person + corporation).
-	le, err := q.GetLegalEntityByEntityID(ctx, entityID)
+	entity, err := q.GetEntityByID(ctx, entityID)
 	if err != nil {
-		// Fall through to service_account.
-		sa, saErr := q.GetServiceAccountByEntityID(ctx, entityID)
-		if saErr != nil {
-			return Profile{}, fmt.Errorf("resolve profile: %w", ErrNotFound)
-		}
-		return Profile{
-			Kind:           "service_account",
-			ServiceAccount: &sa,
-		}, nil
+		return Profile{}, fmt.Errorf("resolve profile: entity %d not found: %w", entityID, ErrNotFound)
 	}
 
-	profile := Profile{Kind: le.Kind}
+	profile := Profile{
+		Entity: coredb.GetEntityByUUIDRow{
+			ID:                  entity.ID,
+			Uuid:                entity.Uuid,
+			FundamentalTypeID:   entity.FundamentalTypeID,
+			FundamentalTypeSlug: entity.FundamentalTypeSlug,
+			CreatedAt:           entity.CreatedAt,
+			UpdatedAt:           entity.UpdatedAt,
+			ArchivedAt:          entity.ArchivedAt,
+		},
+		Kind: entity.FundamentalTypeSlug,
+	}
 
-	switch le.Kind {
+	switch entity.FundamentalTypeSlug {
 	case "natural_person":
-		np, err := q.GetNaturalPersonByLegalEntityID(ctx, le.ID)
+		np, err := q.GetNaturalPersonByEntityID(ctx, entity.ID)
 		if err != nil {
 			return Profile{}, fmt.Errorf("resolve profile natural_person: %w", err)
 		}
 		profile.NaturalPerson = &np
+
 	case "corporation":
-		corp, err := q.GetCorporationByLegalEntityID(ctx, le.ID)
+		corp, err := q.GetCorporationByEntityID(ctx, entity.ID)
 		if err != nil {
 			return Profile{}, fmt.Errorf("resolve profile corporation: %w", err)
 		}
 		profile.Corporation = &corp
+
+	case "service_account":
+		sa, err := q.GetServiceAccountByEntityID(ctx, entity.ID)
+		if err != nil {
+			return Profile{}, fmt.Errorf("resolve profile service_account: %w", err)
+		}
+		profile.ServiceAccount = &sa
+
 	default:
-		return Profile{}, fmt.Errorf("resolve profile: unknown legal_entity kind %q", le.Kind)
+		return Profile{}, fmt.Errorf("resolve profile: unknown fundamental_type_slug %q", entity.FundamentalTypeSlug)
 	}
 
 	return profile, nil

@@ -1,9 +1,9 @@
 -- name: CreateLegalEntity :one
-INSERT INTO legal_entities (entity_id, kind, display_name)
-VALUES ($1, $2, $3)
-RETURNING id, entity_id, kind, display_name, created_at, updated_at;
+INSERT INTO legal_entities (entity_id)
+VALUES ($1)
+RETURNING entity_id;
 
 -- name: GetLegalEntityByEntityID :one
-SELECT id, entity_id, kind, display_name, created_at, updated_at
+SELECT entity_id
 FROM legal_entities
 WHERE entity_id = $1;

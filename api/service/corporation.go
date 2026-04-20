@@ -17,7 +17,7 @@ import (
 type CreateCorporationInput struct {
 	LegalName    string
 	Jurisdiction string // optional
-	DisplayName  string // optional; defaults to LegalName
+	// DisplayName is no longer stored; display is derived via the display registry.
 }
 
 // UpdateCorporationInput carries the fields that may be updated on a corporation.
@@ -59,29 +59,26 @@ func (s *CorporationService) Create(
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("%w: legal_name is required", ErrInvalidInput)
 	}
 
-	displayName := in.DisplayName
-	if displayName == "" {
-		displayName = in.LegalName
+	// Resolve the type ID for 'corporation' from the registry.
+	t, err := q.GetTypeBySlug(ctx, "corporation")
+	if err != nil {
+		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create resolve type: %w", err)
 	}
 
-	entity, err := q.CreateEntity(ctx, "legal_entity")
+	entity, err := q.CreateEntity(ctx, t.ID)
 	if err != nil {
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create entity: %w", err)
 	}
 
-	le, err := q.CreateLegalEntity(ctx, coredb.CreateLegalEntityParams{
-		EntityID:    entity.ID,
-		Kind:        "corporation",
-		DisplayName: displayName,
-	})
+	_, err = q.CreateLegalEntity(ctx, entity.ID)
 	if err != nil {
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create legal_entity: %w", err)
 	}
 
 	corp, err := q.CreateCorporation(ctx, coredb.CreateCorporationParams{
-		LegalEntityID: le.ID,
-		LegalName:     in.LegalName,
-		Jurisdiction:  pgtype.Text{String: in.Jurisdiction, Valid: in.Jurisdiction != ""},
+		EntityID:     entity.ID,
+		LegalName:    in.LegalName,
+		Jurisdiction: pgtype.Text{String: in.Jurisdiction, Valid: in.Jurisdiction != ""},
 	})
 	if err != nil {
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create corporation: %w", err)
@@ -111,7 +108,6 @@ func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Queri
 	if err != nil {
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID profile: %w", err)
 	}
-	profile.Entity = entity
 	return profile, nil
 }
 
@@ -136,15 +132,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 		return fmt.Errorf("corporation.UpdateByEntityUUID entity: %w", err)
 	}
 
-	le, err := q.GetLegalEntityByEntityID(ctx, entity.ID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return ErrNotFound
-		}
-		return fmt.Errorf("corporation.UpdateByEntityUUID legal_entity: %w", err)
-	}
-
-	corp, err := q.GetCorporationByLegalEntityID(ctx, le.ID)
+	corp, err := q.GetCorporationByEntityID(ctx, entity.ID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -167,9 +155,9 @@ func (s *CorporationService) UpdateByEntityUUID(
 	}
 
 	if err := q.UpdateCorporation(ctx, coredb.UpdateCorporationParams{
-		LegalEntityID: le.ID,
-		LegalName:     legalName,
-		Jurisdiction:  jurisdiction,
+		EntityID:     entity.ID,
+		LegalName:    legalName,
+		Jurisdiction: jurisdiction,
 	}); err != nil {
 		return fmt.Errorf("corporation.UpdateByEntityUUID update: %w", err)
 	}

@@ -12,23 +12,23 @@ import (
 )
 
 const createNaturalPerson = `-- name: CreateNaturalPerson :one
-INSERT INTO natural_persons (legal_entity_id, given_name, family_name)
+INSERT INTO natural_persons (entity_id, given_name, family_name)
 VALUES ($1, $2, $3)
-RETURNING id, legal_entity_id, given_name, family_name, created_at, updated_at
+RETURNING id, entity_id, given_name, family_name, created_at, updated_at
 `
 
 type CreateNaturalPersonParams struct {
-	LegalEntityID int64       `json:"legal_entity_id"`
-	GivenName     pgtype.Text `json:"given_name"`
-	FamilyName    pgtype.Text `json:"family_name"`
+	EntityID   int64       `json:"entity_id"`
+	GivenName  pgtype.Text `json:"given_name"`
+	FamilyName pgtype.Text `json:"family_name"`
 }
 
 func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error) {
-	row := q.db.QueryRow(ctx, createNaturalPerson, arg.LegalEntityID, arg.GivenName, arg.FamilyName)
+	row := q.db.QueryRow(ctx, createNaturalPerson, arg.EntityID, arg.GivenName, arg.FamilyName)
 	var i NaturalPerson
 	err := row.Scan(
 		&i.ID,
-		&i.LegalEntityID,
+		&i.EntityID,
 		&i.GivenName,
 		&i.FamilyName,
 		&i.CreatedAt,
@@ -37,18 +37,18 @@ func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPers
 	return i, err
 }
 
-const getNaturalPersonByLegalEntityID = `-- name: GetNaturalPersonByLegalEntityID :one
-SELECT id, legal_entity_id, given_name, family_name, created_at, updated_at
+const getNaturalPersonByEntityID = `-- name: GetNaturalPersonByEntityID :one
+SELECT id, entity_id, given_name, family_name, created_at, updated_at
 FROM natural_persons
-WHERE legal_entity_id = $1
+WHERE entity_id = $1
 `
 
-func (q *Queries) GetNaturalPersonByLegalEntityID(ctx context.Context, legalEntityID int64) (NaturalPerson, error) {
-	row := q.db.QueryRow(ctx, getNaturalPersonByLegalEntityID, legalEntityID)
+func (q *Queries) GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (NaturalPerson, error) {
+	row := q.db.QueryRow(ctx, getNaturalPersonByEntityID, entityID)
 	var i NaturalPerson
 	err := row.Scan(
 		&i.ID,
-		&i.LegalEntityID,
+		&i.EntityID,
 		&i.GivenName,
 		&i.FamilyName,
 		&i.CreatedAt,
@@ -60,16 +60,16 @@ func (q *Queries) GetNaturalPersonByLegalEntityID(ctx context.Context, legalEnti
 const updateNaturalPerson = `-- name: UpdateNaturalPerson :exec
 UPDATE natural_persons
 SET given_name = $2, family_name = $3
-WHERE legal_entity_id = $1
+WHERE entity_id = $1
 `
 
 type UpdateNaturalPersonParams struct {
-	LegalEntityID int64       `json:"legal_entity_id"`
-	GivenName     pgtype.Text `json:"given_name"`
-	FamilyName    pgtype.Text `json:"family_name"`
+	EntityID   int64       `json:"entity_id"`
+	GivenName  pgtype.Text `json:"given_name"`
+	FamilyName pgtype.Text `json:"family_name"`
 }
 
 func (q *Queries) UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPersonParams) error {
-	_, err := q.db.Exec(ctx, updateNaturalPerson, arg.LegalEntityID, arg.GivenName, arg.FamilyName)
+	_, err := q.db.Exec(ctx, updateNaturalPerson, arg.EntityID, arg.GivenName, arg.FamilyName)
 	return err
 }

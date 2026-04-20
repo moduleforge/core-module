@@ -46,13 +46,13 @@ func writeServiceErr(w http.ResponseWriter, err error) {
 
 // profileResponse converts a service.Profile into a JSON-serialisable map.
 // Used by entity-CRUD handlers that return the resolved Profile after a
-// mutation or lookup.
+// mutation or lookup. The "kind" JSON key carries the fundamental_type_slug.
 func profileResponse(p service.Profile) map[string]any {
 	resp := map[string]any{
 		"kind": p.Kind,
 	}
 
-	if p.Entity.Uuid != (coredb.Entity{}).Uuid {
+	if p.Entity.Uuid != (coredb.GetEntityByUUIDRow{}).Uuid {
 		resp["uuid"] = p.Entity.Uuid.String()
 	}
 

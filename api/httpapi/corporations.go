@@ -15,7 +15,6 @@ import (
 type createCorporationRequest struct {
 	LegalName    string `json:"legal_name"`
 	Jurisdiction string `json:"jurisdiction"`
-	DisplayName  string `json:"display_name"`
 }
 
 // createCorporation handles POST /entities/corporations (admin only).
@@ -39,7 +38,6 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 	in := service.CreateCorporationInput{
 		LegalName:    req.LegalName,
 		Jurisdiction: req.Jurisdiction,
-		DisplayName:  req.DisplayName,
 	}
 
 	tx, err := h.d.txBeginner().Begin(r.Context())

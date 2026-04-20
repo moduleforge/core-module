@@ -56,7 +56,13 @@ func (s *ServiceAccountService) Create(
 		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("%w: label is required", ErrInvalidInput)
 	}
 
-	entity, err := q.CreateEntity(ctx, "service_account")
+	// Resolve the type ID for 'service_account' from the registry.
+	t, err := q.GetTypeBySlug(ctx, "service_account")
+	if err != nil {
+		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("service_account.Create resolve type: %w", err)
+	}
+
+	entity, err := q.CreateEntity(ctx, t.ID)
 	if err != nil {
 		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("service_account.Create entity: %w", err)
 	}
@@ -93,7 +99,6 @@ func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Qu
 	if err != nil {
 		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID profile: %w", err)
 	}
-	profile.Entity = entity
 	return profile, nil
 }
 

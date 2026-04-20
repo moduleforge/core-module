@@ -22,7 +22,7 @@ func buildNaturalPersonProfile(givenName, familyName string) service.Profile {
 		FamilyName: pgtype.Text{String: familyName, Valid: true},
 	}
 	return service.Profile{
-		Entity:        coredb.Entity{Uuid: entityUUID},
+		Entity:        coredb.GetEntityByUUIDRow{Uuid: entityUUID, FundamentalTypeSlug: "natural_person"},
 		Kind:          "natural_person",
 		NaturalPerson: np,
 	}

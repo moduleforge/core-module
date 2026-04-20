@@ -21,7 +21,7 @@ func buildCorpProfile() service.Profile {
 		Jurisdiction: pgtype.Text{String: "DE", Valid: true},
 	}
 	return service.Profile{
-		Entity:      coredb.Entity{Uuid: entityUUID},
+		Entity:      coredb.GetEntityByUUIDRow{Uuid: entityUUID, FundamentalTypeSlug: "corporation"},
 		Kind:        "corporation",
 		Corporation: corp,
 	}
@@ -31,7 +31,7 @@ func buildSAProfile() service.Profile {
 	entityUUID := uuid.New()
 	sa := &coredb.ServiceAccount{Label: "my-svc"}
 	return service.Profile{
-		Entity:         coredb.Entity{Uuid: entityUUID},
+		Entity:         coredb.GetEntityByUUIDRow{Uuid: entityUUID, FundamentalTypeSlug: "service_account"},
 		Kind:           "service_account",
 		ServiceAccount: sa,
 	}

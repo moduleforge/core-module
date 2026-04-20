@@ -10,47 +10,27 @@ import (
 )
 
 const createLegalEntity = `-- name: CreateLegalEntity :one
-INSERT INTO legal_entities (entity_id, kind, display_name)
-VALUES ($1, $2, $3)
-RETURNING id, entity_id, kind, display_name, created_at, updated_at
+INSERT INTO legal_entities (entity_id)
+VALUES ($1)
+RETURNING entity_id
 `
 
-type CreateLegalEntityParams struct {
-	EntityID    int64  `json:"entity_id"`
-	Kind        string `json:"kind"`
-	DisplayName string `json:"display_name"`
-}
-
-func (q *Queries) CreateLegalEntity(ctx context.Context, arg CreateLegalEntityParams) (LegalEntity, error) {
-	row := q.db.QueryRow(ctx, createLegalEntity, arg.EntityID, arg.Kind, arg.DisplayName)
-	var i LegalEntity
-	err := row.Scan(
-		&i.ID,
-		&i.EntityID,
-		&i.Kind,
-		&i.DisplayName,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) CreateLegalEntity(ctx context.Context, entityID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, createLegalEntity, entityID)
+	var entity_id int64
+	err := row.Scan(&entity_id)
+	return entity_id, err
 }
 
 const getLegalEntityByEntityID = `-- name: GetLegalEntityByEntityID :one
-SELECT id, entity_id, kind, display_name, created_at, updated_at
+SELECT entity_id
 FROM legal_entities
 WHERE entity_id = $1
 `
 
-func (q *Queries) GetLegalEntityByEntityID(ctx context.Context, entityID int64) (LegalEntity, error) {
+func (q *Queries) GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error) {
 	row := q.db.QueryRow(ctx, getLegalEntityByEntityID, entityID)
-	var i LegalEntity
-	err := row.Scan(
-		&i.ID,
-		&i.EntityID,
-		&i.Kind,
-		&i.DisplayName,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	var entity_id int64
+	err := row.Scan(&entity_id)
+	return entity_id, err
 }

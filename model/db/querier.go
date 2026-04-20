@@ -13,16 +13,18 @@ import (
 type Querier interface {
 	ArchiveEntity(ctx context.Context, argUuid uuid.UUID) error
 	CreateCorporation(ctx context.Context, arg CreateCorporationParams) (Corporation, error)
-	CreateEntity(ctx context.Context, kind string) (Entity, error)
-	CreateLegalEntity(ctx context.Context, arg CreateLegalEntityParams) (LegalEntity, error)
+	CreateEntity(ctx context.Context, fundamentalTypeID int64) (Entity, error)
+	CreateLegalEntity(ctx context.Context, entityID int64) (int64, error)
 	CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error)
 	CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error)
-	GetCorporationByLegalEntityID(ctx context.Context, legalEntityID int64) (Corporation, error)
-	GetEntityByID(ctx context.Context, id int64) (Entity, error)
-	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (Entity, error)
-	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (LegalEntity, error)
-	GetNaturalPersonByLegalEntityID(ctx context.Context, legalEntityID int64) (NaturalPerson, error)
+	GetCorporationByEntityID(ctx context.Context, entityID int64) (Corporation, error)
+	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
+	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
+	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error)
+	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (NaturalPerson, error)
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
+	GetTypeByID(ctx context.Context, id int64) (Type, error)
+	GetTypeBySlug(ctx context.Context, slug string) (Type, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
 	UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error
 	UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPersonParams) error
