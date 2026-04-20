@@ -36,57 +36,10 @@ security:
 # ---------------------------------------------------------------------------
 paths:
 
-  # --------------------------------------------------------------------------
-  # /self — caller's own entity record (top-level identity endpoint)
-  # --------------------------------------------------------------------------
-  /self:
-    get:
-      tags: [Entities]
-      operationId: getSelfEntity
-      summary: Get the caller's entity profile
-      description: |
-        Returns the Entity base record plus the resolved subtype
-        (NaturalPerson, Corporation, or ServiceAccount) for the authenticated
-        caller. The `kind` discriminator in the response indicates which
-        subtype fields are present.
-      responses:
-        "200":
-          description: Caller's entity profile.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Profile"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-    put:
-      tags: [Entities]
-      operationId: updateSelfEntity
-      summary: Update the caller's entity profile
-      description: |
-        Updates the mutable fields of the caller's subtype record. For a
-        NaturalPerson this is given_name and family_name; for a Corporation
-        this is legal_name and jurisdiction. ServiceAccounts are not
-        self-editable.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateProfileRequest"
-      responses:
-        "200":
-          description: Updated entity profile.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Profile"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+  # /self is NOT defined here — core-module has no users/auth concept and
+  # cannot compose a meaningful identity response on its own. Consumers
+  # that own a users layer (e.g. users-module) define their own /self and
+  # use core's EntityService.GetSelf helper for the entity portion.
 
   # --------------------------------------------------------------------------
   # /entities/natural-persons — natural person sub-collection

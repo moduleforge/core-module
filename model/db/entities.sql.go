@@ -42,6 +42,26 @@ func (q *Queries) CreateEntity(ctx context.Context, kind string) (Entity, error)
 	return i, err
 }
 
+const getEntityByID = `-- name: GetEntityByID :one
+SELECT id, uuid, kind, created_at, updated_at, archived_at
+FROM entities
+WHERE id = $1
+`
+
+func (q *Queries) GetEntityByID(ctx context.Context, id int64) (Entity, error) {
+	row := q.db.QueryRow(ctx, getEntityByID, id)
+	var i Entity
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.Kind,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const getEntityByUUID = `-- name: GetEntityByUUID :one
 SELECT id, uuid, kind, created_at, updated_at, archived_at
 FROM entities

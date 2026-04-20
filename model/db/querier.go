@@ -18,6 +18,7 @@ type Querier interface {
 	CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error)
 	CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error)
 	GetCorporationByLegalEntityID(ctx context.Context, legalEntityID int64) (Corporation, error)
+	GetEntityByID(ctx context.Context, id int64) (Entity, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (Entity, error)
 	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (LegalEntity, error)
 	GetNaturalPersonByLegalEntityID(ctx context.Context, legalEntityID int64) (NaturalPerson, error)

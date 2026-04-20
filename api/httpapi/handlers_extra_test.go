@@ -281,26 +281,6 @@ func TestGetServiceAccount_200(t *testing.T) {
 	}
 }
 
-// --- PUT /self (non natural_person) ---
-
-func TestPutSelf_400_NotNaturalPerson(t *testing.T) {
-	profile := buildCorpProfile()
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, EntityID: 1}, ok: true}
-	entSvc := &fakeEntityService{profile: profile}
-	d := buildTestDeps(ext, entSvc, nil, nil, nil)
-	router := NewRouter(d)
-
-	body, _ := json.Marshal(map[string]string{"given_name": "X"})
-	req := httptest.NewRequest(http.MethodPut, "/self", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("status: got %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-}
-
 // --- profileResponse SA branch ---
 
 func TestProfileResponse_ServiceAccount(t *testing.T) {

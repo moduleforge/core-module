@@ -8,6 +8,11 @@ SELECT id, uuid, kind, created_at, updated_at, archived_at
 FROM entities
 WHERE uuid = $1;
 
+-- name: GetEntityByID :one
+SELECT id, uuid, kind, created_at, updated_at, archived_at
+FROM entities
+WHERE id = $1;
+
 -- name: ArchiveEntity :exec
 UPDATE entities
 SET archived_at = now()
