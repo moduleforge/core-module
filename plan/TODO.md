@@ -57,15 +57,15 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
   - [ ] 6.7 Update users-module/gui Tailwind content glob
   - [ ] 6.8 Visual smoke test (/profile, /admin/users/[uuid])
 
-- [ ] **Phase 7 — Verification + cleanup** (depends on: all)
-  - [ ] 7.1 make test green in all six packages
-  - [ ] 7.2 make dev.start full smoke
-  - [ ] 7.3 atlas migrate status shows 0000–0005 then 0100–0109
-  - [ ] 7.4 grep confirms no natural_persons/legal_entities in users-module/api/internal/handlers
-  - [ ] 7.5 No sqlc-generated delta in users-module/model after clean rebuild
-  - [ ] 7.6 Audit log entries correct for profile edits via core handlers
-  - [ ] 7.7 Update users-module CLAUDE.md / summary.md noting core-module dependency
-  - [ ] 7.8 Archive/mark-superseded any prior schema-only plan content
+- [~] **Phase 7 — Verification + cleanup** (depends on: all)
+  - [x] 7.1 make test green in all six packages
+  - [ ] 7.2 make dev.start full smoke — **manual, pending user**
+  - [ ] 7.3 atlas migrate status shows 0000–0005 then 0100–0109 — **manual, pending user (needs live DB)**
+  - [x] 7.4 grep confirms no natural_persons/legal_entities in users-module/api/internal/handlers
+  - [x] 7.5 No sqlc-generated delta in users-module/model after clean rebuild
+  - [ ] 7.6 Audit log entries correct for profile edits via core handlers — **manual, pending user (needs live DB)**
+  - [x] 7.7 Update users-module CLAUDE.md / summary.md noting core-module dependency
+  - [x] 7.8 Archive/mark-superseded any prior schema-only plan content (superseded by summary.md rewrite in Phase 1)
 
 ## Reports
 
