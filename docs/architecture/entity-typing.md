@@ -1,0 +1,100 @@
+# Entity typing in core-module
+
+## 1. Motivation
+
+The original schema encoded entity subtypes with inline `CHECK (kind IN (...))` text columns on `entities` and `legal_entities`. This hardcoded the set of legal subtypes in core migrations, so any downstream module wanting to add its own subtype had to edit core. That approach defeats the purpose of a reusable foundation.
+
+The fix: replace the ad-hoc discriminator columns with a first-class `types` table acting as an append-only registry. Core defines its own types. Downstream modules declare theirs via their own migrations — no core edits required.
+
+## 2. Concepts
+
+**Entity** is the abstract root. Every object in the system is an entity stored in the `entities` table.
+
+**Fundamental type** is the type assigned to an entity at creation. It lives in the `types` table and is referenced by `entities.fundamental_type_id`. An entity's fundamental type is fixed at creation and cannot change.
+
+**Concrete vs. abstract types** — only concrete types may be assigned to entities. Abstract types serve as shared ancestors in the type hierarchy. For example, `legal_entity` is abstract; `natural_person` and `corporation` are concrete.
+
+**Single-inheritance** — types form a tree rooted at `entity`. Each row in `types` has an optional `parent_id` pointing to its parent type. Ancestry is resolved with a recursive CTE.
+
+## 3. Rigid-designator semantics
+
+An entity's fundamental type is a rigid designator: it fixes "what kind of thing this is" permanently. Two DB-level triggers enforce this:
+
+- **Concrete-check** (`entities_fundamental_type_concrete_check`): fires BEFORE INSERT OR UPDATE OF fundamental_type_id. Looks up the referenced `types` row and rejects the operation if `concrete = false`.
+- **Immutability** (`entities_fundamental_type_immutable`): fires BEFORE UPDATE. Rejects any attempt to change `fundamental_type_id` after the initial INSERT.
+
+This means no migration or application code can retroactively reclassify an entity.
+
+## 4. Append-only registry
+
+The `types` table is append-only per row. New type slugs may be INSERTed; existing rows may not be UPDATEd (except to set/unset `deprecated_at`) and may never be DELETEd. Two triggers enforce this:
+
+```sql
+-- Fires BEFORE DELETE: always raises.
+CREATE TRIGGER types_no_delete
+  BEFORE DELETE ON types
+  FOR EACH ROW EXECUTE FUNCTION types_reject_mutation();
+
+-- Fires BEFORE UPDATE: allows only deprecated_at changes.
+CREATE TRIGGER types_append_only_update
+  BEFORE UPDATE ON types
+  FOR EACH ROW EXECUTE FUNCTION types_reject_mutation();
+```
+
+`deprecated_at` is the single off-ramp: setting it signals that a slug is retired but preserves referential integrity for existing entities.
+
+## 5. Per-module type registration
+
+Each module that introduces new subtypes adds a migration file that INSERTs into the `types` table using a parent lookup by slug:
+
+```sql
+-- Example: registering a downstream 'user_account' type under 'entity'
+INSERT INTO types (slug, parent_id, concrete, name, description)
+SELECT
+  'user_account',
+  id,
+  true,
+  'User Account',
+  'An authenticated access point tied to a Legal Entity.'
+FROM types WHERE slug = 'entity';
+```
+
+Core-module seeds its five built-in types in migrations `0002–0006`. Downstream modules follow the same pattern in their own migrations — no core file is touched.
+
+The `type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT) RETURNS BOOLEAN` helper in `0000_helpers.sql` resolves ancestry via a recursive CTE. Subtype-table triggers use this to assert correct parentage.
+
+## 6. Display-rendering pattern
+
+Each concrete type can expose human-readable strings (name, description) for entities of that type. These are not stored in the DB; they are derived from subtype data at runtime by registered renderers.
+
+The `api/display` package provides a concurrent-safe `Registry`:
+
+```go
+type FieldRenderer func(ctx context.Context, tx pgx.Tx, entityID int64) (string, error)
+
+const (
+    FieldName        = "name"
+    FieldDescription = "description"
+)
+
+reg.Register("natural_person", display.FieldName, func(ctx, tx, entityID) (string, error) {
+    np, _ := q.GetNaturalPersonByEntityID(ctx, entityID)
+    return strings.TrimSpace(np.GivenName.String + " " + np.FamilyName.String), nil
+})
+
+name, err := reg.Render(ctx, tx, entityID, display.FieldName)
+```
+
+Each field is an independent registration. Callers request only the fields they need; there is no "render everything" API. This avoids fetching data the caller does not want and lets new fields be added without modifying existing renderers.
+
+`Render` resolves the entity's `fundamental_type_slug` from the DB, then dispatches to the registered renderer. If no renderer is wired, it returns `ErrRendererNotRegistered` — callers may check with `errors.Is`.
+
+Core-module registers default renderers for `natural_person`, `corporation`, and `service_account` via `service.RegisterBuiltins(reg, q)`. Downstream modules register their own renderers in their service init.
+
+## 7. Why accidental typing is deferred
+
+Role-style relationships (e.g., a user account "acting as" a legal entity) are already modelled as FK links between entity rows. There is no need to tag entities with roles. Tagged accidental typing — where an entity simultaneously belongs to multiple type chains — is deferred until a concrete use case appears. Single fundamental typing covers all current requirements.
+
+## 8. Forward note: type-constrained FKs
+
+Some FK columns should logically only reference entities whose fundamental type descends from a specific ancestor. For example, `user_accounts.account_holder` should only point to entities of a `legal_entity` subtype. This constraint is not yet enforced at the DB layer (it would require a trigger or generated column). It is expected to be enforced at the API service layer in a follow-on phase. The `type_is_or_descends_from` helper is available for that purpose when needed.

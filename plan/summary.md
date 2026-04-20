@@ -76,6 +76,11 @@ core-module/gui exports presentational components. users-module/gui's `/profile`
 
 Each phase runs on its own git worktree/branch. Task branches are carved off only for large, parallelizable tasks.
 
+## Architecture
+
+- [Entity typing](../docs/architecture/entity-typing.md) — type registry, rigid-designator semantics, append-only enforcement, display-rendering pattern.
+- Full index: [`docs/architecture.md`](../docs/architecture.md).
+
 ## Supporting documents
 
 - `TODO.md` — live phase/task checklist.
