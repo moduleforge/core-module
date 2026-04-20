@@ -1,0 +1,690 @@
+# ---------------------------------------------------------------------------
+# core-module entities API — OpenAPI 3.0.3 fragment
+#
+# This is a FRAGMENT, not a standalone service spec. It is meant to be
+# composed into a consumer's root spec via $ref. For example:
+#
+#   paths:
+#     /entities/self:
+#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1entities~1self'
+#
+# The fragment intentionally omits `servers:` because the mounting path and
+# host are determined by each consuming service.
+# ---------------------------------------------------------------------------
+
+openapi: "3.0.3"
+
+info:
+  title: core-module entities API
+  version: "0.1.0"
+  description: |
+    Reusable OpenAPI fragment that describes the /entities/* routes owned by
+    core-module. Consuming services (e.g. users-module) compose this fragment
+    into their own root spec via $ref rather than duplicating the definitions.
+
+# ---------------------------------------------------------------------------
+# Default security — all paths require bearerAuth unless overridden with
+# security: [] at the operation level.
+# ---------------------------------------------------------------------------
+security:
+  - bearerAuth: []
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # --------------------------------------------------------------------------
+  # /entities/self — caller's own entity record
+  # --------------------------------------------------------------------------
+  /entities/self:
+    get:
+      tags: [Entities]
+      operationId: getSelfEntity
+      summary: Get the caller's entity profile
+      description: |
+        Returns the Entity base record plus the resolved subtype
+        (NaturalPerson, Corporation, or ServiceAccount) for the authenticated
+        caller. The `kind` discriminator in the response indicates which
+        subtype fields are present.
+      responses:
+        "200":
+          description: Caller's entity profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [Entities]
+      operationId: updateSelfEntity
+      summary: Update the caller's entity profile
+      description: |
+        Updates the mutable fields of the caller's subtype record. For a
+        NaturalPerson this is given_name and family_name; for a Corporation
+        this is legal_name and jurisdiction. ServiceAccounts are not
+        self-editable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated entity profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # --------------------------------------------------------------------------
+  # /entities/natural-persons — natural person sub-collection
+  # --------------------------------------------------------------------------
+  /entities/natural-persons:
+    post:
+      tags: [Entities]
+      operationId: createNaturalPerson
+      summary: Create a natural-person entity (admin)
+      description: |
+        Creates a new Entity of kind `natural_person`, a LegalEntity record,
+        and the associated NaturalPerson subtype record. Requires admin
+        privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNaturalPersonRequest"
+      responses:
+        "201":
+          description: Natural-person entity created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /entities/natural-persons/{uuid}:
+    get:
+      tags: [Entities]
+      operationId: getNaturalPerson
+      summary: Read a natural-person entity
+      description: |
+        Returns the full profile for a natural-person entity. The authenticated
+        caller must be the owner of this entity or have admin privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "200":
+          description: Natural-person profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags: [Entities]
+      operationId: updateNaturalPerson
+      summary: Update a natural-person entity
+      description: |
+        Updates the mutable NaturalPerson fields (given_name, family_name) and
+        the LegalEntity display_name. The authenticated caller must be the
+        owner of this entity or have admin privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNaturalPersonRequest"
+      responses:
+        "200":
+          description: Updated natural-person profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # --------------------------------------------------------------------------
+  # /entities/corporations — corporation sub-collection
+  # --------------------------------------------------------------------------
+  /entities/corporations:
+    post:
+      tags: [Entities]
+      operationId: createCorporation
+      summary: Create a corporation entity (admin)
+      description: |
+        Creates a new Entity of kind `corporation`, a LegalEntity record, and
+        the associated Corporation subtype record. Requires admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCorporationRequest"
+      responses:
+        "201":
+          description: Corporation entity created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /entities/corporations/{uuid}:
+    get:
+      tags: [Entities]
+      operationId: getCorporation
+      summary: Read a corporation entity
+      description: |
+        Returns the full profile for a corporation entity. Available to any
+        authenticated caller.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "200":
+          description: Corporation profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags: [Entities]
+      operationId: updateCorporation
+      summary: Update a corporation entity (admin)
+      description: |
+        Updates the mutable Corporation fields (legal_name, jurisdiction) and
+        the LegalEntity display_name. Requires admin privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCorporationRequest"
+      responses:
+        "200":
+          description: Updated corporation profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # --------------------------------------------------------------------------
+  # /entities/service-accounts — service-account sub-collection
+  # --------------------------------------------------------------------------
+  /entities/service-accounts:
+    post:
+      tags: [Entities]
+      operationId: createServiceAccount
+      summary: Create a service-account entity (admin)
+      description: |
+        Creates a new Entity of kind `service_account` and the associated
+        ServiceAccount subtype record. Requires admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceAccountRequest"
+      responses:
+        "201":
+          description: Service-account entity created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /entities/service-accounts/{uuid}:
+    get:
+      tags: [Entities]
+      operationId: getServiceAccount
+      summary: Read a service-account entity (admin)
+      description: |
+        Returns the full profile for a service-account entity. Requires admin
+        privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "200":
+          description: Service-account profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags: [Entities]
+      operationId: updateServiceAccount
+      summary: Update a service-account entity (admin)
+      description: |
+        Updates the mutable ServiceAccount field (label). Requires admin
+        privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceAccountRequest"
+      responses:
+        "200":
+          description: Updated service-account profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # --------------------------------------------------------------------------
+  # /entities/{uuid} — generic entity lookup and archive
+  # Note: these paths must appear AFTER the fixed sub-collection paths above
+  # so that /entities/self and /entities/natural-persons etc. are not shadowed.
+  # --------------------------------------------------------------------------
+  /entities/{uuid}:
+    get:
+      tags: [Entities]
+      operationId: getEntity
+      summary: Read any entity and resolve its subtype
+      description: |
+        Resolves the entity by UUID, then joins the appropriate subtype table
+        based on the `kind` discriminator. Returns a Profile whose subtype
+        fields match the entity's kind. Available to any authenticated caller.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "200":
+          description: Entity profile with resolved subtype.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Entities]
+      operationId: archiveEntity
+      summary: Archive an entity (admin, soft-delete)
+      description: |
+        Sets `archived_at` on the entity record. The entity remains in the
+        database and can be restored. Requires admin privileges.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "204":
+          description: Entity archived.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+
+  # -------------------------------------------------------------------------
+  # Security schemes
+  # -------------------------------------------------------------------------
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT obtained via any supported auth method (password, email-code,
+        Google OIDC, Microsoft OIDC). Pass as `Authorization: Bearer <token>`.
+
+  # -------------------------------------------------------------------------
+  # Reusable parameters
+  # -------------------------------------------------------------------------
+  parameters:
+    EntityUUID:
+      name: uuid
+      in: path
+      required: true
+      description: External UUID of the entity.
+      schema:
+        type: string
+        format: uuid
+
+  # -------------------------------------------------------------------------
+  # Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+
+    # -- Base types -----------------------------------------------------------
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: not_found
+        message:
+          type: string
+          description: Human-readable error description.
+          example: "entity not found"
+
+    Entity:
+      type: object
+      description: |
+        Base record present for every object in the system. Internal `id` is
+        never serialized; `uuid` is the stable external identifier.
+      required: [uuid, kind, created_at, updated_at]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Stable external identifier.
+        kind:
+          type: string
+          enum: [natural_person, corporation, service_account]
+          description: Discriminator indicating the concrete subtype.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the entity has been soft-deleted.
+
+    LegalEntity:
+      type: object
+      description: |
+        Common fields shared by NaturalPerson and Corporation. A LegalEntity
+        always corresponds to exactly one Entity.
+      required: [kind, display_name]
+      properties:
+        kind:
+          type: string
+          enum: [natural_person, corporation]
+          description: Legal-entity subtype discriminator.
+        display_name:
+          type: string
+          description: Human-readable name suitable for display in a UI.
+
+    NaturalPerson:
+      type: object
+      description: Subtype record for an individual human entity.
+      properties:
+        given_name:
+          type: string
+          nullable: true
+          description: Given (first) name.
+        family_name:
+          type: string
+          nullable: true
+          description: Family (last) name.
+
+    Corporation:
+      type: object
+      description: Subtype record for a corporate or organisational entity.
+      required: [legal_name]
+      properties:
+        legal_name:
+          type: string
+          description: Official registered legal name of the organisation.
+        jurisdiction:
+          type: string
+          nullable: true
+          description: |
+            Jurisdiction of incorporation or registration (e.g. "US-DE",
+            "GB", "CA-ON").
+
+    ServiceAccount:
+      type: object
+      description: |
+        Subtype record for a non-human actor (automated process, integration,
+        etc.). ServiceAccounts are not LegalEntities.
+      required: [label]
+      properties:
+        label:
+          type: string
+          description: Short human-readable identifier for the service account.
+
+    # -- Composite profile response ------------------------------------------
+
+    Profile:
+      type: object
+      description: |
+        Composite response that always includes the Entity base fields plus the
+        resolved subtype. The `kind` field on the Entity acts as a discriminator:
+        when kind is `natural_person` the `natural_person` key is populated;
+        when kind is `corporation` the `corporation` key is populated; when kind
+        is `service_account` the `service_account` key is populated.
+      required: [entity]
+      properties:
+        entity:
+          $ref: "#/components/schemas/Entity"
+        legal_entity:
+          $ref: "#/components/schemas/LegalEntity"
+          description: |
+            Present when kind is `natural_person` or `corporation`; absent for
+            `service_account`.
+          nullable: true
+        natural_person:
+          $ref: "#/components/schemas/NaturalPerson"
+          description: Present only when kind is `natural_person`.
+          nullable: true
+        corporation:
+          $ref: "#/components/schemas/Corporation"
+          description: Present only when kind is `corporation`.
+          nullable: true
+        service_account:
+          $ref: "#/components/schemas/ServiceAccount"
+          description: Present only when kind is `service_account`.
+          nullable: true
+
+    # -- Request bodies -------------------------------------------------------
+
+    UpdateProfileRequest:
+      type: object
+      description: |
+        Generic self-update request. Callers submit only the fields applicable
+        to their entity kind. Unknown fields are ignored.
+        NaturalPerson callers may set given_name and/or family_name.
+        Corporation callers may set legal_name and/or jurisdiction.
+      properties:
+        given_name:
+          type: string
+          nullable: true
+        family_name:
+          type: string
+          nullable: true
+        legal_name:
+          type: string
+          nullable: true
+        jurisdiction:
+          type: string
+          nullable: true
+
+    CreateNaturalPersonRequest:
+      type: object
+      required: [display_name]
+      description: Request body for admin creation of a natural-person entity.
+      properties:
+        display_name:
+          type: string
+          description: Display name stored on the LegalEntity record.
+        given_name:
+          type: string
+          nullable: true
+        family_name:
+          type: string
+          nullable: true
+
+    UpdateNaturalPersonRequest:
+      type: object
+      description: |
+        Mutable fields for a natural-person entity. At least one field must be
+        present. Omitted fields are left unchanged.
+      properties:
+        display_name:
+          type: string
+        given_name:
+          type: string
+          nullable: true
+        family_name:
+          type: string
+          nullable: true
+
+    CreateCorporationRequest:
+      type: object
+      required: [display_name, legal_name]
+      description: Request body for admin creation of a corporation entity.
+      properties:
+        display_name:
+          type: string
+          description: Display name stored on the LegalEntity record.
+        legal_name:
+          type: string
+          description: Official registered legal name.
+        jurisdiction:
+          type: string
+          nullable: true
+
+    UpdateCorporationRequest:
+      type: object
+      description: |
+        Mutable fields for a corporation entity. At least one field must be
+        present. Omitted fields are left unchanged.
+      properties:
+        display_name:
+          type: string
+        legal_name:
+          type: string
+        jurisdiction:
+          type: string
+          nullable: true
+
+    CreateServiceAccountRequest:
+      type: object
+      required: [label]
+      description: Request body for admin creation of a service-account entity.
+      properties:
+        label:
+          type: string
+          description: Short human-readable identifier for the service account.
+
+    UpdateServiceAccountRequest:
+      type: object
+      description: |
+        Mutable fields for a service-account entity. At least one field must be
+        present.
+      properties:
+        label:
+          type: string
+          description: Replacement label for the service account.
+
+  # -------------------------------------------------------------------------
+  # Reusable responses
+  # -------------------------------------------------------------------------
+  responses:
+
+    BadRequest:
+      description: The request body or parameters are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Unauthorized:
+      description: Missing or invalid authentication token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Forbidden:
+      description: Caller lacks the required privileges for this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: The requested entity does not exist or has been archived.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
