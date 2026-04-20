@@ -39,3 +39,19 @@ CREATE TRIGGER types_no_delete
 CREATE TRIGGER types_append_only_update
   BEFORE UPDATE ON types
   FOR EACH ROW EXECUTE FUNCTION types_reject_mutation();
+
+-- type_is_or_descends_from(p_type_id, p_target_slug) — returns TRUE if the
+-- type identified by p_type_id is, or is a descendant of, the type with slug
+-- p_target_slug. Used by subtype BEFORE INSERT triggers to assert ancestry.
+-- Placed here (after CREATE TABLE types) so the SQL-language function can
+-- resolve the types relation at parse time.
+CREATE OR REPLACE FUNCTION type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT)
+RETURNS BOOLEAN AS $$
+WITH RECURSIVE walk AS (
+  SELECT id, slug, parent_id FROM types WHERE id = p_type_id
+  UNION ALL
+  SELECT t.id, t.slug, t.parent_id
+  FROM types t JOIN walk w ON t.id = w.parent_id
+)
+SELECT EXISTS (SELECT 1 FROM walk WHERE slug = p_target_slug);
+$$ LANGUAGE sql STABLE;
