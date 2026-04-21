@@ -9,7 +9,7 @@ import (
 func TestNaturalPersonService_Create_WritesAudit(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
 	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith"}
@@ -45,7 +45,7 @@ func TestNaturalPersonService_Create_WritesAudit(t *testing.T) {
 func TestNaturalPersonService_Create_RequiresAdmin(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 	nonAdmin := Principal{UserID: 2, EntityID: 2, IsAdmin: false}
 
 	_, _, err := svc.Create(context.Background(), q, nonAdmin, CreateNaturalPersonInput{
@@ -62,7 +62,7 @@ func TestNaturalPersonService_Create_RequiresAdmin(t *testing.T) {
 func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 	admin := Principal{IsAdmin: true}
 
 	cases := []struct {
@@ -88,7 +88,7 @@ func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 func TestNaturalPersonService_Update_Forbidden(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 
 	// Seed entity belonging to entity ID 10.
 	entityUUID := q.seedNaturalPerson("Charlie", "Brown")
@@ -108,7 +108,7 @@ func TestNaturalPersonService_Update_Forbidden(t *testing.T) {
 func TestNaturalPersonService_Update_SelfAllowed(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 
 	entityUUID := q.seedNaturalPerson("Dave", "Evans")
 	// Get the entity ID for the seeded entity.
@@ -137,7 +137,7 @@ func TestNaturalPersonService_Update_SelfAllowed(t *testing.T) {
 func TestNaturalPersonService_Update_AdminAllowed(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 
 	entityUUID := q.seedNaturalPerson("Eve", "Foster")
 
@@ -152,7 +152,7 @@ func TestNaturalPersonService_Update_AdminAllowed(t *testing.T) {
 func TestNaturalPersonService_Update_NotFound(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw}
+	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 
 	name := "Bob"
 	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateNaturalPersonInput{GivenName: &name}, Principal{IsAdmin: true})

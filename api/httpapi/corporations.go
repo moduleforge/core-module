@@ -15,6 +15,7 @@ import (
 type createCorporationRequest struct {
 	LegalName    string `json:"legal_name"`
 	Jurisdiction string `json:"jurisdiction"`
+	EIN          string `json:"ein,omitempty"` // optional plaintext; "" means not recorded
 }
 
 // createCorporation handles POST /entities/corporations (admin only).
@@ -38,6 +39,7 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 	in := service.CreateCorporationInput{
 		LegalName:    req.LegalName,
 		Jurisdiction: req.Jurisdiction,
+		EIN:          req.EIN,
 	}
 
 	tx, err := h.d.txBeginner().Begin(r.Context())
@@ -61,16 +63,23 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusCreated, map[string]any{
+	resp := map[string]any{
 		"uuid":         entityUUID.String(),
+		"kind":         "corporation",
 		"legal_name":   corp.LegalName,
 		"jurisdiction": corp.Jurisdiction.String,
-	})
+	}
+	// Admin callers always see the tax_id they just wrote, if one was supplied.
+	if req.EIN != "" {
+		resp["tax_id"] = req.EIN
+		resp["tax_id_type"] = "EIN"
+	}
+	jsonOK(w, http.StatusCreated, resp)
 }
 
 // getCorporation handles GET /entities/corporations/{uuid}.
 func (h *handlers) getCorporation(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.d.Principal.FromContext(r.Context())
+	p, ok := h.d.Principal.FromContext(r.Context())
 	if !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
@@ -88,13 +97,16 @@ func (h *handlers) getCorporation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
 }
 
 // updateCorporationRequest is the body for PUT /entities/corporations/{uuid}.
+// EIN uses three-state semantics: nil (field absent) = unchanged, pointer-to-""
+// = clear, non-empty pointer = set.
 type updateCorporationRequest struct {
 	LegalName    *string `json:"legal_name"`
 	Jurisdiction *string `json:"jurisdiction"`
+	EIN          *string `json:"ein"` // nil = unchanged, "" = clear, else set
 }
 
 // updateCorporation handles PUT /entities/corporations/{uuid} (admin only).
@@ -120,6 +132,7 @@ func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 	in := service.UpdateCorporationInput{
 		LegalName:    req.LegalName,
 		Jurisdiction: req.Jurisdiction,
+		EIN:          req.EIN,
 	}
 
 	if err := h.d.Services.Corporation.UpdateByEntityUUID(
@@ -139,5 +152,5 @@ func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
 }

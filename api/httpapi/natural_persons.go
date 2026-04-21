@@ -15,6 +15,7 @@ import (
 type createNaturalPersonRequest struct {
 	GivenName  string `json:"given_name"`
 	FamilyName string `json:"family_name"`
+	SSN        string `json:"ssn,omitempty"` // optional plaintext; "" means not recorded
 }
 
 // createNaturalPerson handles POST /entities/natural-persons (admin only).
@@ -38,6 +39,7 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	in := service.CreateNaturalPersonInput{
 		GivenName:  req.GivenName,
 		FamilyName: req.FamilyName,
+		SSN:        req.SSN,
 	}
 
 	// Multi-table create: open a tx, pass tx-scoped querier to the service.
@@ -62,11 +64,18 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusCreated, map[string]any{
+	resp := map[string]any{
 		"uuid":        entityUUID.String(),
+		"kind":        "natural_person",
 		"given_name":  np.GivenName.String,
 		"family_name": np.FamilyName.String,
-	})
+	}
+	// Admin callers always see the tax_id they just wrote, if one was supplied.
+	if req.SSN != "" {
+		resp["tax_id"] = req.SSN
+		resp["tax_id_type"] = "SSN"
+	}
+	jsonOK(w, http.StatusCreated, resp)
 }
 
 // getNaturalPerson handles GET /entities/natural-persons/{uuid}.
@@ -95,13 +104,16 @@ func (h *handlers) getNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
 }
 
 // updateNaturalPersonRequest is the body for PUT /entities/natural-persons/{uuid}.
+// SSN uses three-state semantics: nil (field absent) = unchanged, pointer-to-""
+// = clear, non-empty pointer = set.
 type updateNaturalPersonRequest struct {
 	GivenName  *string `json:"given_name"`
 	FamilyName *string `json:"family_name"`
+	SSN        *string `json:"ssn"` // nil = unchanged, "" = clear, else set
 }
 
 // updateNaturalPerson handles PUT /entities/natural-persons/{uuid}.
@@ -127,6 +139,7 @@ func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	in := service.UpdateNaturalPersonInput{
 		GivenName:  req.GivenName,
 		FamilyName: req.FamilyName,
+		SSN:        req.SSN,
 	}
 
 	if err := h.d.Services.NaturalPerson.UpdateByEntityUUID(
@@ -146,5 +159,5 @@ func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
 }

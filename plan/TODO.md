@@ -67,6 +67,14 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked
   - [x] 7.7 Update users-module CLAUDE.md / summary.md noting core-module dependency
   - [x] 7.8 Archive/mark-superseded any prior schema-only plan content (superseded by summary.md rewrite in Phase 1)
 
+- [x] **Phase 8 — Tax ID (SSN/EIN) with at-rest encryption** (depends on: 4)
+  - [x] 8.1 fieldcrypto package (AES-256-GCM helpers, tests)
+  - [x] 8.2 Migrations 0012 (natural_persons.ssn BYTEA) and 0013 (corporations.ein BYTEA)
+  - [x] 8.3 Update queries + sqlc regen
+  - [x] 8.4 Service layer: encrypt/decrypt wiring + LegalEntity GetTaxID abstract accessor
+  - [x] 8.5 httpapi request/response + admin-or-self gate + OpenAPI fragment
+  - [x] 8.6 Integration tests + report.phase8.md — live-DB round-trip pending
+
 ## Reports
 
 Drop progress notes into `report.<N>.<topic>.md` in this directory as work proceeds.

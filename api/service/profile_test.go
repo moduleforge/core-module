@@ -124,7 +124,7 @@ func TestResolveProfileByEntityID_NotFound(t *testing.T) {
 
 func TestNaturalPersonService_GetByEntityUUID_Found(t *testing.T) {
 	q := newMockQuerier()
-	svc := &NaturalPersonService{aw: &mockAuditWriter{}}
+	svc := &NaturalPersonService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 
 	entityUUID := q.seedNaturalPerson("Bob", "Builder")
 
@@ -142,7 +142,7 @@ func TestNaturalPersonService_GetByEntityUUID_Found(t *testing.T) {
 
 func TestNaturalPersonService_GetByEntityUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	svc := &NaturalPersonService{aw: &mockAuditWriter{}}
+	svc := &NaturalPersonService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 
 	_, err := svc.GetByEntityUUID(context.Background(), q, uuid.New())
 	if err == nil {
@@ -262,7 +262,7 @@ func TestLegalEntityService_GetByEntityID_Found(t *testing.T) {
 
 func TestServices_New(t *testing.T) {
 	aw := &mockAuditWriter{}
-	svcs := New(newMockQuerier(), aw)
+	svcs := New(newMockQuerier(), aw, testCipher(t))
 	if svcs == nil {
 		t.Fatal("expected non-nil Services")
 	}

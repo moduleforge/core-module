@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -21,13 +22,14 @@ type Services struct {
 
 // New constructs a Services aggregate. q is typically coredb.New(pool) and is
 // used as the base querier; callers may pass a tx-scoped querier to individual
-// service methods for multi-table atomicity.
-func New(q coredb.Querier, aw audit.Writer) *Services {
+// service methods for multi-table atomicity. cipher is used to encrypt and
+// decrypt SSN and EIN fields; it must not be nil.
+func New(q coredb.Querier, aw audit.Writer, cipher *fieldcrypto.Cipher) *Services {
 	return &Services{
 		Entity:         &EntityService{aw: aw},
-		LegalEntity:    &LegalEntityService{},
-		NaturalPerson:  &NaturalPersonService{aw: aw},
-		Corporation:    &CorporationService{aw: aw},
+		LegalEntity:    &LegalEntityService{cipher: cipher},
+		NaturalPerson:  &NaturalPersonService{aw: aw, cipher: cipher},
+		Corporation:    &CorporationService{aw: aw, cipher: cipher},
 		ServiceAccount: &ServiceAccountService{aw: aw},
 		q:              q,
 	}

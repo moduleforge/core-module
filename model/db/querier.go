@@ -26,7 +26,11 @@ type Querier interface {
 	GetTypeByID(ctx context.Context, id int64) (Type, error)
 	GetTypeBySlug(ctx context.Context, slug string) (Type, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
+	// NOTE: pass NULL for ein to leave it unchanged; pass an empty bytea
+	// to clear it. A non-empty bytea replaces it.
 	UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error
+	// NOTE: pass NULL for ssn to leave it unchanged; pass an empty bytea
+	// ('\x'::bytea / []byte{}) to clear it. A non-empty bytea replaces it.
 	UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPersonParams) error
 }
 

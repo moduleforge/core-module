@@ -18,6 +18,7 @@ type Corporation struct {
 	Jurisdiction pgtype.Text        `json:"jurisdiction"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Ein          []byte             `json:"ein"`
 }
 
 type Entity struct {
@@ -40,6 +41,7 @@ type NaturalPerson struct {
 	FamilyName pgtype.Text        `json:"family_name"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Ssn        []byte             `json:"ssn"`
 }
 
 type ServiceAccount struct {

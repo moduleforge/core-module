@@ -2,14 +2,27 @@ package service
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
+
+// testCipher returns a deterministic Cipher suitable for unit tests.
+// Uses a 32-byte zero key — never use in production.
+func testCipher(t *testing.T) *fieldcrypto.Cipher {
+	t.Helper()
+	c, err := fieldcrypto.NewFromKey(make([]byte, 32))
+	if err != nil {
+		t.Fatalf("testCipher: %v", err)
+	}
+	return c
+}
 
 // --- mock audit.Writer ---
 
@@ -128,6 +141,7 @@ func (m *mockQuerier) CreateCorporation(_ context.Context, arg coredb.CreateCorp
 		EntityID:     arg.EntityID,
 		LegalName:    arg.LegalName,
 		Jurisdiction: arg.Jurisdiction,
+		Ein:          arg.Ein,
 	}
 	m.corporations[arg.EntityID] = corp
 	return corp, nil
@@ -174,6 +188,7 @@ func (m *mockQuerier) CreateNaturalPerson(_ context.Context, arg coredb.CreateNa
 		EntityID:   arg.EntityID,
 		GivenName:  arg.GivenName,
 		FamilyName: arg.FamilyName,
+		Ssn:        arg.Ssn,
 	}
 	m.naturalPersons[arg.EntityID] = np
 	return np, nil
@@ -264,6 +279,10 @@ func (m *mockQuerier) UpdateCorporation(_ context.Context, arg coredb.UpdateCorp
 	if corp, ok := m.corporations[arg.EntityID]; ok {
 		corp.LegalName = arg.LegalName
 		corp.Jurisdiction = arg.Jurisdiction
+		// Mirror COALESCE($4, ein): non-nil arg.Ein replaces; nil leaves unchanged.
+		if arg.Ein != nil {
+			corp.Ein = arg.Ein
+		}
 		m.corporations[arg.EntityID] = corp
 	}
 	return nil
@@ -276,6 +295,10 @@ func (m *mockQuerier) UpdateNaturalPerson(_ context.Context, arg coredb.UpdateNa
 	if np, ok := m.naturalPersons[arg.EntityID]; ok {
 		np.GivenName = arg.GivenName
 		np.FamilyName = arg.FamilyName
+		// Mirror COALESCE($4, ssn): non-nil arg.Ssn replaces; nil leaves unchanged.
+		if arg.Ssn != nil {
+			np.Ssn = arg.Ssn
+		}
 		m.naturalPersons[arg.EntityID] = np
 	}
 	return nil

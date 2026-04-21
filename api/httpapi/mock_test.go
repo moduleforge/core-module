@@ -142,6 +142,10 @@ func (f *fakeLegalEntityService) Create(_ context.Context, _ coredb.Querier, _ i
 	return 0, nil
 }
 
+func (f *fakeLegalEntityService) GetTaxID(_ context.Context, _ coredb.Querier, _ int64) (service.LegalEntityTaxID, error) {
+	return service.LegalEntityTaxID{}, nil
+}
+
 var _ service.LegalEntityServicer = (*fakeLegalEntityService)(nil)
 
 // buildTestDeps constructs a Deps with the given service overrides.

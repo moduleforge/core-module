@@ -509,6 +509,17 @@ components:
           $ref: "#/components/schemas/ServiceAccount"
           description: Present only when kind is `service_account`.
           nullable: true
+        tax_id:
+          type: string
+          description: |
+            Plaintext tax id (SSN for natural persons, EIN for corporations).
+            Present only when the caller is an admin or the subject of the
+            profile. Absent otherwise.
+        tax_id_type:
+          type: string
+          enum: [SSN, EIN]
+          description: |
+            Kind of tax id held. Present only when tax_id is present.
 
     # -- Request bodies -------------------------------------------------------
 
@@ -547,6 +558,11 @@ components:
         family_name:
           type: string
           nullable: true
+        ssn:
+          type: string
+          description: |
+            Optional plaintext Social Security Number. Stored encrypted at rest.
+            Returned on read only to admins or to the subject themselves.
 
     UpdateNaturalPersonRequest:
       type: object
@@ -562,6 +578,14 @@ components:
         family_name:
           type: string
           nullable: true
+        ssn:
+          type: string
+          description: |
+            Optional plaintext Social Security Number. Three-state semantics:
+            omit the field entirely to leave the stored value unchanged;
+            supply an empty string ("") to clear the stored value;
+            supply a non-empty string to set a new value. Stored encrypted at
+            rest. Returned on read only to admins or to the subject themselves.
 
     CreateCorporationRequest:
       type: object
@@ -577,6 +601,12 @@ components:
         jurisdiction:
           type: string
           nullable: true
+        ein:
+          type: string
+          description: |
+            Optional plaintext Employer Identification Number. Stored encrypted
+            at rest. Returned on read only to admins or to the subject
+            themselves.
 
     UpdateCorporationRequest:
       type: object
@@ -591,6 +621,14 @@ components:
         jurisdiction:
           type: string
           nullable: true
+        ein:
+          type: string
+          description: |
+            Optional plaintext Employer Identification Number. Three-state
+            semantics: omit the field entirely to leave the stored value
+            unchanged; supply an empty string ("") to clear the stored value;
+            supply a non-empty string to set a new value. Stored encrypted at
+            rest. Returned on read only to admins or to the subject themselves.
 
     CreateServiceAccountRequest:
       type: object

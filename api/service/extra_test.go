@@ -116,7 +116,7 @@ func TestLegalEntityService_GetByEntityID_NotFound(t *testing.T) {
 
 func TestCorporationService_UpdateByEntityUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	svc := &CorporationService{aw: &mockAuditWriter{}}
+	svc := &CorporationService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 	admin := Principal{IsAdmin: true}
 
 	ln := "X"

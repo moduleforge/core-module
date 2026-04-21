@@ -12,19 +12,25 @@ import (
 )
 
 const createNaturalPerson = `-- name: CreateNaturalPerson :one
-INSERT INTO natural_persons (entity_id, given_name, family_name)
-VALUES ($1, $2, $3)
-RETURNING id, entity_id, given_name, family_name, created_at, updated_at
+INSERT INTO natural_persons (entity_id, given_name, family_name, ssn)
+VALUES ($1, $2, $3, $4)
+RETURNING id, entity_id, given_name, family_name, created_at, updated_at, ssn
 `
 
 type CreateNaturalPersonParams struct {
 	EntityID   int64       `json:"entity_id"`
 	GivenName  pgtype.Text `json:"given_name"`
 	FamilyName pgtype.Text `json:"family_name"`
+	Ssn        []byte      `json:"ssn"`
 }
 
 func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error) {
-	row := q.db.QueryRow(ctx, createNaturalPerson, arg.EntityID, arg.GivenName, arg.FamilyName)
+	row := q.db.QueryRow(ctx, createNaturalPerson,
+		arg.EntityID,
+		arg.GivenName,
+		arg.FamilyName,
+		arg.Ssn,
+	)
 	var i NaturalPerson
 	err := row.Scan(
 		&i.ID,
@@ -33,12 +39,13 @@ func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPers
 		&i.FamilyName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Ssn,
 	)
 	return i, err
 }
 
 const getNaturalPersonByEntityID = `-- name: GetNaturalPersonByEntityID :one
-SELECT id, entity_id, given_name, family_name, created_at, updated_at
+SELECT id, entity_id, given_name, family_name, created_at, updated_at, ssn
 FROM natural_persons
 WHERE entity_id = $1
 `
@@ -53,13 +60,16 @@ func (q *Queries) GetNaturalPersonByEntityID(ctx context.Context, entityID int64
 		&i.FamilyName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Ssn,
 	)
 	return i, err
 }
 
 const updateNaturalPerson = `-- name: UpdateNaturalPerson :exec
 UPDATE natural_persons
-SET given_name = $2, family_name = $3
+SET given_name = $2,
+    family_name = $3,
+    ssn = COALESCE($4, ssn)
 WHERE entity_id = $1
 `
 
@@ -67,9 +77,17 @@ type UpdateNaturalPersonParams struct {
 	EntityID   int64       `json:"entity_id"`
 	GivenName  pgtype.Text `json:"given_name"`
 	FamilyName pgtype.Text `json:"family_name"`
+	Ssn        []byte      `json:"ssn"`
 }
 
+// NOTE: pass NULL for ssn to leave it unchanged; pass an empty bytea
+// ('\x'::bytea / []byte{}) to clear it. A non-empty bytea replaces it.
 func (q *Queries) UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPersonParams) error {
-	_, err := q.db.Exec(ctx, updateNaturalPerson, arg.EntityID, arg.GivenName, arg.FamilyName)
+	_, err := q.db.Exec(ctx, updateNaturalPerson,
+		arg.EntityID,
+		arg.GivenName,
+		arg.FamilyName,
+		arg.Ssn,
+	)
 	return err
 }

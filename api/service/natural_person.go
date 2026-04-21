@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -18,13 +19,16 @@ type CreateNaturalPersonInput struct {
 	GivenName  string
 	FamilyName string
 	// DisplayName is no longer stored; display is derived via the display registry.
+	SSN string // optional plaintext; "" means not recorded
 }
 
 // UpdateNaturalPersonInput carries the fields that may be updated on a natural person.
 // Nil fields are left unchanged.
+// For SSN: nil = leave unchanged; pointer-to-"" = clear; non-empty pointer = set.
 type UpdateNaturalPersonInput struct {
 	GivenName  *string
 	FamilyName *string
+	SSN        *string
 }
 
 // NaturalPersonServicer defines natural person operations available to httpapi handlers.
@@ -36,7 +40,8 @@ type NaturalPersonServicer interface {
 
 // NaturalPersonService implements natural person CRUD with audit logging.
 type NaturalPersonService struct {
-	aw audit.Writer
+	aw     audit.Writer
+	cipher *fieldcrypto.Cipher
 }
 
 // Compile-time assertion.
@@ -81,10 +86,22 @@ func (s *NaturalPersonService) Create(
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create legal_entity: %w", err)
 	}
 
+	var ssnBlob []byte
+	ssnAudit := "unchanged"
+	if strings.TrimSpace(in.SSN) != "" {
+		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
+		if err != nil {
+			return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("encrypt ssn: %w", err)
+		}
+		ssnBlob = blob
+		ssnAudit = "set"
+	}
+
 	np, err := q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
 		EntityID:   entity.ID,
 		GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
 		FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
+		Ssn:        ssnBlob,
 	})
 	if err != nil {
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create natural_person: %w", err)
@@ -95,6 +112,7 @@ func (s *NaturalPersonService) Create(
 		"uuid":        entity.Uuid.String(),
 		"given_name":  in.GivenName,
 		"family_name": in.FamilyName,
+		"ssn":         ssnAudit,
 	})
 
 	return np, entity.Uuid, nil
@@ -102,6 +120,8 @@ func (s *NaturalPersonService) Create(
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
 // Returns ErrNotFound if the entity does not exist.
+// The cipher stored on the service is forwarded to ResolveProfileByEntityID so
+// that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
 	entity, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
@@ -111,7 +131,7 @@ func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Que
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID entity: %w", err)
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID)
+	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID profile: %w", err)
 	}
@@ -151,6 +171,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	before := map[string]any{
 		"given_name":  np.GivenName.String,
 		"family_name": np.FamilyName.String,
+		"ssn":         "unchanged",
 	}
 
 	gn := np.GivenName
@@ -162,10 +183,29 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 		fn = pgtype.Text{String: strings.TrimSpace(*in.FamilyName), Valid: true}
 	}
 
+	// ssnParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
+	var ssnParam []byte
+	ssnAudit := "unchanged"
+	if in.SSN != nil {
+		val := strings.TrimSpace(*in.SSN)
+		if val == "" {
+			ssnParam = []byte{} // clear
+			ssnAudit = "cleared"
+		} else {
+			b, err := s.cipher.Encrypt(val)
+			if err != nil {
+				return fmt.Errorf("encrypt ssn: %w", err)
+			}
+			ssnParam = b
+			ssnAudit = "set"
+		}
+	}
+
 	if err := q.UpdateNaturalPerson(ctx, coredb.UpdateNaturalPersonParams{
 		EntityID:   entity.ID,
 		GivenName:  gn,
 		FamilyName: fn,
+		Ssn:        ssnParam,
 	}); err != nil {
 		return fmt.Errorf("natural_person.UpdateByEntityUUID update: %w", err)
 	}
@@ -173,9 +213,21 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	after := map[string]any{
 		"given_name":  gn.String,
 		"family_name": fn.String,
+		"ssn":         ssnAudit,
 	}
 
 	eid := entity.ID
 	_ = s.aw.Write(ctx, "update", "natural_person", &eid, before, after)
 	return nil
+}
+
+// GetDecryptedSSN returns the plaintext SSN for the given entity.
+// Returns "" if not set. Returns an error only on decrypt failure
+// (i.e. stored blob is corrupt or the key is wrong) — not for NULL.
+func (s *NaturalPersonService) GetDecryptedSSN(ctx context.Context, q coredb.Querier, entityID int64) (string, error) {
+	np, err := q.GetNaturalPersonByEntityID(ctx, entityID)
+	if err != nil {
+		return "", fmt.Errorf("natural_person.GetDecryptedSSN: %w", err)
+	}
+	return s.cipher.Decrypt(np.Ssn)
 }

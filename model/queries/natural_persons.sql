@@ -1,14 +1,18 @@
 -- name: CreateNaturalPerson :one
-INSERT INTO natural_persons (entity_id, given_name, family_name)
-VALUES ($1, $2, $3)
-RETURNING id, entity_id, given_name, family_name, created_at, updated_at;
+INSERT INTO natural_persons (entity_id, given_name, family_name, ssn)
+VALUES ($1, $2, $3, $4)
+RETURNING id, entity_id, given_name, family_name, created_at, updated_at, ssn;
 
 -- name: GetNaturalPersonByEntityID :one
-SELECT id, entity_id, given_name, family_name, created_at, updated_at
+SELECT id, entity_id, given_name, family_name, created_at, updated_at, ssn
 FROM natural_persons
 WHERE entity_id = $1;
 
+-- NOTE: pass NULL for ssn to leave it unchanged; pass an empty bytea
+-- ('\x'::bytea / []byte{}) to clear it. A non-empty bytea replaces it.
 -- name: UpdateNaturalPerson :exec
 UPDATE natural_persons
-SET given_name = $2, family_name = $3
+SET given_name = $2,
+    family_name = $3,
+    ssn = COALESCE($4, ssn)
 WHERE entity_id = $1;

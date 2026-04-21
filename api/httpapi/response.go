@@ -47,7 +47,19 @@ func writeServiceErr(w http.ResponseWriter, err error) {
 // profileResponse converts a service.Profile into a JSON-serialisable map.
 // Used by entity-CRUD handlers that return the resolved Profile after a
 // mutation or lookup. The "kind" JSON key carries the fundamental_type_slug.
+// Tax-id fields are never included; use profileResponseFor when the caller
+// principal is available.
 func profileResponse(p service.Profile) map[string]any {
+	return profileResponseFor(service.Principal{}, p)
+}
+
+// profileResponseFor is like profileResponse but gates tax_id / tax_id_type
+// inclusion on the caller's identity:
+//
+//	include IFF principal.IsAdmin OR principal.EntityID == profile.Entity.ID
+//
+// When the gate fails the keys are omitted entirely (no nulls emitted).
+func profileResponseFor(principal service.Principal, p service.Profile) map[string]any {
 	resp := map[string]any{
 		"kind": p.Kind,
 	}
@@ -71,6 +83,12 @@ func profileResponse(p service.Profile) map[string]any {
 		if sa := p.ServiceAccount; sa != nil {
 			resp["label"] = sa.Label
 		}
+	}
+
+	// Gate: include tax_id / tax_id_type only for admins or the subject.
+	if p.TaxID != "" && (principal.IsAdmin || principal.EntityID == p.Entity.ID) {
+		resp["tax_id"] = p.TaxID
+		resp["tax_id_type"] = p.TaxIDType
 	}
 
 	return resp

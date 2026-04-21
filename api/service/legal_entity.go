@@ -1,3 +1,10 @@
+// Package service — legal_entity.go
+//
+// Design note for GetTaxID: rather than passing NaturalPersonServicer /
+// CorporationServicer interfaces into every call (which forces callers to thread
+// two extra servicer references), LegalEntityService holds a cipher directly and
+// issues the table-specific query inline. This keeps the call signature simple
+// and avoids circular dependency through the servicer interfaces.
 package service
 
 import (
@@ -6,17 +13,30 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
+
+// LegalEntityTaxID is a uniform view of a legal entity's tax identifier.
+// Type is "SSN" for natural persons, "EIN" for corporations, or "" if the
+// entity is not one of those leaf kinds. Value is plaintext; empty string
+// means "not recorded".
+type LegalEntityTaxID struct {
+	Type  string
+	Value string
+}
 
 // LegalEntityServicer defines legal entity operations.
 type LegalEntityServicer interface {
 	GetByEntityID(ctx context.Context, q coredb.Querier, entityID int64) (int64, error)
 	Create(ctx context.Context, q coredb.Querier, entityID int64) (int64, error)
+	GetTaxID(ctx context.Context, q coredb.Querier, entityID int64) (LegalEntityTaxID, error)
 }
 
 // LegalEntityService implements legal entity operations.
-type LegalEntityService struct{}
+type LegalEntityService struct {
+	cipher *fieldcrypto.Cipher
+}
 
 // Compile-time assertion.
 var _ LegalEntityServicer = (*LegalEntityService)(nil)
@@ -41,4 +61,47 @@ func (s *LegalEntityService) Create(ctx context.Context, q coredb.Querier, entit
 		return 0, fmt.Errorf("legal_entity.Create: %w", err)
 	}
 	return id, nil
+}
+
+// GetTaxID returns the decrypted tax identifier for the given entity.
+// Dispatches on the entity's fundamental_type_slug:
+//   - natural_person → SSN
+//   - corporation    → EIN
+//   - anything else  → zero LegalEntityTaxID (not an error)
+func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, entityID int64) (LegalEntityTaxID, error) {
+	entity, err := q.GetEntityByID(ctx, entityID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return LegalEntityTaxID{}, ErrNotFound
+		}
+		return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID entity: %w", err)
+	}
+
+	switch entity.FundamentalTypeSlug {
+	case "natural_person":
+		np, err := q.GetNaturalPersonByEntityID(ctx, entityID)
+		if err != nil {
+			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID natural_person: %w", err)
+		}
+		val, err := s.cipher.Decrypt(np.Ssn)
+		if err != nil {
+			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ssn: %w", err)
+		}
+		return LegalEntityTaxID{Type: "SSN", Value: val}, nil
+
+	case "corporation":
+		corp, err := q.GetCorporationByEntityID(ctx, entityID)
+		if err != nil {
+			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID corporation: %w", err)
+		}
+		val, err := s.cipher.Decrypt(corp.Ein)
+		if err != nil {
+			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ein: %w", err)
+		}
+		return LegalEntityTaxID{Type: "EIN", Value: val}, nil
+
+	default:
+		// Not a leaf kind that carries a tax id — return zero, not an error.
+		return LegalEntityTaxID{}, nil
+	}
 }

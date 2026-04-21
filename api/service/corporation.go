@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -18,13 +19,16 @@ type CreateCorporationInput struct {
 	LegalName    string
 	Jurisdiction string // optional
 	// DisplayName is no longer stored; display is derived via the display registry.
+	EIN string // optional plaintext; "" means not recorded
 }
 
 // UpdateCorporationInput carries the fields that may be updated on a corporation.
 // Nil fields are left unchanged.
+// For EIN: nil = leave unchanged; pointer-to-"" = clear; non-empty pointer = set.
 type UpdateCorporationInput struct {
 	LegalName    *string
 	Jurisdiction *string
+	EIN          *string
 }
 
 // CorporationServicer defines corporation operations available to httpapi handlers.
@@ -36,7 +40,8 @@ type CorporationServicer interface {
 
 // CorporationService implements corporation CRUD with audit logging.
 type CorporationService struct {
-	aw audit.Writer
+	aw     audit.Writer
+	cipher *fieldcrypto.Cipher
 }
 
 // Compile-time assertion.
@@ -75,10 +80,22 @@ func (s *CorporationService) Create(
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create legal_entity: %w", err)
 	}
 
+	var einBlob []byte
+	einAudit := "unchanged"
+	if strings.TrimSpace(in.EIN) != "" {
+		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.EIN))
+		if err != nil {
+			return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("encrypt ein: %w", err)
+		}
+		einBlob = blob
+		einAudit = "set"
+	}
+
 	corp, err := q.CreateCorporation(ctx, coredb.CreateCorporationParams{
 		EntityID:     entity.ID,
 		LegalName:    in.LegalName,
 		Jurisdiction: pgtype.Text{String: in.Jurisdiction, Valid: in.Jurisdiction != ""},
+		Ein:          einBlob,
 	})
 	if err != nil {
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create corporation: %w", err)
@@ -89,12 +106,15 @@ func (s *CorporationService) Create(
 		"uuid":         entity.Uuid.String(),
 		"legal_name":   in.LegalName,
 		"jurisdiction": in.Jurisdiction,
+		"ein":          einAudit,
 	})
 
 	return corp, entity.Uuid, nil
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
+// The cipher stored on the service is forwarded to ResolveProfileByEntityID so
+// that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
 	entity, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
@@ -104,7 +124,7 @@ func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Queri
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID entity: %w", err)
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID)
+	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID profile: %w", err)
 	}
@@ -143,6 +163,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 	before := map[string]any{
 		"legal_name":   corp.LegalName,
 		"jurisdiction": corp.Jurisdiction.String,
+		"ein":          "unchanged",
 	}
 
 	legalName := corp.LegalName
@@ -154,10 +175,29 @@ func (s *CorporationService) UpdateByEntityUUID(
 		jurisdiction = pgtype.Text{String: *in.Jurisdiction, Valid: true}
 	}
 
+	// einParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
+	var einParam []byte
+	einAudit := "unchanged"
+	if in.EIN != nil {
+		val := strings.TrimSpace(*in.EIN)
+		if val == "" {
+			einParam = []byte{} // clear
+			einAudit = "cleared"
+		} else {
+			b, err := s.cipher.Encrypt(val)
+			if err != nil {
+				return fmt.Errorf("encrypt ein: %w", err)
+			}
+			einParam = b
+			einAudit = "set"
+		}
+	}
+
 	if err := q.UpdateCorporation(ctx, coredb.UpdateCorporationParams{
 		EntityID:     entity.ID,
 		LegalName:    legalName,
 		Jurisdiction: jurisdiction,
+		Ein:          einParam,
 	}); err != nil {
 		return fmt.Errorf("corporation.UpdateByEntityUUID update: %w", err)
 	}
@@ -165,9 +205,21 @@ func (s *CorporationService) UpdateByEntityUUID(
 	after := map[string]any{
 		"legal_name":   legalName,
 		"jurisdiction": jurisdiction.String,
+		"ein":          einAudit,
 	}
 
 	eid := entity.ID
 	_ = s.aw.Write(ctx, "update", "corporation", &eid, before, after)
 	return nil
+}
+
+// GetDecryptedEIN returns the plaintext EIN for the given entity.
+// Returns "" if not set. Returns an error only on decrypt failure
+// (i.e. stored blob is corrupt or the key is wrong) — not for NULL.
+func (s *CorporationService) GetDecryptedEIN(ctx context.Context, q coredb.Querier, entityID int64) (string, error) {
+	corp, err := q.GetCorporationByEntityID(ctx, entityID)
+	if err != nil {
+		return "", fmt.Errorf("corporation.GetDecryptedEIN: %w", err)
+	}
+	return s.cipher.Decrypt(corp.Ein)
 }

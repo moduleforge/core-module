@@ -12,19 +12,25 @@ import (
 )
 
 const createCorporation = `-- name: CreateCorporation :one
-INSERT INTO corporations (entity_id, legal_name, jurisdiction)
-VALUES ($1, $2, $3)
-RETURNING id, entity_id, legal_name, jurisdiction, created_at, updated_at
+INSERT INTO corporations (entity_id, legal_name, jurisdiction, ein)
+VALUES ($1, $2, $3, $4)
+RETURNING id, entity_id, legal_name, jurisdiction, created_at, updated_at, ein
 `
 
 type CreateCorporationParams struct {
 	EntityID     int64       `json:"entity_id"`
 	LegalName    string      `json:"legal_name"`
 	Jurisdiction pgtype.Text `json:"jurisdiction"`
+	Ein          []byte      `json:"ein"`
 }
 
 func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationParams) (Corporation, error) {
-	row := q.db.QueryRow(ctx, createCorporation, arg.EntityID, arg.LegalName, arg.Jurisdiction)
+	row := q.db.QueryRow(ctx, createCorporation,
+		arg.EntityID,
+		arg.LegalName,
+		arg.Jurisdiction,
+		arg.Ein,
+	)
 	var i Corporation
 	err := row.Scan(
 		&i.ID,
@@ -33,12 +39,13 @@ func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationPa
 		&i.Jurisdiction,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Ein,
 	)
 	return i, err
 }
 
 const getCorporationByEntityID = `-- name: GetCorporationByEntityID :one
-SELECT id, entity_id, legal_name, jurisdiction, created_at, updated_at
+SELECT id, entity_id, legal_name, jurisdiction, created_at, updated_at, ein
 FROM corporations
 WHERE entity_id = $1
 `
@@ -53,13 +60,16 @@ func (q *Queries) GetCorporationByEntityID(ctx context.Context, entityID int64) 
 		&i.Jurisdiction,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Ein,
 	)
 	return i, err
 }
 
 const updateCorporation = `-- name: UpdateCorporation :exec
 UPDATE corporations
-SET legal_name = $2, jurisdiction = $3
+SET legal_name = $2,
+    jurisdiction = $3,
+    ein = COALESCE($4, ein)
 WHERE entity_id = $1
 `
 
@@ -67,9 +77,17 @@ type UpdateCorporationParams struct {
 	EntityID     int64       `json:"entity_id"`
 	LegalName    string      `json:"legal_name"`
 	Jurisdiction pgtype.Text `json:"jurisdiction"`
+	Ein          []byte      `json:"ein"`
 }
 
+// NOTE: pass NULL for ein to leave it unchanged; pass an empty bytea
+// to clear it. A non-empty bytea replaces it.
 func (q *Queries) UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error {
-	_, err := q.db.Exec(ctx, updateCorporation, arg.EntityID, arg.LegalName, arg.Jurisdiction)
+	_, err := q.db.Exec(ctx, updateCorporation,
+		arg.EntityID,
+		arg.LegalName,
+		arg.Jurisdiction,
+		arg.Ein,
+	)
 	return err
 }

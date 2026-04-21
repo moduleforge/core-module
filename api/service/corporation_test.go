@@ -9,7 +9,7 @@ import (
 func TestCorporationService_Create_WritesAudit(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &CorporationService{aw: aw}
+	svc := &CorporationService{aw: aw, cipher: testCipher(t)}
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
 	in := CreateCorporationInput{LegalName: "Acme Corp", Jurisdiction: "DE"}
@@ -39,7 +39,7 @@ func TestCorporationService_Create_WritesAudit(t *testing.T) {
 func TestCorporationService_Create_RequiresAdmin(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &CorporationService{aw: aw}
+	svc := &CorporationService{aw: aw, cipher: testCipher(t)}
 	nonAdmin := Principal{IsAdmin: false}
 
 	_, _, err := svc.Create(context.Background(), q, nonAdmin, CreateCorporationInput{LegalName: "Foo"})
@@ -50,7 +50,7 @@ func TestCorporationService_Create_RequiresAdmin(t *testing.T) {
 
 func TestCorporationService_Create_EmptyLegalName(t *testing.T) {
 	q := newMockQuerier()
-	svc := &CorporationService{aw: &mockAuditWriter{}}
+	svc := &CorporationService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 	admin := Principal{IsAdmin: true}
 
 	_, _, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "   "})
@@ -61,7 +61,7 @@ func TestCorporationService_Create_EmptyLegalName(t *testing.T) {
 
 func TestCorporationService_GetByEntityUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	svc := &CorporationService{aw: &mockAuditWriter{}}
+	svc := &CorporationService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 
 	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(nil))
 	if err == nil {
@@ -71,7 +71,7 @@ func TestCorporationService_GetByEntityUUID_NotFound(t *testing.T) {
 
 func TestCorporationService_GetByEntityUUID_Found(t *testing.T) {
 	q := newMockQuerier()
-	svc := &CorporationService{aw: &mockAuditWriter{}}
+	svc := &CorporationService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
 	admin := Principal{IsAdmin: true}
 
 	// Create via the service to set up all rows.
@@ -92,10 +92,10 @@ func TestCorporationService_GetByEntityUUID_Found(t *testing.T) {
 func TestCorporationService_Update_RequiresAdmin(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &CorporationService{aw: aw}
+	svc := &CorporationService{aw: aw, cipher: testCipher(t)}
 	nonAdmin := Principal{IsAdmin: false}
 
-	_, entityUUID, _ := (&CorporationService{aw: aw}).Create(context.Background(), q, Principal{IsAdmin: true}, CreateCorporationInput{LegalName: "Gamma Inc"})
+	_, entityUUID, _ := (&CorporationService{aw: aw, cipher: testCipher(t)}).Create(context.Background(), q, Principal{IsAdmin: true}, CreateCorporationInput{LegalName: "Gamma Inc"})
 
 	ln := "Delta Inc"
 	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln}, nonAdmin)
@@ -107,7 +107,7 @@ func TestCorporationService_Update_RequiresAdmin(t *testing.T) {
 func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 	q := newMockQuerier()
 	aw := &mockAuditWriter{}
-	svc := &CorporationService{aw: aw}
+	svc := &CorporationService{aw: aw, cipher: testCipher(t)}
 	admin := Principal{IsAdmin: true}
 
 	_, entityUUID, _ := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "Epsilon Corp"})
