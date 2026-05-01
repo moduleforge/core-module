@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- legal_entities is a pure FK-anchor table: no kind, no display_name, no
 -- synthetic id, no timestamps (those live on entities). Any entity whose
 -- fundamental type descends from 'legal_entity' may have a row here.
@@ -7,6 +9,7 @@ CREATE TABLE legal_entities (
 
 -- Enforce that only entities whose fundamental type descends from 'legal_entity'
 -- may be inserted into this table.
+-- +goose StatementBegin
 CREATE FUNCTION legal_entities_check_type() RETURNS TRIGGER AS $$
 DECLARE
   v_type_id BIGINT;
@@ -21,6 +24,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 CREATE TRIGGER legal_entities_type_check
   BEFORE INSERT ON legal_entities

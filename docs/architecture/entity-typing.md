@@ -59,9 +59,9 @@ SELECT
 FROM types WHERE slug = 'entity';
 ```
 
-Core-module seeds its five built-in types in migrations `0002–0006`. Downstream modules follow the same pattern in their own migrations — no core file is touched.
+Core-module seeds its five built-in types in migrations `0003–0007`. Downstream modules follow the same pattern in their own migrations — no core file is touched.
 
-The `type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT) RETURNS BOOLEAN` helper in `0000_helpers.sql` resolves ancestry via a recursive CTE. Subtype-table triggers use this to assert correct parentage.
+The `type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT) RETURNS BOOLEAN` helper defined in `0002_types.sql` resolves ancestry via a recursive CTE. Subtype-table triggers use this to assert correct parentage.
 
 ## 6. Display-rendering pattern
 

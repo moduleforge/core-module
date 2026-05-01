@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- Seed: abstract root type 'entity'. Every object in the system is an Entity.
 INSERT INTO types (slug, parent_id, concrete, name, description)
 VALUES (

@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE corporations (
   id           BIGSERIAL PRIMARY KEY,
   entity_id    BIGINT NOT NULL UNIQUE REFERENCES legal_entities(entity_id) ON DELETE RESTRICT,
@@ -13,6 +15,7 @@ CREATE TABLE corporations (
 -- Consumers should prefer joining through entity_id rather than the synthetic id.
 
 -- Enforce that the entity's fundamental type is exactly 'corporation'.
+-- +goose StatementBegin
 CREATE FUNCTION corporations_check_type() RETURNS TRIGGER AS $$
 DECLARE
   v_type_id BIGINT;
@@ -27,6 +30,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 CREATE TRIGGER corporations_type_check
   BEFORE INSERT ON corporations

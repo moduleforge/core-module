@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE service_accounts (
   id          BIGSERIAL PRIMARY KEY,
   entity_id   BIGINT NOT NULL UNIQUE REFERENCES entities(id) ON DELETE RESTRICT,
@@ -7,6 +9,7 @@ CREATE TABLE service_accounts (
 );
 
 -- Enforce that the entity's fundamental type is exactly 'service_account'.
+-- +goose StatementBegin
 CREATE FUNCTION service_accounts_check_type() RETURNS TRIGGER AS $$
 DECLARE
   v_type_id BIGINT;
@@ -21,6 +24,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 CREATE TRIGGER service_accounts_type_check
   BEFORE INSERT ON service_accounts

@@ -1,3 +1,5 @@
+-- +goose Up
+
 -- pgcrypto is the single Postgres-specific dependency; provides gen_random_uuid().
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -14,6 +16,7 @@ CREATE INDEX entities_fundamental_type_id_idx ON entities(fundamental_type_id);
 CREATE INDEX entities_archived_at_idx ON entities(archived_at) WHERE archived_at IS NOT NULL;
 
 -- Enforce that fundamental_type_id must reference a concrete type.
+-- +goose StatementBegin
 CREATE FUNCTION entities_check_concrete_type() RETURNS TRIGGER AS $$
 DECLARE
   v_concrete BOOLEAN;
@@ -28,6 +31,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- Both triggers below are scoped to fundamental_type_id changes only.
 -- The concrete-check validates that the (possibly unchanged) new value references a concrete type.
@@ -37,6 +41,7 @@ CREATE TRIGGER entities_fundamental_type_concrete_check
   FOR EACH ROW EXECUTE FUNCTION entities_check_concrete_type();
 
 -- Enforce that fundamental_type_id is immutable after insert.
+-- +goose StatementBegin
 CREATE FUNCTION entities_immutable_type() RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.fundamental_type_id IS DISTINCT FROM NEW.fundamental_type_id THEN
@@ -45,6 +50,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 CREATE TRIGGER entities_fundamental_type_immutable
   BEFORE UPDATE OF fundamental_type_id ON entities

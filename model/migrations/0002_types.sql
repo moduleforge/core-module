@@ -1,3 +1,5 @@
+-- +goose Up
+
 CREATE TABLE types (
   id             BIGSERIAL PRIMARY KEY,
   slug           TEXT UNIQUE NOT NULL,
@@ -13,6 +15,7 @@ CREATE INDEX types_parent_id_idx ON types(parent_id);
 
 -- Append-only enforcement: rows may never be DELETEd,
 -- and may only be UPDATEd to set/unset deprecated_at.
+-- +goose StatementBegin
 CREATE FUNCTION types_reject_mutation() RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -31,6 +34,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 CREATE TRIGGER types_no_delete
   BEFORE DELETE ON types
@@ -45,6 +49,7 @@ CREATE TRIGGER types_append_only_update
 -- p_target_slug. Used by subtype BEFORE INSERT triggers to assert ancestry.
 -- Placed here (after CREATE TABLE types) so the SQL-language function can
 -- resolve the types relation at parse time.
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT)
 RETURNS BOOLEAN AS $$
 WITH RECURSIVE walk AS (
@@ -55,3 +60,4 @@ WITH RECURSIVE walk AS (
 )
 SELECT EXISTS (SELECT 1 FROM walk WHERE slug = p_target_slug);
 $$ LANGUAGE sql STABLE;
+-- +goose StatementEnd
