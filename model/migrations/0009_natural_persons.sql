@@ -3,7 +3,10 @@ CREATE TABLE natural_persons (
   entity_id   BIGINT NOT NULL UNIQUE REFERENCES legal_entities(entity_id) ON DELETE RESTRICT,
   given_name  TEXT,
   family_name TEXT,
-  -- legal_id intentionally omitted in v1 (PII)
+  -- ssn holds an AES-256-GCM blob (nonce || ciphertext || tag) produced
+  -- by the application. NULL means no SSN is recorded. The database never
+  -- sees plaintext.
+  ssn         BYTEA,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

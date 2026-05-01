@@ -1,0 +1,6 @@
+# dirs
+/.git
+npm_modules/
+
+# files
+CLAUDE.md
