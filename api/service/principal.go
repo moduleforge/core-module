@@ -1,6 +1,6 @@
 // Package service exposes tx-aware entity CRUD for consumer apps.
-// Consumer modules wire in their own auth and audit implementations
-// via the PrincipalExtractor and audit.Writer interfaces.
+// Consumer modules wire in their own auth implementation via PrincipalExtractor
+// and observation via observer.MutationObserver.
 package service
 
 import "context"
