@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -135,7 +136,7 @@ func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Qu
 
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, ErrNotFound
 		}
 		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID entity: %w", err)
@@ -167,7 +168,7 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 	// 1. Authorize.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("service_account.UpdateByEntityUUID entity: %w", err)
@@ -180,7 +181,7 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 
 	_, err = q.GetServiceAccountByEntityID(ctx, ent.ID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("service_account.UpdateByEntityUUID service_account: %w", err)

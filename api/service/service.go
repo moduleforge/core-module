@@ -14,7 +14,6 @@ import (
 // construct this once at startup and pass it into httpapi.NewRouter.
 type Services struct {
 	Entity         EntityServicer
-	LegalEntity    LegalEntityServicer
 	NaturalPerson  NaturalPersonServicer
 	Corporation    CorporationServicer
 	ServiceAccount ServiceAccountServicer
@@ -43,7 +42,6 @@ func New(q coredb.Querier, db txhelper.DB, az authz.Authorizer, obs *observer.Ob
 	newQ := func(tx pgx.Tx) coredb.Querier { return coredb.New(tx) }
 	return &Services{
 		Entity:         &EntityService{db: db, az: az, obs: obs, newQuerier: newQ},
-		LegalEntity:    &LegalEntityService{cipher: cipher},
 		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
 		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
 		ServiceAccount: &ServiceAccountService{db: db, az: az, obs: obs, newQuerier: newQ},

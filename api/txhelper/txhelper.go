@@ -79,7 +79,7 @@ func RunWithLogger(
 
 	// Attach an empty queue to the context so QueuePostCommit can accumulate
 	// entries inside fn.
-	queue := make([]postCommitEntry, 0)
+	var queue []postCommitEntry
 	innerCtx := context.WithValue(ctx, queueKey{}, &queue)
 
 	if err := fn(innerCtx, tx); err != nil {
