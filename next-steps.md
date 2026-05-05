@@ -22,6 +22,17 @@ All 8 planned phases (bootstrap → extract model → wire model → core API �
 - **Key rotation.** No mechanism for rotating the AES-256-GCM key. A future hardening step would embed a key-id prefix in the blob and introduce a re-encryption migration.
 - **AAD binding.** Ciphertext is not bound to the row's primary key, so a ciphertext could in principle be copied between rows. A source comment documents this as future work.
 
-## Component workbench (Ladle)
+## Cross-cutting framework — deferred from Phase 5 review
+
+These are LOW/MED-deferred items from `plan/final-review.md`; safe to skip but worth tracking.
+
+- **`txhelper.QueuePostCommit` is implemented but unused** (architect M3). Either adopt in service code or remove. Re-evaluate when a use case needing in-closure post-commit queueing appears.
+- **`ObserverGroup.ObserveAfterCommit` returns `error` but always returns nil and every caller discards it** (golang-dev M2). Cosmetic; cleaner alternative is to drop the return type. Lint warnings are tolerable today.
+- **`fake_tx_test.go` in `api/httpapi/`** — vestigial dead code retained because a wrapper in `mock_test.go.buildTestDepsWithTx` still references it. Pure cleanup pass.
+- **`ServiceAccountService.UpdateByEntityUUID`** — the sentinel `ErrInvalidInput` is misleading; should be `ErrNotImplemented` (HTTP 501) or remove the method entirely until the sqlc query exists.
+- **`ObserveAfterCommit` `before` parameter** — Phase 1 question still open: drop the parameter from the interface entirely, or keep for symmetry. Convention is now "always pass nil" (enforced by doc comment); a future small-PR can drop the parameter when convenient.
+- **`_ = eg.Wait()` discard pattern** in `observer.go:197-211, 226-238` — current code is correct (closures always return nil) but a future maintainer adding a return inside would not get a compile warning. Consider switching swallow/post-commit branches to plain `sync.WaitGroup`.
+
+
 
 See `stories-next.md` at this module's root for the deferred Ladle / Storybook follow-ups (story coverage gaps, Storybook migration path, a11y / theme / MSW addons, visual-regression options).
