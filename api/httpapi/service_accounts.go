@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/moduleforge/core-api/service"
-	coredb "github.com/moduleforge/core-model/db"
 )
 
 // createServiceAccountRequest is the body for POST /entities/service-accounts.
@@ -36,24 +35,10 @@ func (h *handlers) createServiceAccount(w http.ResponseWriter, r *http.Request) 
 
 	in := service.CreateServiceAccountInput{Label: req.Label}
 
-	tx, err := h.d.txBeginner().Begin(r.Context())
-	if err != nil {
-		h.d.Logger.ErrorContext(r.Context(), "createServiceAccount: begin tx", "error", err)
-		jsonErr(w, http.StatusInternalServerError, "internal_error", "failed to begin transaction")
-		return
-	}
-	defer tx.Rollback(r.Context()) //nolint:errcheck
-
-	txQ := coredb.New(tx)
-	sa, entityUUID, err := h.d.Services.ServiceAccount.Create(r.Context(), txQ, *p, in)
+	// The service manages its own transaction internally via txhelper.Run.
+	sa, entityUUID, err := h.d.Services.ServiceAccount.Create(r.Context(), h.d.Services.Querier(), *p, in)
 	if err != nil {
 		writeServiceErr(w, err)
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		h.d.Logger.ErrorContext(r.Context(), "createServiceAccount: commit", "error", err)
-		jsonErr(w, http.StatusInternalServerError, "internal_error", "failed to commit transaction")
 		return
 	}
 

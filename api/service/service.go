@@ -1,8 +1,12 @@
 package service
 
 import (
-	"github.com/moduleforge/core-api/audit"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
+	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -20,17 +24,29 @@ type Services struct {
 	q coredb.Querier
 }
 
-// New constructs a Services aggregate. q is typically coredb.New(pool) and is
-// used as the base querier; callers may pass a tx-scoped querier to individual
-// service methods for multi-table atomicity. cipher is used to encrypt and
-// decrypt SSN and EIN fields; it must not be nil.
-func New(q coredb.Querier, aw audit.Writer, cipher *fieldcrypto.Cipher) *Services {
+// New constructs a Services aggregate.
+//
+// q is typically coredb.New(pool) and is used as the base querier for reads;
+// mutations open their own transactions via db.
+//
+// db is the connection pool (or any txhelper.DB) used to open transactions for
+// mutating operations.
+//
+// az gates every operation; a non-nil error from az.Authorize aborts the
+// operation immediately.
+//
+// obs receives in-tx and post-commit notifications for every mutation;
+// pass observer.NewObserverGroup() for a no-op group.
+//
+// cipher is used to encrypt and decrypt SSN and EIN fields; it must not be nil.
+func New(q coredb.Querier, db txhelper.DB, az authz.Authorizer, obs *observer.ObserverGroup, cipher *fieldcrypto.Cipher) *Services {
+	newQ := func(tx pgx.Tx) coredb.Querier { return coredb.New(tx) }
 	return &Services{
-		Entity:         &EntityService{aw: aw},
+		Entity:         &EntityService{db: db, az: az, obs: obs, newQuerier: newQ},
 		LegalEntity:    &LegalEntityService{cipher: cipher},
-		NaturalPerson:  &NaturalPersonService{aw: aw, cipher: cipher},
-		Corporation:    &CorporationService{aw: aw, cipher: cipher},
-		ServiceAccount: &ServiceAccountService{aw: aw},
+		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
+		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
+		ServiceAccount: &ServiceAccountService{db: db, az: az, obs: obs, newQuerier: newQ},
 		q:              q,
 	}
 }

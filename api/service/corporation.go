@@ -9,8 +9,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
+	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -38,25 +41,39 @@ type CorporationServicer interface {
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateCorporationInput, actor Principal) error
 }
 
-// CorporationService implements corporation CRUD with audit logging.
+// CorporationService implements corporation CRUD with authorization,
+// transactional mutation, and observer dispatch.
 type CorporationService struct {
-	aw     audit.Writer
-	cipher *fieldcrypto.Cipher
+	db         txhelper.DB
+	az         authz.Authorizer
+	obs        *observer.ObserverGroup
+	cipher     *fieldcrypto.Cipher
+	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 }
 
 // Compile-time assertion.
 var _ CorporationServicer = (*CorporationService)(nil)
 
-// Create inserts entity → legal_entity → corporation rows in sequence.
-// Requires actor.IsAdmin.
+func (s *CorporationService) querier(tx pgx.Tx) coredb.Querier {
+	if s.newQuerier != nil {
+		return s.newQuerier(tx)
+	}
+	return coredb.New(tx)
+}
+
+// Create inserts entity → legal_entity → corporation rows atomically inside a
+// transaction. The caller-supplied q parameter is accepted for interface
+// compatibility but the service opens its own transaction via s.db.
+// Requires admin authorization.
 func (s *CorporationService) Create(
 	ctx context.Context,
-	q coredb.Querier,
-	actor Principal,
+	_ coredb.Querier,
+	_ Principal,
 	in CreateCorporationInput,
 ) (coredb.Corporation, uuid.UUID, error) {
-	if !actor.IsAdmin {
-		return coredb.Corporation{}, uuid.UUID{}, ErrForbidden
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "create", entity.Corporation{}); err != nil {
+		return coredb.Corporation{}, uuid.UUID{}, err
 	}
 
 	in.LegalName = strings.TrimSpace(in.LegalName)
@@ -64,59 +81,89 @@ func (s *CorporationService) Create(
 		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("%w: legal_name is required", ErrInvalidInput)
 	}
 
-	// Resolve the type ID for 'corporation' from the registry.
-	t, err := q.GetTypeBySlug(ctx, "corporation")
-	if err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create resolve type: %w", err)
-	}
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	var (
+		corp       coredb.Corporation
+		entityUUID uuid.UUID
+		entityID   int64
+	)
 
-	entity, err := q.CreateEntity(ctx, t.ID)
-	if err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create entity: %w", err)
-	}
+	err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := s.querier(tx)
 
-	_, err = q.CreateLegalEntity(ctx, entity.ID)
-	if err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create legal_entity: %w", err)
-	}
-
-	var einBlob []byte
-	einAudit := "unchanged"
-	if strings.TrimSpace(in.EIN) != "" {
-		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.EIN))
+		// Resolve the type ID for 'corporation' from the registry.
+		t, err := q.GetTypeBySlug(ctx, "corporation")
 		if err != nil {
-			return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("encrypt ein: %w", err)
+			return fmt.Errorf("corporation.Create resolve type: %w", err)
 		}
-		einBlob = blob
-		einAudit = "set"
-	}
 
-	corp, err := q.CreateCorporation(ctx, coredb.CreateCorporationParams{
-		EntityID:     entity.ID,
-		LegalName:    in.LegalName,
-		Jurisdiction: pgtype.Text{String: in.Jurisdiction, Valid: in.Jurisdiction != ""},
-		Ein:          einBlob,
+		ent, err := q.CreateEntity(ctx, t.ID)
+		if err != nil {
+			return fmt.Errorf("corporation.Create entity: %w", err)
+		}
+
+		_, err = q.CreateLegalEntity(ctx, ent.ID)
+		if err != nil {
+			return fmt.Errorf("corporation.Create legal_entity: %w", err)
+		}
+
+		var einBlob []byte
+		einAudit := "unchanged"
+		if strings.TrimSpace(in.EIN) != "" {
+			blob, err := s.cipher.Encrypt(strings.TrimSpace(in.EIN))
+			if err != nil {
+				return fmt.Errorf("encrypt ein: %w", err)
+			}
+			einBlob = blob
+			einAudit = "set"
+		}
+
+		corp, err = q.CreateCorporation(ctx, coredb.CreateCorporationParams{
+			EntityID:     ent.ID,
+			LegalName:    in.LegalName,
+			Jurisdiction: pgtype.Text{String: in.Jurisdiction, Valid: in.Jurisdiction != ""},
+			Ein:          einBlob,
+		})
+		if err != nil {
+			return fmt.Errorf("corporation.Create corporation: %w", err)
+		}
+
+		entityUUID = ent.Uuid
+		entityID = ent.ID
+
+		after := map[string]any{
+			"uuid":         ent.Uuid.String(),
+			"legal_name":   in.LegalName,
+			"jurisdiction": in.Jurisdiction,
+			"ein":          einAudit,
+		}
+		return s.obs.Observe(ctx, tx, "create", "corporation", &entityID, nil, after)
 	})
 	if err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("corporation.Create corporation: %w", err)
+		return coredb.Corporation{}, uuid.UUID{}, err
 	}
 
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "create", "corporation", &eid, nil, map[string]any{
-		"uuid":         entity.Uuid.String(),
+	// 3. Post-commit observers.
+	after := map[string]any{
+		"uuid":         entityUUID.String(),
 		"legal_name":   in.LegalName,
 		"jurisdiction": in.Jurisdiction,
-		"ein":          einAudit,
-	})
+	}
+	s.obs.ObserveAfterCommit(ctx, "create", "corporation", &entityID, nil, after)
 
-	return corp, entity.Uuid, nil
+	return corp, entityUUID, nil
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "read", entity.Corporation{}); err != nil {
+		return Profile{}, err
+	}
+
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return Profile{}, ErrNotFound
@@ -124,7 +171,7 @@ func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Queri
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID entity: %w", err)
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID, s.cipher)
+	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID profile: %w", err)
 	}
@@ -132,19 +179,18 @@ func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Queri
 }
 
 // UpdateByEntityUUID updates corporation fields for the given entity UUID.
-// Requires actor.IsAdmin.
+// Requires admin authorization. Nil fields in the input are left unchanged.
+// The caller-supplied q parameter is accepted for interface compatibility but
+// the service opens its own transaction via s.db.
 func (s *CorporationService) UpdateByEntityUUID(
 	ctx context.Context,
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateCorporationInput,
-	actor Principal,
+	_ Principal,
 ) error {
-	if !actor.IsAdmin {
-		return ErrForbidden
-	}
-
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize — fetch entity first to build a richer target.
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -152,64 +198,79 @@ func (s *CorporationService) UpdateByEntityUUID(
 		return fmt.Errorf("corporation.UpdateByEntityUUID entity: %w", err)
 	}
 
-	corp, err := q.GetCorporationByEntityID(ctx, entity.ID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return ErrNotFound
-		}
-		return fmt.Errorf("corporation.UpdateByEntityUUID corporation: %w", err)
+	eid := ent.ID
+	if err := s.az.Authorize(ctx, "update", entity.Corporation{ID: &eid}); err != nil {
+		return err
 	}
 
-	before := map[string]any{
-		"legal_name":   corp.LegalName,
-		"jurisdiction": corp.Jurisdiction.String,
-		"ein":          "unchanged",
-	}
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	err = txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		txQ := s.querier(tx)
 
-	legalName := corp.LegalName
-	jurisdiction := corp.Jurisdiction
-	if in.LegalName != nil {
-		legalName = strings.TrimSpace(*in.LegalName)
-	}
-	if in.Jurisdiction != nil {
-		jurisdiction = pgtype.Text{String: *in.Jurisdiction, Valid: true}
-	}
-
-	// einParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
-	var einParam []byte
-	einAudit := "unchanged"
-	if in.EIN != nil {
-		val := strings.TrimSpace(*in.EIN)
-		if val == "" {
-			einParam = []byte{} // clear
-			einAudit = "cleared"
-		} else {
-			b, err := s.cipher.Encrypt(val)
-			if err != nil {
-				return fmt.Errorf("encrypt ein: %w", err)
+		corp, err := txQ.GetCorporationByEntityID(ctx, ent.ID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return ErrNotFound
 			}
-			einParam = b
-			einAudit = "set"
+			return fmt.Errorf("corporation.UpdateByEntityUUID corporation: %w", err)
 		}
+
+		before := map[string]any{
+			"legal_name":   corp.LegalName,
+			"jurisdiction": corp.Jurisdiction.String,
+			"ein":          "unchanged",
+		}
+
+		legalName := corp.LegalName
+		jurisdiction := corp.Jurisdiction
+		if in.LegalName != nil {
+			legalName = strings.TrimSpace(*in.LegalName)
+		}
+		if in.Jurisdiction != nil {
+			jurisdiction = pgtype.Text{String: *in.Jurisdiction, Valid: true}
+		}
+
+		// einParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
+		var einParam []byte
+		einAudit := "unchanged"
+		if in.EIN != nil {
+			val := strings.TrimSpace(*in.EIN)
+			if val == "" {
+				einParam = []byte{} // clear
+				einAudit = "cleared"
+			} else {
+				b, err := s.cipher.Encrypt(val)
+				if err != nil {
+					return fmt.Errorf("encrypt ein: %w", err)
+				}
+				einParam = b
+				einAudit = "set"
+			}
+		}
+
+		if err := txQ.UpdateCorporation(ctx, coredb.UpdateCorporationParams{
+			EntityID:     ent.ID,
+			LegalName:    legalName,
+			Jurisdiction: jurisdiction,
+			Ein:          einParam,
+		}); err != nil {
+			return fmt.Errorf("corporation.UpdateByEntityUUID update: %w", err)
+		}
+
+		after := map[string]any{
+			"legal_name":   legalName,
+			"jurisdiction": jurisdiction.String,
+			"ein":          einAudit,
+		}
+
+		return s.obs.Observe(ctx, tx, "update", "corporation", &eid, before, after)
+	})
+	if err != nil {
+		return err
 	}
 
-	if err := q.UpdateCorporation(ctx, coredb.UpdateCorporationParams{
-		EntityID:     entity.ID,
-		LegalName:    legalName,
-		Jurisdiction: jurisdiction,
-		Ein:          einParam,
-	}); err != nil {
-		return fmt.Errorf("corporation.UpdateByEntityUUID update: %w", err)
-	}
-
-	after := map[string]any{
-		"legal_name":   legalName,
-		"jurisdiction": jurisdiction.String,
-		"ein":          einAudit,
-	}
-
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "update", "corporation", &eid, before, after)
+	// 3. Post-commit observers.
+	s.obs.ObserveAfterCommit(ctx, "update", "corporation", &eid, nil, nil)
 	return nil
 }
 
