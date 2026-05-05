@@ -22,14 +22,6 @@ func (f *fakePrincipalExtractor) FromContext(_ context.Context) (*service.Princi
 	return f.p, f.ok
 }
 
-// --- fake audit.Writer ---
-
-type fakeAuditWriter struct{}
-
-func (f *fakeAuditWriter) Write(_ context.Context, _, _ string, _ *int64, _, _ any) error {
-	return nil
-}
-
 // --- fake service implementations ---
 
 type fakeEntityService struct {
@@ -149,25 +141,12 @@ func (f *fakeLegalEntityService) GetTaxID(_ context.Context, _ coredb.Querier, _
 var _ service.LegalEntityServicer = (*fakeLegalEntityService)(nil)
 
 // buildTestDeps constructs a Deps with the given service overrides.
-// tb may be nil for tests that do not exercise the transaction path.
 func buildTestDeps(
 	principal *fakePrincipalExtractor,
 	entity *fakeEntityService,
 	np *fakeNaturalPersonService,
 	corp *fakeCorporationService,
 	sa *fakeServiceAccountService,
-) Deps {
-	return buildTestDepsWithTx(principal, entity, np, corp, sa, nil)
-}
-
-// buildTestDepsWithTx is like buildTestDeps but allows a custom TxBeginner.
-func buildTestDepsWithTx(
-	principal *fakePrincipalExtractor,
-	entity *fakeEntityService,
-	np *fakeNaturalPersonService,
-	corp *fakeCorporationService,
-	sa *fakeServiceAccountService,
-	tb TxBeginner,
 ) Deps {
 	svcs := &service.Services{}
 	if entity != nil {
@@ -185,13 +164,24 @@ func buildTestDepsWithTx(
 	svcs.LegalEntity = &fakeLegalEntityService{}
 
 	return Deps{
-		Pool:      nil, // acceptable for non-tx tests
-		Tx:        tb,
 		Services:  svcs,
-		Audit:     &fakeAuditWriter{},
 		Principal: principal,
 		Logger:    noopLogger(),
 	}
+}
+
+// buildTestDepsWithTx is an alias for buildTestDeps. The tx parameter is
+// accepted but ignored: handlers delegate all transactions to the service
+// layer, so handler tests never exercise a tx path.
+func buildTestDepsWithTx(
+	principal *fakePrincipalExtractor,
+	entity *fakeEntityService,
+	np *fakeNaturalPersonService,
+	corp *fakeCorporationService,
+	sa *fakeServiceAccountService,
+	_ *fakeTxBeginner,
+) Deps {
+	return buildTestDeps(principal, entity, np, corp, sa)
 }
 
 // noopLogger returns a slog.Logger that discards all output.
