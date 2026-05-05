@@ -59,11 +59,29 @@ Action and target are method parameters, not context values, because they are me
 
 ## 6. Why no inter-observer dependencies
 
-The multi-observer dispatches all in-tx observers in parallel (via `errgroup`) and all post-commit observers in parallel. Observers cannot declare dependencies on each other.
+The `ObserverGroup` dispatches all in-tx observers in parallel (via `errgroup`) and all post-commit observers in parallel. Observers cannot declare dependencies on each other.
 
-This is a deliberate simplification, not a fundamental constraint. The use cases at planning time — audit, outbox, cache invalidation — do not require ordering. Allowing inter-observer dependencies would add startup-time dependency resolution, sequential dispatch paths, and error-propagation complexity that is not justified until a concrete use case demands it. If such a use case appears, the multi-observer can be extended.
+This is a deliberate simplification, not a fundamental constraint. The use cases at planning time — audit, outbox, cache invalidation — do not require ordering. Allowing inter-observer dependencies would add startup-time dependency resolution, sequential dispatch paths, and error-propagation complexity that is not justified until a concrete use case demands it. If such a use case appears, the `ObserverGroup` can be extended.
 
-## 7. Why pre-commit and post-commit observation points, not just one
+## 7. Why three policy variants for in-tx observation
+
+**The problem.** Different apps — and different call sites within the same app — treat observer failures differently. Audit rows are often mandatory: if the audit write fails, the operation should abort. Cache invalidation is best-effort: a cache miss is recoverable, but aborting a user-visible write because of it is not. A single hard-coded policy (always propagate, or always swallow) satisfies neither class of use case.
+
+**The choice.** A configurable default at composition time, plus per-call overrides:
+
+- `Observe(...)` uses the group's configured default. `PolicyPropagate` is the default-of-defaults so that unintentionally missed audit writes are visible rather than silent.
+- `MustObserve(...)` always propagates, regardless of the group's configured default. Use it when the observer's success is a correctness requirement for the operation.
+- `MayObserve(...)` always logs and swallows, regardless of the group's configured default. Use it when the observer is genuinely best-effort and failure must not affect the caller.
+
+This covers the common case cheaply (one `WithPolicy` call at composition time) while letting individual service methods deviate at a specific call site without reconfiguring the whole group.
+
+**Why the policy lives on the group, not the interface.** Observer implementations (`auditmod`, `outboxmod`, `cacheinval`) return errors honestly. They have no knowledge of whether the application treats their failure as fatal. That is an application-level decision, not an implementation decision. The `ObserverGroup` is the right home because it is the application's assembly point: it knows which observers are wired and what contract the application expects from them.
+
+**Why policy applies only in-tx.** `ObserveAfterCommit` errors cannot abort the operation — the transaction has already committed. Logging is the only meaningful response, so there are no `Must`/`May` variants for the post-commit method.
+
+**What is deferred.** Per-observer policy split within a single group (e.g. "audit must propagate but cache may swallow in the same call") awaits a concrete use case. Ordering and dependency resolution between observers are also deferred (see §6).
+
+## 8. Why pre-commit and post-commit observation points, not just one
 
 The two methods on `MutationObserver` exist because different observers need to be at different points relative to the transaction commit:
 
@@ -77,7 +95,7 @@ The two methods on `MutationObserver` exist because different observers need to 
 
 An observer that only needs one of the two points implements the other as a no-op. The framework does not force every observer to do both.
 
-## 8. Why app-side multi-observer composition rather than a core-side registry
+## 9. Why app-side multi-observer composition rather than a core-side registry
 
 Two reasons:
 
@@ -86,7 +104,7 @@ Two reasons:
 
 If a future architecture requires dynamic observer registration (e.g., plugin-loaded observers), a registry can be introduced then. The `MutationObserver` interface does not need to change.
 
-## 9. Open questions deferred to future revisions
+## 10. Open questions deferred to future revisions
 
 - **Inter-observer dependencies.** If a use case appears where observer B must run after observer A succeeds, the multi-observer dispatch model will need to support ordering or sequential batches. See section 6.
 - **General operation lifecycle hook.** The current framework covers mutation audit-shape use cases. A broader "operation lifecycle" hook (suitable for validation chains, projection updates, or pre/post hooks on reads) is not addressed. If that use case arises, evaluate whether to extend `MutationObserver` or introduce a third interface.

@@ -27,8 +27,11 @@ type Authorizer interface {
 
 ```go
 type MutationObserver interface {
-    // Observe runs inside the operation's transaction.
-    // A non-nil error aborts the operation and rolls back the transaction.
+    // Observe runs inside the operation's transaction. The error return is
+    // passed to the caller (typically an ObserverGroup), which decides
+    // whether to propagate or log-and-swallow based on its configured
+    // Policy and the call variant in use (Observe / MustObserve / MayObserve).
+    // See §6.
     Observe(ctx context.Context, tx pgx.Tx, op, resource string, targetEntityID *int64, before, after any) error
 
     // ObserveAfterCommit runs after the transaction successfully commits.
@@ -117,7 +120,10 @@ func (s *FooService) Update(ctx context.Context, in FooUpdate) (Foo, error) {
 
 1. **Authorize** — single call, single interface, single error path. If denied, nothing else runs.
 2. **Mutate + in-tx observe** — `repo.Update` and `Observe` share the same transaction. If either fails, the transaction rolls back and the caller sees the error.
-3. **Post-commit observe** — fires only after the transaction commits successfully. Observer errors do not affect the caller; they are logged by the `multiObserver` (§6).
+   - `s.observers.Observe(...)` uses the app's configured default policy (see §6).
+   - `s.observers.MustObserve(...)` is available as a per-call override: always propagates errors and aborts, regardless of the group's default.
+   - `s.observers.MayObserve(...)` is available as a per-call override: always logs and swallows errors, regardless of the group's default.
+3. **Post-commit observe** — fires only after the transaction commits successfully. `ObserveAfterCommit` has no `Must`/`May` variants: the transaction has already committed, so propagation is meaningless. Errors are always logged and never returned to the caller.
 
 **Read-only methods** collapse to:
 
@@ -136,20 +142,39 @@ No observers, no transaction helper (unless the read needs one for consistency).
 
 ## 6. Multi-observer composition
 
-`core-module` provides a `MultiObserver` helper that wraps N `MutationObserver` implementations and dispatches to all of them.
+`core-module` provides a concrete `ObserverGroup` type that wraps N `MutationObserver` implementations and dispatches to all of them. Service methods receive `*ObserverGroup` (not the bare `MutationObserver` interface) so they can call the per-call policy variants described below.
 
 ```go
-func MultiObserver(observers ...MutationObserver) MutationObserver
+// Constructor — exact name to be finalised in Phase 2.
+func NewObserverGroup(observers ...MutationObserver) *ObserverGroup
+
+// Optional: set the default in-tx policy at construction time.
+func (g *ObserverGroup) WithPolicy(p Policy) *ObserverGroup
 ```
 
-Dispatch behaviour:
+### In-tx methods
 
-- **In-tx (`Observe`)**: all N observers are called in parallel via `errgroup`. The first non-nil error aborts the `errgroup` and that error is returned, rolling back the enclosing transaction.
-- **Post-commit (`ObserveAfterCommit`)**: all N observers are called in parallel. Each error is logged independently; one failing observer does not affect the others. No error is propagated to the caller.
+`ObserverGroup` exposes three methods for in-transaction work:
 
-**No inter-observer dependencies.** Observers within a batch run without ordering guarantees. This is a simplification, not a fundamental constraint; ordering or dependency resolution may be added if a concrete use case appears.
+| Method | Policy applied |
+|--------|---------------|
+| `Observe(...)` | Uses the group's configured default. Default-of-defaults is `PolicyPropagate`. |
+| `MustObserve(...)` | Always propagates the first non-nil error, aborting the operation regardless of group config. |
+| `MayObserve(...)` | Always logs each non-nil error per-observer and returns nil, regardless of group config. |
 
-If no observers are wired (e.g. in tests), `MultiObserver()` with zero arguments returns a no-op implementation; service code does not need nil checks.
+All three call every wrapped observer in parallel via `errgroup`. `Observe` and `MustObserve` return the first non-nil error; `MayObserve` logs all errors and returns nil.
+
+### Post-commit method
+
+`ObserveAfterCommit(...)` always logs errors and never propagates them. There are no `Must`/`May` variants because the transaction has already committed.
+
+### Additional notes
+
+**No inter-observer dependencies.** Observers run without ordering guarantees. This is a simplification, not a fundamental constraint; ordering or dependency resolution may be added if a concrete use case appears.
+
+**No per-observer policy split within a group.** A future revision may support configuring individual observers differently (e.g. audit-must, cache-may). For now, one policy applies to the whole group at each call site.
+
+**Zero-observer case.** `NewObserverGroup()` with no arguments returns a no-op group; service code does not need nil checks.
 
 ---
 
@@ -158,19 +183,21 @@ If no observers are wired (e.g. in tests), `MultiObserver()` with zero arguments
 Cross-cutting behaviour is composed in the application's composition root. No module knows about any peer module.
 
 ```go
-authz := authzimpl.New(db, roleStore)
+authz := authzimpl.New(...)
 
-observers := core.MultiObserver(
-    auditmod.New(auditDB),         // writes audit_log rows
-    outboxmod.New(outboxDB),       // writes outbox rows for async delivery
-    cacheinval.New(cacheClient),   // invalidates cache entries post-commit
-)
+observers := core.NewObserverGroup(
+    auditmod.New(...),       // writes audit_log rows
+    outboxmod.New(...),      // writes outbox rows for async delivery
+    cacheinval.New(...),     // invalidates cache entries post-commit
+).WithPolicy(core.PolicySwallow)  // omit to keep the default PolicyPropagate
 
 userSvc := usersservice.New(userDB, authz, observers)
 tagSvc  := tagsservice.New(tagDB,  authz, observers)
 ```
 
-Each module (`auditmod`, `outboxmod`, `cacheinval`) exports a single `MutationObserver`. The app decides which observers are active and in what combination. Module packages remain isolated.
+Each module (`auditmod`, `outboxmod`, `cacheinval`) exports a single `MutationObserver`. The app decides which observers are active, in what combination, and what the default error policy is. Module packages remain isolated.
+
+Service constructors accept `*ObserverGroup` (not the bare `MutationObserver` interface) so that individual service methods can call `MustObserve` or `MayObserve` at sites that need to deviate from the group's default.
 
 ---
 
@@ -191,6 +218,6 @@ Each module (`auditmod`, `outboxmod`, `cacheinval`) exports a single `MutationOb
 | `Authorize` | One virtual call per service method. |
 | `Observe` (in-tx) | One virtual call per service method. With no observers wired, one nil check. |
 | `ObserveAfterCommit` | Same as `Observe`. |
-| `MultiObserver` fan-out | O(n) goroutines per batch where n = observer count. n is typically ≤ 5. |
+| `ObserverGroup` fan-out | O(n) goroutines per batch where n = observer count. n is typically ≤ 5. |
 
 No reflection. No event marshalling. No per-call allocations beyond what individual observer implementations perform internally.
