@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/observer"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -122,73 +123,15 @@ func TestResolveProfileByEntityID_NotFound(t *testing.T) {
 	}
 }
 
-func TestNaturalPersonService_GetByEntityUUID_Found(t *testing.T) {
+func TestServiceAccountService_Create_WritesObserver(t *testing.T) {
 	q := newMockQuerier()
-	svc := &NaturalPersonService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
-
-	entityUUID := q.seedNaturalPerson("Bob", "Builder")
-
-	profile, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	rec := &recordingObserver{}
+	svc := &ServiceAccountService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		newQuerier: mockQuerierFactory(q),
 	}
-	if profile.Kind != "natural_person" {
-		t.Errorf("kind: got %q, want natural_person", profile.Kind)
-	}
-	if profile.NaturalPerson.GivenName.String != "Bob" {
-		t.Errorf("given_name: got %q, want Bob", profile.NaturalPerson.GivenName.String)
-	}
-}
-
-func TestNaturalPersonService_GetByEntityUUID_NotFound(t *testing.T) {
-	q := newMockQuerier()
-	svc := &NaturalPersonService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
-
-	_, err := svc.GetByEntityUUID(context.Background(), q, uuid.New())
-	if err == nil {
-		t.Error("expected error for missing entity")
-	}
-}
-
-func TestEntityService_GetSelf(t *testing.T) {
-	q := newMockQuerier()
-	svc := &EntityService{aw: &mockAuditWriter{}}
-
-	entityUUID := q.seedNaturalPerson("Carol", "White")
-	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
-
-	actor := Principal{EntityID: entity.ID}
-	profile, err := svc.GetSelf(context.Background(), q, actor)
-	if err != nil {
-		t.Fatalf("GetSelf: unexpected error: %v", err)
-	}
-	if profile.Kind != "natural_person" {
-		t.Errorf("kind: got %q, want natural_person", profile.Kind)
-	}
-}
-
-func TestEntityService_ResolveProfile(t *testing.T) {
-	q := newMockQuerier()
-	svc := &EntityService{aw: &mockAuditWriter{}}
-
-	entityUUID := q.seedNaturalPerson("Dan", "Brown")
-
-	profile, err := svc.ResolveProfile(context.Background(), q, entityUUID)
-	if err != nil {
-		t.Fatalf("ResolveProfile: unexpected error: %v", err)
-	}
-	if profile.Entity.Uuid != entityUUID {
-		t.Errorf("entity UUID mismatch")
-	}
-	if profile.Kind != "natural_person" {
-		t.Errorf("kind: got %q, want natural_person", profile.Kind)
-	}
-}
-
-func TestServiceAccountService_Create_WritesAudit(t *testing.T) {
-	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &ServiceAccountService{aw: aw}
 	admin := Principal{IsAdmin: true}
 
 	sa, entityUUID, err := svc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: "my-service"})
@@ -201,29 +144,34 @@ func TestServiceAccountService_Create_WritesAudit(t *testing.T) {
 	if entityUUID.String() == "" {
 		t.Error("expected non-empty UUID")
 	}
-	if len(aw.calls) != 1 {
-		t.Fatalf("expected 1 audit call, got %d", len(aw.calls))
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 in-tx observe call, got %d", len(rec.observeCalls))
 	}
 }
 
-func TestServiceAccountService_Create_RequiresAdmin(t *testing.T) {
+func TestServiceAccountService_Create_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
-	svc := &ServiceAccountService{aw: &mockAuditWriter{}}
-	nonAdmin := Principal{IsAdmin: false}
+	authzErr := errors.New("forbidden")
+	svc := &ServiceAccountService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		newQuerier: mockQuerierFactory(q),
+	}
 
-	_, _, err := svc.Create(context.Background(), q, nonAdmin, CreateServiceAccountInput{Label: "x"})
-	if err == nil || !isErrForbidden(err) {
-		t.Errorf("expected ErrForbidden, got %v", err)
+	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateServiceAccountInput{Label: "x"})
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
 	}
 }
 
 func TestServiceAccountService_Create_EmptyLabel(t *testing.T) {
 	q := newMockQuerier()
-	svc := &ServiceAccountService{aw: &mockAuditWriter{}}
+	svc := newSAService(q)
 	admin := Principal{IsAdmin: true}
 
 	_, _, err := svc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: ""})
-	if err == nil || !isErrInvalid(err) {
+	if !isErrInvalid(err) {
 		t.Errorf("expected ErrInvalidInput, got %v", err)
 	}
 }
@@ -261,8 +209,8 @@ func TestLegalEntityService_GetByEntityID_Found(t *testing.T) {
 }
 
 func TestServices_New(t *testing.T) {
-	aw := &mockAuditWriter{}
-	svcs := New(newMockQuerier(), aw, testCipher(t))
+	q := newMockQuerier()
+	svcs := New(q, newFakeDB(), allowAllAuthz{}, observer.NewObserverGroup(), testCipher(t))
 	if svcs == nil {
 		t.Fatal("expected non-nil Services")
 	}

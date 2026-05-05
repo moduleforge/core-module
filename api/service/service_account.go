@@ -8,7 +8,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
+	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -30,25 +33,39 @@ type ServiceAccountServicer interface {
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateServiceAccountInput, actor Principal) error
 }
 
-// ServiceAccountService implements service account CRUD with audit logging.
+// ServiceAccountService implements service account CRUD with authorization,
+// transactional mutation, and observer dispatch.
 type ServiceAccountService struct {
-	aw audit.Writer
+	db         txhelper.DB
+	az         authz.Authorizer
+	obs        *observer.ObserverGroup
+	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 }
 
 // Compile-time assertion.
 var _ ServiceAccountServicer = (*ServiceAccountService)(nil)
 
-// Create inserts entity → service_account rows in sequence.
-// Requires actor.IsAdmin. Note that service accounts do not have a legal_entity
-// row — they attach directly to entity.
+func (s *ServiceAccountService) querier(tx pgx.Tx) coredb.Querier {
+	if s.newQuerier != nil {
+		return s.newQuerier(tx)
+	}
+	return coredb.New(tx)
+}
+
+// Create inserts entity → service_account rows atomically inside a transaction.
+// The caller-supplied q parameter is accepted for interface compatibility but
+// the service opens its own transaction via s.db.
+// Note that service accounts do not have a legal_entity row — they attach
+// directly to entity. Requires admin authorization.
 func (s *ServiceAccountService) Create(
 	ctx context.Context,
-	q coredb.Querier,
-	actor Principal,
+	_ coredb.Querier,
+	_ Principal,
 	in CreateServiceAccountInput,
 ) (coredb.ServiceAccount, uuid.UUID, error) {
-	if !actor.IsAdmin {
-		return coredb.ServiceAccount{}, uuid.UUID{}, ErrForbidden
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "create", entity.ServiceAccount{}); err != nil {
+		return coredb.ServiceAccount{}, uuid.UUID{}, err
 	}
 
 	in.Label = strings.TrimSpace(in.Label)
@@ -56,38 +73,67 @@ func (s *ServiceAccountService) Create(
 		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("%w: label is required", ErrInvalidInput)
 	}
 
-	// Resolve the type ID for 'service_account' from the registry.
-	t, err := q.GetTypeBySlug(ctx, "service_account")
-	if err != nil {
-		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("service_account.Create resolve type: %w", err)
-	}
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	var (
+		sa         coredb.ServiceAccount
+		entityUUID uuid.UUID
+		entityID   int64
+	)
 
-	entity, err := q.CreateEntity(ctx, t.ID)
-	if err != nil {
-		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("service_account.Create entity: %w", err)
-	}
+	err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := s.querier(tx)
 
-	sa, err := q.CreateServiceAccount(ctx, coredb.CreateServiceAccountParams{
-		EntityID: entity.ID,
-		Label:    in.Label,
+		// Resolve the type ID for 'service_account' from the registry.
+		t, err := q.GetTypeBySlug(ctx, "service_account")
+		if err != nil {
+			return fmt.Errorf("service_account.Create resolve type: %w", err)
+		}
+
+		ent, err := q.CreateEntity(ctx, t.ID)
+		if err != nil {
+			return fmt.Errorf("service_account.Create entity: %w", err)
+		}
+
+		sa, err = q.CreateServiceAccount(ctx, coredb.CreateServiceAccountParams{
+			EntityID: ent.ID,
+			Label:    in.Label,
+		})
+		if err != nil {
+			return fmt.Errorf("service_account.Create service_account: %w", err)
+		}
+
+		entityUUID = ent.Uuid
+		entityID = ent.ID
+
+		after := map[string]any{
+			"uuid":  ent.Uuid.String(),
+			"label": in.Label,
+		}
+		return s.obs.Observe(ctx, tx, "create", "service_account", &entityID, nil, after)
 	})
 	if err != nil {
-		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("service_account.Create service_account: %w", err)
+		return coredb.ServiceAccount{}, uuid.UUID{}, err
 	}
 
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "create", "service_account", &eid, nil, map[string]any{
-		"uuid":  entity.Uuid.String(),
+	// 3. Post-commit observers.
+	after := map[string]any{
+		"uuid":  entityUUID.String(),
 		"label": in.Label,
-	})
+	}
+	s.obs.ObserveAfterCommit(ctx, "create", "service_account", &entityID, nil, after)
 
-	return sa, entity.Uuid, nil
+	return sa, entityUUID, nil
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
-// Requires actor.IsAdmin (callers should check before calling).
+// Requires admin authorization (callers should check before calling).
 func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "read", entity.ServiceAccount{}); err != nil {
+		return Profile{}, err
+	}
+
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return Profile{}, ErrNotFound
@@ -95,7 +141,7 @@ func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Qu
 		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID entity: %w", err)
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID)
+	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID)
 	if err != nil {
 		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID profile: %w", err)
 	}
@@ -103,28 +149,23 @@ func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Qu
 }
 
 // UpdateByEntityUUID updates service_account fields for the given entity UUID.
-// Requires actor.IsAdmin. Since there is no sqlc-emitted UpdateServiceAccount
-// query, this performs a raw update by re-inserting the label via available
-// interface. In practice the sqlc schema may need an UpdateServiceAccount query
-// added; for now we return ErrInvalidInput to signal the operation is not yet
+// Requires admin authorization. Since there is no sqlc-emitted UpdateServiceAccount
+// query, this returns ErrInvalidInput to signal the operation is not yet
 // implemented at the DB layer, preserving a clean interface for consumers.
 func (s *ServiceAccountService) UpdateByEntityUUID(
 	ctx context.Context,
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateServiceAccountInput,
-	actor Principal,
+	_ Principal,
 ) error {
-	if !actor.IsAdmin {
-		return ErrForbidden
-	}
-
 	if in.Label == nil {
 		// Nothing to update.
 		return nil
 	}
 
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize.
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -132,7 +173,12 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 		return fmt.Errorf("service_account.UpdateByEntityUUID entity: %w", err)
 	}
 
-	sa, err := q.GetServiceAccountByEntityID(ctx, entity.ID)
+	eid := ent.ID
+	if err := s.az.Authorize(ctx, "update", entity.ServiceAccount{ID: &eid}); err != nil {
+		return err
+	}
+
+	_, err = q.GetServiceAccountByEntityID(ctx, ent.ID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -140,13 +186,9 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 		return fmt.Errorf("service_account.UpdateByEntityUUID service_account: %w", err)
 	}
 
-	before := map[string]any{"label": sa.Label}
-
 	// UpdateServiceAccount is not in the generated Querier interface.
 	// Signal that the update is unsupported until the query is added to sqlc.
 	// Returning ErrInvalidInput here is intentional: the interface is defined
 	// and the handler wired up, but the DB mutation isn't available yet.
-	_ = before
-	_ = entity
 	return fmt.Errorf("%w: UpdateServiceAccount query not yet generated by sqlc", ErrInvalidInput)
 }

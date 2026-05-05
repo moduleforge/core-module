@@ -6,15 +6,23 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/moduleforge/core-api/observer"
 )
 
 // TestNaturalPersonService_Create_EncryptsSSN verifies that a non-empty SSN on
 // create is stored as ciphertext (non-nil, different from plaintext) and that
-// the audit entry records "set" rather than the plaintext value.
+// the observer payload records "set" rather than the plaintext value.
 func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith", SSN: "123-45-6789"}
@@ -31,25 +39,31 @@ func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 		t.Error("ssn blob must not equal plaintext")
 	}
 
-	// Audit must record "set", never plaintext.
-	if len(aw.calls) != 1 {
-		t.Fatalf("expected 1 audit call, got %d", len(aw.calls))
+	// Observer after payload must record "set", never plaintext.
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 observe call, got %d", len(rec.observeCalls))
 	}
-	after, ok := aw.calls[0].after.(map[string]any)
+	after, ok := rec.observeCalls[0].after.(map[string]any)
 	if !ok {
-		t.Fatalf("audit after is not map[string]any: %T", aw.calls[0].after)
+		t.Fatalf("observe after is not map[string]any: %T", rec.observeCalls[0].after)
 	}
 	if after["ssn"] != "set" {
-		t.Errorf("audit ssn marker: got %q, want %q", after["ssn"], "set")
+		t.Errorf("observe ssn marker: got %q, want %q", after["ssn"], "set")
 	}
 }
 
 // TestNaturalPersonService_Create_NoSSN verifies that an empty SSN on create
-// stores nil blob and the audit records "unchanged".
+// stores nil blob and the observer payload records "unchanged".
 func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	in := CreateNaturalPersonInput{GivenName: "Bob", FamilyName: "Jones", SSN: ""}
@@ -62,9 +76,9 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 		t.Error("expected empty ssn blob when SSN not provided")
 	}
 
-	after := aw.calls[0].after.(map[string]any)
+	after := rec.observeCalls[0].after.(map[string]any)
 	if after["ssn"] != "unchanged" {
-		t.Errorf("audit ssn marker: got %q, want %q", after["ssn"], "unchanged")
+		t.Errorf("observe ssn marker: got %q, want %q", after["ssn"], "unchanged")
 	}
 }
 
@@ -72,9 +86,14 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 // then decrypt returns the original plaintext.
 func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
 	cipher := testCipher(t)
-	svc := &NaturalPersonService{aw: aw, cipher: cipher}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     cipher,
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	in := CreateNaturalPersonInput{GivenName: "Carol", FamilyName: "White", SSN: "987-65-4321"}
@@ -103,7 +122,13 @@ func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 // "" without error.
 func TestNaturalPersonService_GetDecryptedSSN_Nil(t *testing.T) {
 	q := newMockQuerier()
-	svc := &NaturalPersonService{aw: &mockAuditWriter{}, cipher: testCipher(t)}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 
 	entityUUID := q.seedNaturalPerson("Dave", "Evans") // seeded with nil Ssn
 	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
@@ -118,11 +143,17 @@ func TestNaturalPersonService_GetDecryptedSSN_Nil(t *testing.T) {
 }
 
 // TestNaturalPersonService_Update_SetSSN verifies pointer-to-value encrypts and
-// audit records "set".
+// observer payload records "set".
 func TestNaturalPersonService_Update_SetSSN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	entityUUID := q.seedNaturalPerson("Eve", "Foster")
@@ -133,19 +164,28 @@ func TestNaturalPersonService_Update_SetSSN(t *testing.T) {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
 
-	// Audit after must say "set".
-	after := aw.calls[0].after.(map[string]any)
+	// Observer after must say "set".
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 observe call, got %d", len(rec.observeCalls))
+	}
+	after := rec.observeCalls[0].after.(map[string]any)
 	if after["ssn"] != "set" {
-		t.Errorf("audit ssn: got %q, want %q", after["ssn"], "set")
+		t.Errorf("observe ssn: got %q, want %q", after["ssn"], "set")
 	}
 }
 
 // TestNaturalPersonService_Update_ClearSSN verifies pointer-to-empty-string
-// stores an empty blob and audit records "cleared".
+// stores an empty blob and observer payload records "cleared".
 func TestNaturalPersonService_Update_ClearSSN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	entityUUID := q.seedNaturalPerson("Frank", "Green")
@@ -156,18 +196,24 @@ func TestNaturalPersonService_Update_ClearSSN(t *testing.T) {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
 
-	after := aw.calls[0].after.(map[string]any)
+	after := rec.observeCalls[0].after.(map[string]any)
 	if after["ssn"] != "cleared" {
-		t.Errorf("audit ssn: got %q, want %q", after["ssn"], "cleared")
+		t.Errorf("observe ssn: got %q, want %q", after["ssn"], "cleared")
 	}
 }
 
 // TestNaturalPersonService_Update_NilSSN verifies nil SSN pointer leaves the
-// field unchanged and audit records "unchanged".
+// field unchanged and observer payload records "unchanged".
 func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	entityUUID := q.seedNaturalPerson("Grace", "Hall")
@@ -177,9 +223,9 @@ func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
 
-	after := aw.calls[0].after.(map[string]any)
+	after := rec.observeCalls[0].after.(map[string]any)
 	if after["ssn"] != "unchanged" {
-		t.Errorf("audit ssn: got %q, want %q", after["ssn"], "unchanged")
+		t.Errorf("observe ssn: got %q, want %q", after["ssn"], "unchanged")
 	}
 }
 
@@ -187,8 +233,14 @@ func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 // test for corporations.
 func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &CorporationService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &CorporationService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	in := CreateCorporationInput{LegalName: "Acme Inc", EIN: "12-3456789"}
@@ -204,9 +256,9 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 		t.Error("ein blob must not equal plaintext")
 	}
 
-	after := aw.calls[0].after.(map[string]any)
+	after := rec.observeCalls[0].after.(map[string]any)
 	if after["ein"] != "set" {
-		t.Errorf("audit ein: got %q, want %q", after["ein"], "set")
+		t.Errorf("observe ein: got %q, want %q", after["ein"], "set")
 	}
 }
 
@@ -214,9 +266,14 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 // then decrypt returns the original EIN.
 func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
 	cipher := testCipher(t)
-	svc := &CorporationService{aw: aw, cipher: cipher}
+	svc := &CorporationService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     cipher,
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	_, _, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "Beta Corp", EIN: "98-7654321"})
@@ -243,9 +300,14 @@ func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 // Type="SSN" and the correct plaintext for a natural person entity.
 func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
 	cipher := testCipher(t)
-	npSvc := &NaturalPersonService{aw: aw, cipher: cipher}
+	npSvc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     cipher,
+		newQuerier: mockQuerierFactory(q),
+	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
 
@@ -278,9 +340,14 @@ func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 // Type="EIN" for a corporation entity.
 func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
 	cipher := testCipher(t)
-	corpSvc := &CorporationService{aw: aw, cipher: cipher}
+	corpSvc := &CorporationService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     cipher,
+		newQuerier: mockQuerierFactory(q),
+	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
 
@@ -313,9 +380,13 @@ func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 // LegalEntityTaxID for a non-leaf type (no error).
 func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
 	cipher := testCipher(t)
-	saSvc := &ServiceAccountService{aw: aw}
+	saSvc := &ServiceAccountService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		newQuerier: mockQuerierFactory(q),
+	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
 
@@ -381,12 +452,18 @@ func TestProfile_TaxIDNotPopulatedWithoutCipher(t *testing.T) {
 	}
 }
 
-// TestAuditRedaction_NoPlaintext is a guard: it checks that none of the audit
+// TestAuditRedaction_NoPlaintext is a guard: it checks that none of the observer
 // call payloads in a create+update cycle contain the plaintext SSN value.
 func TestAuditRedaction_NoPlaintext(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{IsAdmin: true}
 
 	const plainSSN = "999-88-7777"
@@ -397,14 +474,14 @@ func TestAuditRedaction_NoPlaintext(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	for _, call := range aw.calls {
+	for _, call := range rec.observeCalls {
 		checkNoPlaintext(t, call.before, plainSSN)
 		checkNoPlaintext(t, call.after, plainSSN)
 	}
 }
 
 // checkNoPlaintext fails the test if the plaintext value appears anywhere
-// in the audit payload map.
+// in the observer payload map.
 func checkNoPlaintext(t *testing.T, payload any, plainSSN string) {
 	t.Helper()
 	if payload == nil {
@@ -416,7 +493,7 @@ func checkNoPlaintext(t *testing.T, payload any, plainSSN string) {
 	}
 	for k, v := range m {
 		if s, ok := v.(string); ok && s == plainSSN {
-			t.Errorf("audit field %q contains plaintext SSN value — must be redacted", k)
+			t.Errorf("observer field %q contains plaintext SSN value — must be redacted", k)
 		}
 	}
 }

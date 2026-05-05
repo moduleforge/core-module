@@ -4,12 +4,31 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/moduleforge/core-api/observer"
 )
 
-func TestNaturalPersonService_Create_WritesAudit(t *testing.T) {
+func newNPService(t *testing.T, q *mockQuerier) *NaturalPersonService {
+	t.Helper()
+	return &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
+}
+
+func TestNaturalPersonService_Create_WritesObserver(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
 	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith"}
@@ -24,45 +43,50 @@ func TestNaturalPersonService_Create_WritesAudit(t *testing.T) {
 		t.Error("expected non-empty entity UUID")
 	}
 
-	if len(aw.calls) != 1 {
-		t.Fatalf("expected 1 audit call, got %d", len(aw.calls))
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 in-tx observe call, got %d", len(rec.observeCalls))
 	}
-	c := aw.calls[0]
+	c := rec.observeCalls[0]
 	if c.op != "create" {
-		t.Errorf("audit op: got %q, want %q", c.op, "create")
+		t.Errorf("op: got %q, want create", c.op)
 	}
 	if c.resource != "natural_person" {
-		t.Errorf("audit resource: got %q, want %q", c.resource, "natural_person")
+		t.Errorf("resource: got %q, want natural_person", c.resource)
 	}
 	if c.after == nil {
-		t.Error("audit after: expected non-nil")
+		t.Error("after: expected non-nil")
 	}
 	if c.before != nil {
-		t.Errorf("audit before: expected nil for create, got %v", c.before)
+		t.Errorf("before: expected nil for create, got %v", c.before)
+	}
+
+	if len(rec.observeAfterCommitCalls) != 1 {
+		t.Fatalf("expected 1 post-commit observe call, got %d", len(rec.observeAfterCommitCalls))
 	}
 }
 
-func TestNaturalPersonService_Create_RequiresAdmin(t *testing.T) {
+func TestNaturalPersonService_Create_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
-	nonAdmin := Principal{UserID: 2, EntityID: 2, IsAdmin: false}
+	authzErr := errors.New("unauthorized")
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 
-	_, _, err := svc.Create(context.Background(), q, nonAdmin, CreateNaturalPersonInput{
+	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateNaturalPersonInput{
 		GivenName: "Bob", FamilyName: "Jones",
 	})
-	if !errors.Is(err, ErrForbidden) {
-		t.Errorf("expected ErrForbidden, got %v", err)
-	}
-	if len(aw.calls) != 0 {
-		t.Error("expected no audit calls on forbidden create")
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
 	}
 }
 
 func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	svc := newNPService(t, q)
 	admin := Principal{IsAdmin: true}
 
 	cases := []struct {
@@ -85,79 +109,129 @@ func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestNaturalPersonService_Update_Forbidden(t *testing.T) {
+func TestNaturalPersonService_Create_ObserverError_RollsBack(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	observeErr := errors.New("observer failure")
+	rec := &recordingObserver{observeErr: observeErr}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
 
-	// Seed entity belonging to entity ID 10.
+	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: true}, CreateNaturalPersonInput{
+		GivenName: "Dave", FamilyName: "Test",
+	})
+	if err == nil {
+		t.Fatal("expected error from observer, got nil")
+	}
+	if !errors.Is(err, observeErr) {
+		t.Errorf("expected observer error, got %v", err)
+	}
+	// No post-commit calls because the tx rolled back.
+	if len(rec.observeAfterCommitCalls) != 0 {
+		t.Errorf("expected 0 post-commit calls after rollback, got %d", len(rec.observeAfterCommitCalls))
+	}
+}
+
+func TestNaturalPersonService_Update_AuthzDenied(t *testing.T) {
+	q := newMockQuerier()
+	authzErr := errors.New("unauthorized")
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
+
 	entityUUID := q.seedNaturalPerson("Charlie", "Brown")
-
-	// Non-admin caller with a different entity ID.
-	nonAdmin := Principal{UserID: 2, EntityID: 999, IsAdmin: false}
 	gn := "Changed"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn}, nonAdmin)
-	if !errors.Is(err, ErrForbidden) {
-		t.Errorf("expected ErrForbidden, got %v", err)
-	}
-	if len(aw.calls) != 0 {
-		t.Error("expected no audit calls on forbidden update")
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn}, Principal{})
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
 	}
 }
 
-func TestNaturalPersonService_Update_SelfAllowed(t *testing.T) {
+func TestNaturalPersonService_Update_Success(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
-
-	entityUUID := q.seedNaturalPerson("Dave", "Evans")
-	// Get the entity ID for the seeded entity.
-	entity, err := q.GetEntityByUUID(context.Background(), entityUUID)
-	if err != nil {
-		t.Fatalf("setup: get entity: %v", err)
+	rec := &recordingObserver{}
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
 	}
-
-	// Non-admin actor whose EntityID matches the target entity.
-	self := Principal{UserID: 3, EntityID: entity.ID, IsAdmin: false}
-	gn := "David"
-	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn}, self)
-	if err != nil {
-		t.Fatalf("expected success, got %v", err)
-	}
-
-	// Verify audit was written.
-	if len(aw.calls) != 1 {
-		t.Fatalf("expected 1 audit call, got %d", len(aw.calls))
-	}
-	if aw.calls[0].op != "update" {
-		t.Errorf("audit op: got %q, want %q", aw.calls[0].op, "update")
-	}
-}
-
-func TestNaturalPersonService_Update_AdminAllowed(t *testing.T) {
-	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
 
 	entityUUID := q.seedNaturalPerson("Eve", "Foster")
-
-	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 	fn := "Forster"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{FamilyName: &fn}, admin)
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{FamilyName: &fn}, Principal{IsAdmin: true})
 	if err != nil {
-		t.Fatalf("expected success for admin update, got %v", err)
+		t.Fatalf("expected success for update, got %v", err)
+	}
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 in-tx observe call, got %d", len(rec.observeCalls))
+	}
+	if rec.observeCalls[0].op != "update" {
+		t.Errorf("op: got %q, want update", rec.observeCalls[0].op)
 	}
 }
 
 func TestNaturalPersonService_Update_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &NaturalPersonService{aw: aw, cipher: testCipher(t)}
+	svc := newNPService(t, q)
 
 	name := "Bob"
 	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateNaturalPersonInput{GivenName: &name}, Principal{IsAdmin: true})
-	// The mock returns a generic error for missing UUID; service wraps it.
 	if err == nil {
 		t.Error("expected error for missing entity")
+	}
+}
+
+func TestNaturalPersonService_GetByEntityUUID_Found(t *testing.T) {
+	q := newMockQuerier()
+	svc := newNPService(t, q)
+
+	entityUUID := q.seedNaturalPerson("Bob", "Builder")
+
+	profile, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if profile.Kind != "natural_person" {
+		t.Errorf("kind: got %q, want natural_person", profile.Kind)
+	}
+	if profile.NaturalPerson.GivenName.String != "Bob" {
+		t.Errorf("given_name: got %q, want Bob", profile.NaturalPerson.GivenName.String)
+	}
+}
+
+func TestNaturalPersonService_GetByEntityUUID_NotFound(t *testing.T) {
+	q := newMockQuerier()
+	svc := newNPService(t, q)
+
+	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(t))
+	if err == nil {
+		t.Error("expected error for missing entity")
+	}
+}
+
+func TestNaturalPersonService_GetByEntityUUID_AuthzDenied(t *testing.T) {
+	q := newMockQuerier()
+	authzErr := errors.New("denied")
+	svc := &NaturalPersonService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		cipher:     testCipher(t),
+		newQuerier: mockQuerierFactory(q),
+	}
+
+	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(t))
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
 	}
 }

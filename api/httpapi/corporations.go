@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/moduleforge/core-api/service"
-	coredb "github.com/moduleforge/core-model/db"
 )
 
 // createCorporationRequest is the body for POST /entities/corporations.
@@ -42,24 +41,10 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 		EIN:          req.EIN,
 	}
 
-	tx, err := h.d.txBeginner().Begin(r.Context())
-	if err != nil {
-		h.d.Logger.ErrorContext(r.Context(), "createCorporation: begin tx", "error", err)
-		jsonErr(w, http.StatusInternalServerError, "internal_error", "failed to begin transaction")
-		return
-	}
-	defer tx.Rollback(r.Context()) //nolint:errcheck
-
-	txQ := coredb.New(tx)
-	corp, entityUUID, err := h.d.Services.Corporation.Create(r.Context(), txQ, *p, in)
+	// The service manages its own transaction internally via txhelper.Run.
+	corp, entityUUID, err := h.d.Services.Corporation.Create(r.Context(), h.d.Services.Querier(), *p, in)
 	if err != nil {
 		writeServiceErr(w, err)
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		h.d.Logger.ErrorContext(r.Context(), "createCorporation: commit", "error", err)
-		jsonErr(w, http.StatusInternalServerError, "internal_error", "failed to commit transaction")
 		return
 	}
 

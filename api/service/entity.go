@@ -7,7 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
+	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -20,17 +23,31 @@ type EntityServicer interface {
 	ResolveProfile(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
 }
 
-// EntityService implements entity-level operations.
+// EntityService implements entity-level operations with authorization,
+// transactional mutation, and observer dispatch.
 type EntityService struct {
-	aw audit.Writer
+	db         txhelper.DB
+	az         authz.Authorizer
+	obs        *observer.ObserverGroup
+	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 }
 
 // Compile-time assertion.
 var _ EntityServicer = (*EntityService)(nil)
 
+func (s *EntityService) querier(tx pgx.Tx) coredb.Querier {
+	if s.newQuerier != nil {
+		return s.newQuerier(tx)
+	}
+	return coredb.New(tx)
+}
+
 // GetByUUID fetches a single entity by its public UUID.
 // Returns ErrNotFound if no matching row exists.
 func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
+	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+		return coredb.GetEntityByUUIDRow{}, err
+	}
 	e, err := q.GetEntityByUUID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -44,6 +61,9 @@ func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid
 // GetByID fetches a single entity by internal ID.
 // Returns ErrNotFound if no matching row exists.
 func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64) (coredb.GetEntityByIDRow, error) {
+	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+		return coredb.GetEntityByIDRow{}, err
+	}
 	e, err := q.GetEntityByID(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -56,6 +76,9 @@ func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64)
 
 // GetSelf returns the Profile for the authenticated caller's entity.
 func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Principal) (Profile, error) {
+	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+		return Profile{}, err
+	}
 	profile, err := ResolveProfileByEntityID(ctx, q, actor.EntityID)
 	if err != nil {
 		return Profile{}, fmt.Errorf("entity.GetSelf: %w", err)
@@ -65,33 +88,56 @@ func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Pri
 
 // ResolveProfile loads an entity by UUID then resolves its sub-type profile.
 func (s *EntityService) ResolveProfile(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	entity, err := s.GetByUUID(ctx, q, entityUUID)
-	if err != nil {
+	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
 		return Profile{}, err
 	}
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID)
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return Profile{}, ErrNotFound
+		}
+		return Profile{}, fmt.Errorf("entity.ResolveProfile: %w", err)
+	}
+	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID)
 	if err != nil {
 		return Profile{}, err
 	}
 	return profile, nil
 }
 
-// Archive soft-deletes an entity. Requires admin.
-func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, actor Principal) error {
-	if !actor.IsAdmin {
-		return ErrForbidden
+// Archive soft-deletes an entity. Requires admin authorization.
+// The caller-supplied q parameter is accepted for interface compatibility but
+// the service opens its own transaction via s.db.
+func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, _ Principal) error {
+	// 1. Authorize — fetch entity first to build a richer target.
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrNotFound
+		}
+		return fmt.Errorf("entity.Archive: %w", err)
 	}
 
-	entity, err := s.GetByUUID(ctx, q, entityUUID)
+	eid := ent.ID
+	if err := s.az.Authorize(ctx, "delete", entity.LegalEntity{ID: &eid}); err != nil {
+		return err
+	}
+
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	err = txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		txQ := s.querier(tx)
+		if err := txQ.ArchiveEntity(ctx, entityUUID); err != nil {
+			return fmt.Errorf("entity.Archive: %w", err)
+		}
+
+		before := map[string]any{"uuid": entityUUID.String()}
+		return s.obs.Observe(ctx, tx, "delete", "entity", &eid, before, nil)
+	})
 	if err != nil {
 		return err
 	}
 
-	if err := q.ArchiveEntity(ctx, entityUUID); err != nil {
-		return fmt.Errorf("entity.Archive: %w", err)
-	}
-
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "delete", "entity", &eid, map[string]any{"uuid": entityUUID.String()}, nil)
+	// 3. Post-commit observers.
+	s.obs.ObserveAfterCommit(ctx, "delete", "entity", &eid, map[string]any{"uuid": entityUUID.String()}, nil)
 	return nil
 }

@@ -9,8 +9,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/moduleforge/core-api/audit"
+	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
+	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -38,27 +41,39 @@ type NaturalPersonServicer interface {
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateNaturalPersonInput, actor Principal) error
 }
 
-// NaturalPersonService implements natural person CRUD with audit logging.
+// NaturalPersonService implements natural person CRUD with authorization,
+// transactional mutation, and observer dispatch.
 type NaturalPersonService struct {
-	aw     audit.Writer
-	cipher *fieldcrypto.Cipher
+	db         txhelper.DB
+	az         authz.Authorizer
+	obs        *observer.ObserverGroup
+	cipher     *fieldcrypto.Cipher
+	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 }
 
 // Compile-time assertion.
 var _ NaturalPersonServicer = (*NaturalPersonService)(nil)
 
-// Create inserts entity → legal_entity → natural_person rows in sequence.
-// The caller is responsible for transaction lifecycle: pass a tx-backed Querier
-// (via coredb.New(tx)) for multi-table atomicity. Returns the new record and
-// the entity's public UUID. Requires actor.IsAdmin.
+func (s *NaturalPersonService) querier(tx pgx.Tx) coredb.Querier {
+	if s.newQuerier != nil {
+		return s.newQuerier(tx)
+	}
+	return coredb.New(tx)
+}
+
+// Create inserts entity → legal_entity → natural_person rows atomically inside
+// a transaction. The caller-supplied q parameter is accepted for interface
+// compatibility but the service opens its own transaction via s.db.
+// Returns the new record and the entity's public UUID. Requires admin authorization.
 func (s *NaturalPersonService) Create(
 	ctx context.Context,
-	q coredb.Querier,
-	actor Principal,
+	_ coredb.Querier,
+	_ Principal,
 	in CreateNaturalPersonInput,
 ) (coredb.NaturalPerson, uuid.UUID, error) {
-	if !actor.IsAdmin {
-		return coredb.NaturalPerson{}, uuid.UUID{}, ErrForbidden
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "create", entity.NaturalPerson{}); err != nil {
+		return coredb.NaturalPerson{}, uuid.UUID{}, err
 	}
 
 	in.GivenName = strings.TrimSpace(in.GivenName)
@@ -70,52 +85,77 @@ func (s *NaturalPersonService) Create(
 		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
 	}
 
-	// Resolve the type ID for 'natural_person' from the registry.
-	t, err := q.GetTypeBySlug(ctx, "natural_person")
-	if err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create resolve type: %w", err)
-	}
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	var (
+		np         coredb.NaturalPerson
+		entityUUID uuid.UUID
+		entityID   int64
+	)
 
-	entity, err := q.CreateEntity(ctx, t.ID)
-	if err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create entity: %w", err)
-	}
+	err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		q := s.querier(tx)
 
-	_, err = q.CreateLegalEntity(ctx, entity.ID)
-	if err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create legal_entity: %w", err)
-	}
-
-	var ssnBlob []byte
-	ssnAudit := "unchanged"
-	if strings.TrimSpace(in.SSN) != "" {
-		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
+		// Resolve the type ID for 'natural_person' from the registry.
+		t, err := q.GetTypeBySlug(ctx, "natural_person")
 		if err != nil {
-			return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("encrypt ssn: %w", err)
+			return fmt.Errorf("natural_person.Create resolve type: %w", err)
 		}
-		ssnBlob = blob
-		ssnAudit = "set"
-	}
 
-	np, err := q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
-		EntityID:   entity.ID,
-		GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
-		FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
-		Ssn:        ssnBlob,
+		ent, err := q.CreateEntity(ctx, t.ID)
+		if err != nil {
+			return fmt.Errorf("natural_person.Create entity: %w", err)
+		}
+
+		_, err = q.CreateLegalEntity(ctx, ent.ID)
+		if err != nil {
+			return fmt.Errorf("natural_person.Create legal_entity: %w", err)
+		}
+
+		var ssnBlob []byte
+		ssnAudit := "unchanged"
+		if strings.TrimSpace(in.SSN) != "" {
+			blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
+			if err != nil {
+				return fmt.Errorf("encrypt ssn: %w", err)
+			}
+			ssnBlob = blob
+			ssnAudit = "set"
+		}
+
+		np, err = q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
+			EntityID:   ent.ID,
+			GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
+			FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
+			Ssn:        ssnBlob,
+		})
+		if err != nil {
+			return fmt.Errorf("natural_person.Create natural_person: %w", err)
+		}
+
+		entityUUID = ent.Uuid
+		entityID = ent.ID
+
+		after := map[string]any{
+			"uuid":        ent.Uuid.String(),
+			"given_name":  in.GivenName,
+			"family_name": in.FamilyName,
+			"ssn":         ssnAudit,
+		}
+		return s.obs.Observe(ctx, tx, "create", "natural_person", &entityID, nil, after)
 	})
 	if err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("natural_person.Create natural_person: %w", err)
+		return coredb.NaturalPerson{}, uuid.UUID{}, err
 	}
 
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "create", "natural_person", &eid, nil, map[string]any{
-		"uuid":        entity.Uuid.String(),
+	// 3. Post-commit observers.
+	after := map[string]any{
+		"uuid":        entityUUID.String(),
 		"given_name":  in.GivenName,
 		"family_name": in.FamilyName,
-		"ssn":         ssnAudit,
-	})
+	}
+	s.obs.ObserveAfterCommit(ctx, "create", "natural_person", &entityID, nil, after)
 
-	return np, entity.Uuid, nil
+	return np, entityUUID, nil
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
@@ -123,7 +163,12 @@ func (s *NaturalPersonService) Create(
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize.
+	if err := s.az.Authorize(ctx, "read", entity.NaturalPerson{}); err != nil {
+		return Profile{}, err
+	}
+
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return Profile{}, ErrNotFound
@@ -131,7 +176,7 @@ func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Que
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID entity: %w", err)
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, entity.ID, s.cipher)
+	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID profile: %w", err)
 	}
@@ -139,16 +184,18 @@ func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Que
 }
 
 // UpdateByEntityUUID updates natural_person fields for the given entity UUID.
-// Non-admin callers may only update their own entity; admins may update any.
 // Nil fields in the input are left unchanged.
+// The caller-supplied q parameter is used for the pre-tx entity lookup; the
+// service opens its own transaction via s.db for the mutation.
 func (s *NaturalPersonService) UpdateByEntityUUID(
 	ctx context.Context,
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateNaturalPersonInput,
-	actor Principal,
+	_ Principal,
 ) error {
-	entity, err := q.GetEntityByUUID(ctx, entityUUID)
+	// 1. Authorize — fetch entity first to build a richer target.
+	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
@@ -156,68 +203,79 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 		return fmt.Errorf("natural_person.UpdateByEntityUUID entity: %w", err)
 	}
 
-	if !actor.IsAdmin && actor.EntityID != entity.ID {
-		return ErrForbidden
+	eid := ent.ID
+	if err := s.az.Authorize(ctx, "update", entity.NaturalPerson{ID: &eid}); err != nil {
+		return err
 	}
 
-	np, err := q.GetNaturalPersonByEntityID(ctx, entity.ID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return ErrNotFound
-		}
-		return fmt.Errorf("natural_person.UpdateByEntityUUID natural_person: %w", err)
-	}
+	// 2. Mutate inside a transaction; observers participate in the same tx.
+	err = txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+		txQ := s.querier(tx)
 
-	before := map[string]any{
-		"given_name":  np.GivenName.String,
-		"family_name": np.FamilyName.String,
-		"ssn":         "unchanged",
-	}
-
-	gn := np.GivenName
-	fn := np.FamilyName
-	if in.GivenName != nil {
-		gn = pgtype.Text{String: strings.TrimSpace(*in.GivenName), Valid: true}
-	}
-	if in.FamilyName != nil {
-		fn = pgtype.Text{String: strings.TrimSpace(*in.FamilyName), Valid: true}
-	}
-
-	// ssnParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
-	var ssnParam []byte
-	ssnAudit := "unchanged"
-	if in.SSN != nil {
-		val := strings.TrimSpace(*in.SSN)
-		if val == "" {
-			ssnParam = []byte{} // clear
-			ssnAudit = "cleared"
-		} else {
-			b, err := s.cipher.Encrypt(val)
-			if err != nil {
-				return fmt.Errorf("encrypt ssn: %w", err)
+		np, err := txQ.GetNaturalPersonByEntityID(ctx, ent.ID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return ErrNotFound
 			}
-			ssnParam = b
-			ssnAudit = "set"
+			return fmt.Errorf("natural_person.UpdateByEntityUUID natural_person: %w", err)
 		}
+
+		before := map[string]any{
+			"given_name":  np.GivenName.String,
+			"family_name": np.FamilyName.String,
+			"ssn":         "unchanged",
+		}
+
+		gn := np.GivenName
+		fn := np.FamilyName
+		if in.GivenName != nil {
+			gn = pgtype.Text{String: strings.TrimSpace(*in.GivenName), Valid: true}
+		}
+		if in.FamilyName != nil {
+			fn = pgtype.Text{String: strings.TrimSpace(*in.FamilyName), Valid: true}
+		}
+
+		// ssnParam: nil = leave unchanged (COALESCE keeps DB value); []byte{} = clear; non-empty = set.
+		var ssnParam []byte
+		ssnAudit := "unchanged"
+		if in.SSN != nil {
+			val := strings.TrimSpace(*in.SSN)
+			if val == "" {
+				ssnParam = []byte{} // clear
+				ssnAudit = "cleared"
+			} else {
+				b, err := s.cipher.Encrypt(val)
+				if err != nil {
+					return fmt.Errorf("encrypt ssn: %w", err)
+				}
+				ssnParam = b
+				ssnAudit = "set"
+			}
+		}
+
+		if err := txQ.UpdateNaturalPerson(ctx, coredb.UpdateNaturalPersonParams{
+			EntityID:   ent.ID,
+			GivenName:  gn,
+			FamilyName: fn,
+			Ssn:        ssnParam,
+		}); err != nil {
+			return fmt.Errorf("natural_person.UpdateByEntityUUID update: %w", err)
+		}
+
+		after := map[string]any{
+			"given_name":  gn.String,
+			"family_name": fn.String,
+			"ssn":         ssnAudit,
+		}
+
+		return s.obs.Observe(ctx, tx, "update", "natural_person", &eid, before, after)
+	})
+	if err != nil {
+		return err
 	}
 
-	if err := q.UpdateNaturalPerson(ctx, coredb.UpdateNaturalPersonParams{
-		EntityID:   entity.ID,
-		GivenName:  gn,
-		FamilyName: fn,
-		Ssn:        ssnParam,
-	}); err != nil {
-		return fmt.Errorf("natural_person.UpdateByEntityUUID update: %w", err)
-	}
-
-	after := map[string]any{
-		"given_name":  gn.String,
-		"family_name": fn.String,
-		"ssn":         ssnAudit,
-	}
-
-	eid := entity.ID
-	_ = s.aw.Write(ctx, "update", "natural_person", &eid, before, after)
+	// 3. Post-commit observers.
+	s.obs.ObserveAfterCommit(ctx, "update", "natural_person", &eid, nil, nil)
 	return nil
 }
 

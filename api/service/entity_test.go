@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/moduleforge/core-api/observer"
 )
 
 // randomUUID returns a random UUID for use in tests that need a "missing" UUID.
@@ -17,26 +19,41 @@ func randomUUID(t *testing.T) uuid.UUID {
 	return uuid.New()
 }
 
-func TestEntityService_Archive_AdminOnly(t *testing.T) {
+func newEntityService(q *mockQuerier) *EntityService {
+	return &EntityService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(),
+		newQuerier: mockQuerierFactory(q),
+	}
+}
+
+func TestEntityService_Archive_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &EntityService{aw: aw}
+	authzErr := errors.New("forbidden")
+	svc := &EntityService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		newQuerier: mockQuerierFactory(q),
+	}
 
-	// Seed an entity.
 	entityUUID := q.seedNaturalPerson("Grace", "Hopper")
-
-	// Non-admin attempt.
-	nonAdmin := Principal{UserID: 2, EntityID: 999, IsAdmin: false}
-	err := svc.Archive(context.Background(), q, entityUUID, nonAdmin)
-	if !errors.Is(err, ErrForbidden) {
-		t.Errorf("expected ErrForbidden, got %v", err)
+	err := svc.Archive(context.Background(), q, entityUUID, Principal{})
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
 	}
 }
 
 func TestEntityService_Archive_AdminSucceeds(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &EntityService{aw: aw}
+	rec := &recordingObserver{}
+	svc := &EntityService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		newQuerier: mockQuerierFactory(q),
+	}
 
 	entityUUID := q.seedNaturalPerson("Grace", "Hopper")
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
@@ -46,21 +63,22 @@ func TestEntityService_Archive_AdminSucceeds(t *testing.T) {
 		t.Fatalf("expected success, got %v", err)
 	}
 
-	if len(aw.calls) != 1 {
-		t.Fatalf("expected 1 audit call, got %d", len(aw.calls))
+	if len(rec.observeCalls) != 1 {
+		t.Fatalf("expected 1 in-tx observe call, got %d", len(rec.observeCalls))
 	}
-	if aw.calls[0].op != "delete" {
-		t.Errorf("audit op: got %q, want %q", aw.calls[0].op, "delete")
+	if rec.observeCalls[0].op != "delete" {
+		t.Errorf("op: got %q, want delete", rec.observeCalls[0].op)
+	}
+	if len(rec.observeAfterCommitCalls) != 1 {
+		t.Fatalf("expected 1 post-commit observe call, got %d", len(rec.observeAfterCommitCalls))
 	}
 }
 
 func TestEntityService_Archive_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	aw := &mockAuditWriter{}
-	svc := &EntityService{aw: aw}
+	svc := newEntityService(q)
 
-	admin := Principal{IsAdmin: true}
-	err := svc.Archive(context.Background(), q, randomUUID(t), admin)
+	err := svc.Archive(context.Background(), q, randomUUID(t), Principal{IsAdmin: true})
 	if err == nil {
 		t.Error("expected error for missing entity")
 	}
@@ -68,7 +86,7 @@ func TestEntityService_Archive_NotFound(t *testing.T) {
 
 func TestEntityService_GetByUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
-	svc := &EntityService{aw: &mockAuditWriter{}}
+	svc := newEntityService(q)
 
 	_, err := svc.GetByUUID(context.Background(), q, randomUUID(t))
 	if !errors.Is(err, ErrNotFound) {
@@ -78,7 +96,7 @@ func TestEntityService_GetByUUID_NotFound(t *testing.T) {
 
 func TestEntityService_GetByUUID_Found(t *testing.T) {
 	q := newMockQuerier()
-	svc := &EntityService{aw: &mockAuditWriter{}}
+	svc := newEntityService(q)
 
 	entityUUID := q.seedNaturalPerson("Hank", "Aaron")
 	e, err := svc.GetByUUID(context.Background(), q, entityUUID)
@@ -87,5 +105,107 @@ func TestEntityService_GetByUUID_Found(t *testing.T) {
 	}
 	if e.Uuid != entityUUID {
 		t.Errorf("uuid mismatch: got %v, want %v", e.Uuid, entityUUID)
+	}
+}
+
+func TestEntityService_GetByUUID_AuthzDenied(t *testing.T) {
+	q := newMockQuerier()
+	authzErr := errors.New("denied")
+	svc := &EntityService{
+		db:         newFakeDB(),
+		az:         denyAllAuthz{err: authzErr},
+		obs:        observer.NewObserverGroup(),
+		newQuerier: mockQuerierFactory(q),
+	}
+
+	_, err := svc.GetByUUID(context.Background(), q, randomUUID(t))
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
+	}
+}
+
+func TestEntityService_GetByID_NotFound(t *testing.T) {
+	q := newMockQuerier()
+	svc := newEntityService(q)
+
+	_, err := svc.GetByID(context.Background(), q, 9999)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestEntityService_GetByID_Found(t *testing.T) {
+	q := newMockQuerier()
+	svc := newEntityService(q)
+
+	entityUUID := q.seedNaturalPerson("Hank", "Williams")
+	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
+
+	row, err := svc.GetByID(context.Background(), q, entity.ID)
+	if err != nil {
+		t.Fatalf("GetByID: unexpected error: %v", err)
+	}
+	if row.ID != entity.ID {
+		t.Errorf("ID mismatch: got %d, want %d", row.ID, entity.ID)
+	}
+}
+
+func TestEntityService_GetSelf(t *testing.T) {
+	q := newMockQuerier()
+	svc := newEntityService(q)
+
+	entityUUID := q.seedNaturalPerson("Carol", "White")
+	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
+
+	actor := Principal{EntityID: entity.ID}
+	profile, err := svc.GetSelf(context.Background(), q, actor)
+	if err != nil {
+		t.Fatalf("GetSelf: unexpected error: %v", err)
+	}
+	if profile.Kind != "natural_person" {
+		t.Errorf("kind: got %q, want natural_person", profile.Kind)
+	}
+}
+
+func TestEntityService_ResolveProfile(t *testing.T) {
+	q := newMockQuerier()
+	svc := newEntityService(q)
+
+	entityUUID := q.seedNaturalPerson("Dan", "Brown")
+
+	profile, err := svc.ResolveProfile(context.Background(), q, entityUUID)
+	if err != nil {
+		t.Fatalf("ResolveProfile: unexpected error: %v", err)
+	}
+	if profile.Entity.Uuid != entityUUID {
+		t.Errorf("entity UUID mismatch")
+	}
+	if profile.Kind != "natural_person" {
+		t.Errorf("kind: got %q, want natural_person", profile.Kind)
+	}
+}
+
+func TestEntityService_Archive_ObserverError_RollsBack(t *testing.T) {
+	q := newMockQuerier()
+	observeErr := errors.New("observer failure")
+	rec := &recordingObserver{observeErr: observeErr}
+	svc := &EntityService{
+		db:         newFakeDB(),
+		az:         allowAllAuthz{},
+		obs:        observer.NewObserverGroup(rec),
+		newQuerier: mockQuerierFactory(q),
+	}
+
+	entityUUID := q.seedNaturalPerson("Test", "User")
+	err := svc.Archive(context.Background(), q, entityUUID, Principal{IsAdmin: true})
+	if err == nil {
+		t.Fatal("expected error from observer, got nil")
+	}
+	if !errors.Is(err, observeErr) {
+		t.Errorf("expected observer error, got %v", err)
+	}
+	// No post-commit calls because tx rolled back.
+	if len(rec.observeAfterCommitCalls) != 0 {
+		t.Errorf("expected 0 post-commit calls after rollback, got %d", len(rec.observeAfterCommitCalls))
 	}
 }
