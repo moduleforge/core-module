@@ -22,13 +22,14 @@ package opctx
 import "context"
 
 // contextKey is a package-private type for context keys. Using an unexported
-// type prevents collisions with keys from other packages.
-type contextKey int
+// struct type prevents collisions with keys from other packages, including
+// packages that also use an integer-based key type.
+type contextKey struct{ name string }
 
-const (
-	actorEntityIDKey contextKey = iota
-	assumedActorEntityIDKey
-	requestIDKey
+var (
+	actorEntityIDKey        = contextKey{"actorEntityID"}
+	assumedActorEntityIDKey = contextKey{"assumedActorEntityID"}
+	requestIDKey            = contextKey{"requestID"}
 )
 
 // WithActor returns a new context carrying the given actor entity ID.

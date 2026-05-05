@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -50,7 +51,7 @@ func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid
 	}
 	e, err := q.GetEntityByUUID(ctx, id)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return coredb.GetEntityByUUIDRow{}, ErrNotFound
 		}
 		return coredb.GetEntityByUUIDRow{}, fmt.Errorf("entity.GetByUUID: %w", err)
@@ -66,7 +67,7 @@ func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64)
 	}
 	e, err := q.GetEntityByID(ctx, id)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return coredb.GetEntityByIDRow{}, ErrNotFound
 		}
 		return coredb.GetEntityByIDRow{}, fmt.Errorf("entity.GetByID: %w", err)
@@ -93,7 +94,7 @@ func (s *EntityService) ResolveProfile(ctx context.Context, q coredb.Querier, en
 	}
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, ErrNotFound
 		}
 		return Profile{}, fmt.Errorf("entity.ResolveProfile: %w", err)
@@ -112,7 +113,7 @@ func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUI
 	// 1. Authorize — fetch entity first to build a richer target.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("entity.Archive: %w", err)
@@ -138,6 +139,6 @@ func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUI
 	}
 
 	// 3. Post-commit observers.
-	s.obs.ObserveAfterCommit(ctx, "delete", "entity", &eid, map[string]any{"uuid": entityUUID.String()}, nil)
+	s.obs.ObserveAfterCommit(ctx, "delete", "entity", &eid, nil, nil)
 	return nil
 }

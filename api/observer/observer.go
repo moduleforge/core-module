@@ -50,6 +50,11 @@ type MutationObserver interface {
 	// ObserveAfterCommit runs after the tx has successfully committed.
 	// Errors are logged by the caller (ObserverGroup / txhelper); they do
 	// not unwind the already-committed operation.
+	//
+	// Callers MUST pass nil for the before parameter — post-commit observers
+	// can re-fetch from the DB if they need before-state. The parameter is
+	// retained on the interface for symmetry with Observe but has no
+	// well-defined value at this phase.
 	ObserveAfterCommit(
 		ctx context.Context,
 		op string,
@@ -120,18 +125,21 @@ func NewObserverGroup(observers ...MutationObserver) *ObserverGroup {
 	return &ObserverGroup{observers: observers}
 }
 
-// WithPolicy returns the same ObserverGroup with the given default policy set.
-// Builder-style: typically chained on the constructor.
+// WithPolicy returns a copy of g with the given default policy set.
+// Builder-style: safely chainable on a shared base group.
 func (g *ObserverGroup) WithPolicy(p Policy) *ObserverGroup {
-	g.policy = p
-	return g
+	g2 := *g
+	g2.policy = p
+	return &g2
 }
 
-// WithLogger attaches a logger for swallowed-error messages. If not called,
-// slog.Default() is used. Useful in tests that capture log output.
+// WithLogger returns a copy of g with the given logger set for swallowed-error
+// messages. If not called, slog.Default() is used. Useful in tests that
+// capture log output.
 func (g *ObserverGroup) WithLogger(l *slog.Logger) *ObserverGroup {
-	g.logger = l
-	return g
+	g2 := *g
+	g2.logger = l
+	return &g2
 }
 
 func (g *ObserverGroup) log() *slog.Logger {
@@ -214,6 +222,11 @@ func (g *ObserverGroup) dispatch(
 // ObserveAfterCommit runs all wrapped observers in parallel after a successful
 // commit. Errors are logged per-observer; this method always returns nil.
 // There are no Must/May variants because the transaction has already committed.
+//
+// Callers MUST pass nil for the before parameter — post-commit observers
+// can re-fetch from the DB if they need before-state. The parameter is
+// retained on the interface for symmetry with Observe but has no
+// well-defined value at this phase.
 func (g *ObserverGroup) ObserveAfterCommit(
 	ctx context.Context,
 	op, resource string, targetEntityID *int64,

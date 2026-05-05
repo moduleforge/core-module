@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -170,7 +171,7 @@ func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Que
 
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, ErrNotFound
 		}
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID entity: %w", err)
@@ -197,7 +198,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	// 1. Authorize — fetch entity first to build a richer target.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("natural_person.UpdateByEntityUUID entity: %w", err)
@@ -214,7 +215,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 
 		np, err := txQ.GetNaturalPersonByEntityID(ctx, ent.ID)
 		if err != nil {
-			if err == pgx.ErrNoRows {
+			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrNotFound
 			}
 			return fmt.Errorf("natural_person.UpdateByEntityUUID natural_person: %w", err)

@@ -9,6 +9,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -46,7 +47,7 @@ var _ LegalEntityServicer = (*LegalEntityService)(nil)
 func (s *LegalEntityService) GetByEntityID(ctx context.Context, q coredb.Querier, entityID int64) (int64, error) {
 	id, err := q.GetLegalEntityByEntityID(ctx, entityID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, ErrNotFound
 		}
 		return 0, fmt.Errorf("legal_entity.GetByEntityID: %w", err)
@@ -71,7 +72,7 @@ func (s *LegalEntityService) Create(ctx context.Context, q coredb.Querier, entit
 func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, entityID int64) (LegalEntityTaxID, error) {
 	entity, err := q.GetEntityByID(ctx, entityID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return LegalEntityTaxID{}, ErrNotFound
 		}
 		return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID entity: %w", err)
