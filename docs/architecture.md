@@ -2,19 +2,15 @@
 
 ## Scope and purpose
 
-These documents describe the **system design concepts, high-level specifications, and the reasoning behind them** for `core-module` and the modules that build on it. They are aimed at engineers picking up the codebase who need to understand how the pieces fit, what invariants the design depends on, and why specific choices were made.
+These documents describe the **system design concepts, high-level specifications, and the reasoning behind them** for `core-module` and the modules that build on it. The target audience is architects and engineers who need to understand the system as a whole, the top level concepts and components, and how everything fits together.
 
-These documents are NOT a substitute for:
-
-- **API references** — exact function signatures, parameter shapes, and return types live with the code (Go doc comments, OpenAPI fragments).
-- **Implementation walkthroughs** — line-by-line explanations of specific files; read the code.
-- **Operational runbooks** — deployment, migrations, on-call procedures live alongside the operational tooling, not here.
-- **Tutorials** — step-by-step "how to add an X" guides; the code patterns and the `skill.*.md` files at the project root cover this.
-
-If you find yourself reaching for an API signature or a deploy step in here, that's a sign the doc has drifted; move it to the appropriate place.
+These documents do NOT cover specific APIs, usage, or operations.
 
 ## Framework overview
 
+<---
+AI readers can refer to the diagram source link following the SVG reference, or refer to the textual description which follows.
+--->
 ![Framework overview](./architecture/diagrams/framework-overview.svg)
 
 (Source: [`framework-overview.mmd`](./architecture/diagrams/framework-overview.mmd))
