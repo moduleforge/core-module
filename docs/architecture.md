@@ -8,9 +8,9 @@ These documents do NOT cover specific APIs, usage, or operations.
 
 ## Framework overview
 
-<---
+<--
 AI readers can refer to the diagram source link following the SVG reference, or refer to the textual description which follows.
---->
+-->
 ![Framework overview](./architecture/diagrams/framework-overview.svg)
 
 (Source: [`framework-overview.mmd`](./architecture/diagrams/framework-overview.mmd))
