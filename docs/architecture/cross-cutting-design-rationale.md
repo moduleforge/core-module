@@ -1,6 +1,6 @@
 # Cross-cutting design rationale
 
-This document records *why* the cross-cutting framework takes the shape it does. For the *what* — interface signatures, service-method shape, composition examples — see [`cross-cutting-design.md`](cross-cutting-design.md). The audience is a future engineer deciding whether a new use case justifies reopening any of the decisions below.
+This document records *why* the cross-cutting framework takes the shape it does. For the *what* — interface signatures, service-method shape, composition examples — see [`authorization-design.md`](authorization-design.md) (the pre-operation gate) and [`state-management-design.md`](state-management-design.md) (the transaction lifecycle and observers). The audience is a future engineer deciding whether a new use case justifies reopening any of the decisions below.
 
 ## 1. The design space
 
