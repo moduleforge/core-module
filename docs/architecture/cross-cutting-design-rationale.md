@@ -1,12 +1,14 @@
 # Cross-cutting design rationale
 
-This document records *why* the cross-cutting framework takes the shape it does. For the *what* — interface signatures, service-method shape, composition examples — see [`authorization-design.md`](authorization-design.md) (the pre-operation gate) and [`state-management-design.md`](state-management-design.md) (the transaction lifecycle and observers). The audience is a future engineer deciding whether a new use case justifies reopening any of the decisions below.
+## Purpose and scope
 
-## 1. The design space
+This document records *why* the cross-cutting framework dealing with authorization and state management takes the shape it does. For the *what* — interface signatures, service-method shape, composition examples — see [`authorization-design.md`](authorization-design.md) (the pre-operation gate) and [`state-management-design.md`](state-management-design.md) (the transaction lifecycle and observers). The audience is a future engineer deciding whether a new use case justifies reopening any of the decisions below.
+
+## The design space
 
 Five candidate patterns were evaluated before the current design was locked.
 
-**A. Typed interface per concern (chosen).** Constructor-injected; called explicitly at known service-method extension points. Strengths: no reflection, no startup ceremony, clear call-site ownership. Weaknesses: each concern is a named parameter in every service constructor; scaling past ~5 concerns would make constructors unwieldy.
+**A. Typed interface per concern (chosen).** Constructor-injected; called explicitly at known service-method extension points. Strengths: no reflection, no startup ceremony, clear call-site ownership. Weaknesses: each concern is a named parameter in every service constructor; however, this has been addressed by reducing the concerns to more general categories of "authorization" and "state change handling", which are generically handled above the service calls themselves, and "metrics", which are handled at the request processing level.
 
 **B. Decorator chain on service interfaces.** App composition root wires `auth(audit(metrics(svc)))`. Strengths: each decorator is self-contained and independently testable. Weaknesses: every cross-cutting concern requires a per-service wrapper type; "apply to any Entity uniformly" is awkward because it couples the decorator to the concrete service interface.
 
@@ -16,14 +18,14 @@ Five candidate patterns were evaluated before the current design was locked.
 
 **E. HTTP middleware.** Around-handler wrappers, run before the service layer. Strengths: cross-module, reusable, well-understood. Weaknesses: runs before the service executes, so it cannot observe the entity's before/after state. HTTP middleware cannot participate in the operation's transaction.
 
-## 2. Why Pattern A over B, C, D, E
+## Why Pattern A over B, C, D, E
 
 - **D is too low.** Repo hooks see rows, not business operations. They cannot carry operation-level context (operation name, before-state) without smuggling it through the row itself, which corrupts the data model.
 - **E is too high.** HTTP middleware runs before service logic. It cannot capture the actual entity state before or after the mutation, and it cannot participate in the transaction.
 - **B (decorators)** would work at a small scale, but each cross-cutting concern must provide a separate wrapper per service interface. This creates a combinatorial maintenance surface as the module count grows. The "for any Entity" case is particularly awkward — a generic decorator would need the service interface to declare an Entity-returning shape, which over-constrains service design.
 - **C (hook bus)** scales linearly with `|events| × |concerns|`, where Pattern A scales linearly with `|concerns|` alone. Given that we have few concerns (≤ 5 at planning time) and many event types across modules, Pattern A is the more economical choice. If the concern count grows past ~5, revisit Pattern C.
 
-## 3. Why two interfaces, not three or more
+## Why two interfaces, not three or more
 
 The following concerns share a single shape: one observation point per mutation, with before-state and after-state:
 
@@ -39,7 +41,7 @@ Authorization has a fundamentally different shape: it fires before the operation
 
 Metrics is the borderline case. It usually wants timing and throughput data rather than before/after entity state. HTTP middleware is a more natural home for metrics because it already wraps the full request/response cycle. Metrics is treated as out of scope for this framework.
 
-## 4. Concerns explicitly excluded from the framework
+## Concerns explicitly excluded from the framework
 
 These were considered and ruled out for service-layer interface treatment:
 
@@ -51,19 +53,19 @@ These were considered and ruled out for service-layer interface treatment:
 - **Transactions / unit-of-work** — a coordination mechanism, not an intercept. The operation's transaction is a `tx` parameter passed through the call graph, not something that a cross-cutting hook controls.
 - **Feature flags** — site-specific; no universal hook shape fits. Individual services may check feature flags inline.
 
-## 5. Why context carries actor, not action or target
+## Why context carries actor, not action or target
 
 `context.Context` carries the actor entity ID (and optional assumed-actor entity ID) because these are ambient properties of the entire request — they do not change across call boundaries within a single request.
 
 Action and target are method parameters, not context values, because they are method-specific: each service method knows its own action name and the entity it is operating on. Placing action on `ctx` would require the caller to set it before the call and the callee to trust it — this couples the two code sites and creates staleness bugs when one service method calls another (the inner call would see the outer call's action on `ctx`). Explicit parameters eliminate this hazard.
 
-## 6. Why no inter-observer dependencies
+## Why no inter-observer dependencies
 
 The `ObserverGroup` dispatches all in-tx observers in parallel (via `errgroup`) and all post-commit observers in parallel. Observers cannot declare dependencies on each other.
 
 This is a deliberate simplification, not a fundamental constraint. The use cases at planning time — audit, outbox, cache invalidation — do not require ordering. Allowing inter-observer dependencies would add startup-time dependency resolution, sequential dispatch paths, and error-propagation complexity that is not justified until a concrete use case demands it. If such a use case appears, the `ObserverGroup` can be extended.
 
-## 7. Why three policy variants for in-tx observation
+## Why three policy variants for in-tx observation
 
 **The problem.** Different apps — and different call sites within the same app — treat observer failures differently. Audit rows are often mandatory: if the audit write fails, the operation should abort. Cache invalidation is best-effort: a cache miss is recoverable, but aborting a user-visible write because of it is not. A single hard-coded policy (always propagate, or always swallow) satisfies neither class of use case.
 
@@ -81,7 +83,7 @@ This covers the common case cheaply (one `WithPolicy` call at composition time) 
 
 **What is deferred.** Per-observer policy split within a single group (e.g. "audit must propagate but cache may swallow in the same call") awaits a concrete use case. Ordering and dependency resolution between observers are also deferred (see §6).
 
-## 8. Why pre-commit and post-commit observation points, not just one
+## Why pre-commit and post-commit observation points, not just one
 
 The two methods on `MutationObserver` exist because different observers need to be at different points relative to the transaction commit:
 
@@ -95,7 +97,7 @@ The two methods on `MutationObserver` exist because different observers need to 
 
 An observer that only needs one of the two points implements the other as a no-op. The framework does not force every observer to do both.
 
-## 9. Why app-side multi-observer composition rather than a core-side registry
+## Why app-side multi-observer composition rather than a core-side registry
 
 Two reasons:
 
@@ -104,7 +106,7 @@ Two reasons:
 
 If a future architecture requires dynamic observer registration (e.g., plugin-loaded observers), a registry can be introduced then. The `MutationObserver` interface does not need to change.
 
-## 10. Open questions deferred to future revisions
+## Open questions deferred to future revisions
 
 - **Inter-observer dependencies.** If a use case appears where observer B must run after observer A succeeds, the multi-observer dispatch model will need to support ordering or sequential batches. See section 6.
 - **General operation lifecycle hook.** The current framework covers mutation audit-shape use cases. A broader "operation lifecycle" hook (suitable for validation chains, projection updates, or pre/post hooks on reads) is not addressed. If that use case arises, evaluate whether to extend `MutationObserver` or introduce a third interface.

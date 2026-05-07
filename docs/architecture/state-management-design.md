@@ -1,14 +1,12 @@
 # State-management design
 
-## 1. Purpose
+## Purpose and scope
 
 This document describes how state-changing operations — creates, updates, deletes, and other mutations — flow through the service layer: the transaction lifecycle, the post-mutation observation points, and how observers compose to deliver audit logging, cache invalidation, outbox/notification dispatch, search-index synchronisation, and similar behaviours.
 
 For the pre-operation gate (authorization), see [`authorization-design.md`](authorization-design.md). For why this design (rather than middleware, decorator chains, hook bus, or repo-level hooks) was chosen, see [`cross-cutting-design-rationale.md`](cross-cutting-design-rationale.md).
 
----
-
-## 2. The `MutationObserver` interface
+## The `MutationObserver` interface
 
 Defined in `core-module/api/observer`:
 
@@ -43,9 +41,7 @@ Different observers need to fire at different points relative to commit:
 
 An observer that needs only one phase implements the other as `return nil`.
 
----
-
-## 3. The `txhelper.Run` helper
+## The `txhelper.Run` helper
 
 Defined in `core-module/api/txhelper`. Owns transaction lifecycle for service methods.
 
@@ -62,9 +58,7 @@ After a successful commit, `Run` dispatches any post-commit observer calls that 
 
 `txhelper.DB` is a minimal interface (`BeginTx`); `*pgxpool.Pool` satisfies it.
 
----
-
-## 4. The `ObserverGroup` and its three call variants
+## The `ObserverGroup` and its three call variants
 
 `core-module/api/observer.ObserverGroup` is a concrete fan-out helper that wraps any number of `MutationObserver` implementations. Service methods take `*ObserverGroup` (not the bare interface) so they can choose between three in-transaction call variants per operation:
 
@@ -92,9 +86,7 @@ Observer implementations (`audit.Observer`, `outbox.Observer`, `cache.Invalidato
 
 `NewObserverGroup()` with no arguments returns a no-op group. Service code does not need nil checks; the empty-group path is a single length check with no goroutine allocation.
 
----
-
-## 5. Standard service-method shape
+## Standard service-method shape
 
 The canonical pattern. Every mutating service method across every module follows this exactly:
 
@@ -130,9 +122,7 @@ There are no variations. The agent-facing one-pager at [`skill.cross-cutting.md`
 
 Read methods collapse to a single Authorize call followed by the fetch — no transaction, no observers (see [`authorization-design.md` §5](authorization-design.md)).
 
----
-
-## 6. App-side composition
+## App-side composition
 
 Cross-cutting behaviour is composed at the application's composition root. No module knows about any peer module:
 
@@ -154,9 +144,7 @@ Each cross-cutting module exports a single `MutationObserver` (or a function ret
 
 Service constructors accept `*ObserverGroup` (not the bare interface) so individual service methods can call `MustObserve` or `MayObserve` at sites that need to deviate from the group's default.
 
----
-
-## 7. Use cases
+## Use cases
 
 The interface covers the common cross-cutting concerns that need to react to mutations:
 
@@ -170,9 +158,7 @@ The interface covers the common cross-cutting concerns that need to react to mut
 
 Some observers may want both phases (e.g. an outbox that also caches): they implement both methods accordingly.
 
----
-
-## 8. Performance properties
+## Performance properties
 
 | Operation | Cost |
 |-----------|------|
@@ -183,9 +169,7 @@ Some observers may want both phases (e.g. an outbox that also caches): they impl
 
 No reflection. No event marshalling. No per-call allocations beyond what individual observer implementations perform internally.
 
----
-
-## 9. What this design does not do
+## What this design does not do
 
 - **No service-layer middleware or decorator chain.** Extension points are explicit interface calls, not wrapping.
 - **No event bus, no event registry, no reflection.**
