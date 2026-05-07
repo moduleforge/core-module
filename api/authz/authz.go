@@ -6,7 +6,7 @@
 // package defines only the contract.
 //
 // The acting user's identity is resolved from ctx by the implementation using
-// the opctx package (ActorEntityID, AssumedActorEntityID). action and target
+// the opctx package (ActorEntityID, AssumedActorEntityID). operation and target
 // are explicit parameters because they differ per service call and context
 // values survive call boundaries poorly when they are method-specific.
 //
@@ -15,30 +15,29 @@
 // "not authenticated" to 401 and "authenticated but not allowed" to 403.
 package authz
 
-import (
-	"context"
-
-	"github.com/moduleforge/core-api/entity"
-)
+import "context"
 
 // Authorizer gates every operation in the system. A single Authorizer
 // implementation is wired per application at the composition root; peer modules
 // receive it via their service constructors.
 //
-// action is a stable, lower-case verb string describing the operation:
+// operation is a stable, lower-case verb string describing the operation:
 //
-//	"read", "list", "create", "update", "delete", "assume"
+//	"read", "list", "search", "create", "update", "delete"
 //
-// Domain-specific verbs are permitted where the standard set is insufficient.
+// Domain-specific verbs (e.g. "assume", "login", "grant", "revoke") are
+// permitted where the standard set is insufficient.
 //
-// target is the Entity being acted on. For create operations where no entity ID
-// exists yet, the target may carry only the result of Resource() and return nil
-// from EntityID().
+// target is the internal entity ID of the object being acted on, or nil when
+// no specific target exists yet (create / list / search). The Authorizer
+// operates *before* any retrieval or instantiation of the target; it never
+// needs more than the ID. If policy needs the target's resource type, the
+// implementation looks it up by ID.
 //
 // The Authorizer resolves the effective actor from ctx via the opctx accessors.
 // When AssumedActorEntityID is set on ctx, the Authorizer must treat that ID as
 // the effective actor for all policy checks (the admin's own identity is not the
 // subject of the request for the duration of an assume session).
 type Authorizer interface {
-	Authorize(ctx context.Context, action string, target entity.Entity) error
+	Authorize(ctx context.Context, operation string, target *int64) error
 }

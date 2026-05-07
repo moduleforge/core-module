@@ -13,19 +13,18 @@ import (
 	"testing"
 
 	"github.com/moduleforge/core-api/authz"
-	"github.com/moduleforge/core-api/entity"
 )
 
 // stubAuthorizer is a minimal, outside-the-package implementation of authz.Authorizer.
 // It is used only to confirm that the interface can be satisfied by consumer code.
 type stubAuthorizer struct {
-	// denyAction, if non-empty, causes Authorize to return an error for that action.
-	denyAction string
+	// denyOperation, if non-empty, causes Authorize to return an error for that operation.
+	denyOperation string
 }
 
 // Authorize implements authz.Authorizer.
-func (s *stubAuthorizer) Authorize(_ context.Context, action string, _ entity.Entity) error {
-	if s.denyAction != "" && action == s.denyAction {
+func (s *stubAuthorizer) Authorize(_ context.Context, operation string, _ *int64) error {
+	if s.denyOperation != "" && operation == s.denyOperation {
 		return errors.New("authz: denied")
 	}
 	return nil
@@ -34,35 +33,32 @@ func (s *stubAuthorizer) Authorize(_ context.Context, action string, _ entity.En
 // Compile-time assertion: *stubAuthorizer must satisfy authz.Authorizer.
 var _ authz.Authorizer = (*stubAuthorizer)(nil)
 
-// TestStubAuthorizerAllows verifies the stub permits actions that are not denied.
+// TestStubAuthorizerAllows verifies the stub permits operations that are not denied.
 func TestStubAuthorizerAllows(t *testing.T) {
-	a := &stubAuthorizer{denyAction: "delete"}
-	target := entity.NaturalPerson{ID: ptr(int64(1))}
+	a := &stubAuthorizer{denyOperation: "delete"}
+	id := int64(1)
 
-	if err := a.Authorize(context.Background(), "read", target); err != nil {
-		t.Fatalf("expected nil error for allowed action, got: %v", err)
+	if err := a.Authorize(context.Background(), "read", &id); err != nil {
+		t.Fatalf("expected nil error for allowed operation, got: %v", err)
 	}
 }
 
-// TestStubAuthorizerDenies verifies the stub rejects the configured action.
+// TestStubAuthorizerDenies verifies the stub rejects the configured operation.
 func TestStubAuthorizerDenies(t *testing.T) {
-	a := &stubAuthorizer{denyAction: "delete"}
-	target := entity.NaturalPerson{ID: ptr(int64(1))}
+	a := &stubAuthorizer{denyOperation: "delete"}
+	id := int64(1)
 
-	if err := a.Authorize(context.Background(), "delete", target); err == nil {
-		t.Fatal("expected error for denied action, got nil")
+	if err := a.Authorize(context.Background(), "delete", &id); err == nil {
+		t.Fatal("expected error for denied operation, got nil")
 	}
 }
 
-// TestAuthorizerWithNilEntityID confirms the interface handles a pre-create entity
-// (EntityID() returns nil) without panicking.
-func TestAuthorizerWithNilEntityID(t *testing.T) {
+// TestAuthorizerWithNilTarget confirms the interface handles a nil target
+// (e.g. create / list / search) without panicking.
+func TestAuthorizerWithNilTarget(t *testing.T) {
 	a := &stubAuthorizer{}
-	target := entity.NaturalPerson{ID: nil} // pre-create: no ID yet
 
-	if err := a.Authorize(context.Background(), "create", target); err != nil {
+	if err := a.Authorize(context.Background(), "create", nil); err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
 }
-
-func ptr[T any](v T) *T { return &v }

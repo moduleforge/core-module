@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/authz"
-	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
@@ -73,7 +72,7 @@ func (s *CorporationService) Create(
 	in CreateCorporationInput,
 ) (coredb.Corporation, uuid.UUID, error) {
 	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", entity.Corporation{}); err != nil {
+	if err := s.az.Authorize(ctx, "create", nil); err != nil {
 		return coredb.Corporation{}, uuid.UUID{}, err
 	}
 
@@ -159,8 +158,9 @@ func (s *CorporationService) Create(
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "read", entity.Corporation{}); err != nil {
+	// 1. Authorize. UUID has not been resolved to an internal ID yet, so pass
+	// nil; policy that requires a specific target denies non-admins by default.
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return Profile{}, err
 	}
 
@@ -200,7 +200,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 	}
 
 	eid := ent.ID
-	if err := s.az.Authorize(ctx, "update", entity.Corporation{ID: &eid}); err != nil {
+	if err := s.az.Authorize(ctx, "update", &eid); err != nil {
 		return err
 	}
 

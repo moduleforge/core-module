@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/authz"
-	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
@@ -73,7 +72,7 @@ func (s *NaturalPersonService) Create(
 	in CreateNaturalPersonInput,
 ) (coredb.NaturalPerson, uuid.UUID, error) {
 	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", entity.NaturalPerson{}); err != nil {
+	if err := s.az.Authorize(ctx, "create", nil); err != nil {
 		return coredb.NaturalPerson{}, uuid.UUID{}, err
 	}
 
@@ -164,8 +163,8 @@ func (s *NaturalPersonService) Create(
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "read", entity.NaturalPerson{}); err != nil {
+	// 1. Authorize. UUID has not been resolved to an internal ID yet.
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return Profile{}, err
 	}
 
@@ -205,7 +204,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	}
 
 	eid := ent.ID
-	if err := s.az.Authorize(ctx, "update", entity.NaturalPerson{ID: &eid}); err != nil {
+	if err := s.az.Authorize(ctx, "update", &eid); err != nil {
 		return err
 	}
 

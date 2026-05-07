@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/authz"
-	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
@@ -65,7 +64,7 @@ func (s *ServiceAccountService) Create(
 	in CreateServiceAccountInput,
 ) (coredb.ServiceAccount, uuid.UUID, error) {
 	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", entity.ServiceAccount{}); err != nil {
+	if err := s.az.Authorize(ctx, "create", nil); err != nil {
 		return coredb.ServiceAccount{}, uuid.UUID{}, err
 	}
 
@@ -129,8 +128,8 @@ func (s *ServiceAccountService) Create(
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
 // Requires admin authorization (callers should check before calling).
 func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "read", entity.ServiceAccount{}); err != nil {
+	// 1. Authorize. UUID has not been resolved to an internal ID yet.
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return Profile{}, err
 	}
 
@@ -175,7 +174,7 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 	}
 
 	eid := ent.ID
-	if err := s.az.Authorize(ctx, "update", entity.ServiceAccount{ID: &eid}); err != nil {
+	if err := s.az.Authorize(ctx, "update", &eid); err != nil {
 		return err
 	}
 
