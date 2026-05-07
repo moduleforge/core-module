@@ -93,7 +93,7 @@ The canonical pattern. Every mutating service method across every module follows
 ```go
 func (s *FooService) Update(ctx context.Context, in FooUpdate) (Foo, error) {
     // 1. Authorize — abort immediately on error.
-    if err := s.authz.Authorize(ctx, "update", in); err != nil {
+    if err := s.authz.Authorize(ctx, "update", &in.ID); err != nil {
         return Foo{}, err
     }
 

@@ -12,14 +12,15 @@ Defined in `core-module/api/authz`:
 
 ```go
 type Authorizer interface {
-    Authorize(ctx context.Context, operation string, target Entity) error
+    Authorize(ctx context.Context, operation string, target *int64) error
 }
 ```
 
 - **One `Authorizer` per app.** No fan-out. The application's composition root constructs a single instance and injects it into every peer-module service.
 - **Called pre-op on all operations**, including reads. Requests *must* be authorized before any action is taken.
 - **A non-nil return aborts immediately.** Callers return the error as-is; service methods do not wrap or suppress it. HTTP handlers map known sentinel errors (`ErrUnauthenticated`, `ErrForbidden`) to 401/403 status codes.
-- **The actor is resolved from `ctx`**, not from a method parameter. See [operation context](operation-context-opctx).
+- **`target` is the internal entity ID of the object being acted on**, or `nil` when no specific target exists yet (e.g. `create`, `list`, `search`). The Authorizer operates *before* any retrieval or instantiation of the target, so it never needs more than the ID. If policy needs the target's resource type, the implementation looks it up by ID.
+- **The actor is resolved from `ctx`**, not from a method parameter. See [Operation context](#operation-context-opctx).
 - **`operation` and `target` are explicit method parameters** — they are method-specific and do not belong on the context. Putting them on `ctx` would create staleness bugs when one service method calls another.
 
 ## Operation context (`opctx`)
@@ -40,7 +41,7 @@ Authorizations do not consider involved `Entities` outside the subject and targe
 
 ## Entity contract
 
-The `Authorizer.Authorize` call takes an `Entity`. The interface is small:
+The `Authorizer` does not consume the `Entity` interface directly — it only takes an ID. But the broader system uses an `Entity` interface for service-layer types. The interface is small:
 
 ```go
 type Entity interface {
@@ -54,18 +55,18 @@ type Entity interface {
     // Admins may specifically request the ID.
     EntityID() *int64
 
-    // PublicUUID returns the public UUID. The public ID is immutably
-    // assigned even prior to persistance. This value should be used for any 
+    // PublicUUID returns the public UUID. This value should be used for any
     // public reference, including display to the user and log entries.
+    // Returns "" for not-yet-persisted entities.
     PublicUUID() string
 }
 ```
 
-`Resource()` is the canonical slug. It corresponds to the `fundamental_type_slug` used in the entity-typing system (see [`entity-typing.md`](entity-typing.md)). Authorizer policy code uses it to route decisions without inspecting concrete types or importing module-specific packages.
+`Resource()` is the canonical slug. It corresponds to the `fundamental_type_slug` used in the entity-typing system (see [`entity-typing.md`](entity-typing.md)). It is consumed by observers (see [`state-management-design.md`](state-management-design.md)) and may be used by `Authorizer` implementations that want to route policy by type — but only after looking the target up by ID.
 
-The same interface is used by observers (see [`state-management-design.md`](state-management-design.md)) so a single `target Entity` value carries through the full Authorize → Observe lifecycle.
+`PublicUUID()` is what callers should use whenever they need to display, log, or otherwise externally reference an entity. `EntityID()` stays internal.
 
-For create operations where the target entity does not yet have an ID, pass a zero-valued Entity (e.g. `entity.NaturalPerson{}` with nil ID) — the resource string is the only thing the authorizer needs at that point.
+Service methods typically obtain the target ID for the `Authorize` call from request inputs (e.g. an entity UUID resolved to its internal ID, or a domain object's `EntityID()`). For create / list / search where no specific target exists, pass `nil`.
 
 ## Where the `Authorize()` call goes
 
@@ -92,7 +93,7 @@ func (s *FooService) Get(ctx context.Context, id int64) (Foo, error) {
 }
 ```
 
-Core  `read`, `sread`, `create`, `update`, `delete`, plus domain-specific verbs for special operations (`assume`, `login`, `grant`, `revoke`).
+Operation strings are stable lower-case verbs: `read`, `list`, `search`, `create`, `update`, `delete`, plus domain-specific verbs (`assume`, `login`, `grant`, `revoke`) for special cases.
 
 `Authorize()` is called from the **service layer**, not from HTTP handlers. Handlers must not duplicate the call — the service is the authoritative gate. This keeps the contract uniform regardless of how a service is invoked (HTTP today; potentially gRPC, message-queue handlers, or scheduled jobs in future).
 
