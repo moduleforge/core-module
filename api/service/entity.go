@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/authz"
-	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
@@ -46,7 +45,7 @@ func (s *EntityService) querier(tx pgx.Tx) coredb.Querier {
 // GetByUUID fetches a single entity by its public UUID.
 // Returns ErrNotFound if no matching row exists.
 func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
-	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return coredb.GetEntityByUUIDRow{}, err
 	}
 	e, err := q.GetEntityByUUID(ctx, id)
@@ -62,7 +61,7 @@ func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid
 // GetByID fetches a single entity by internal ID.
 // Returns ErrNotFound if no matching row exists.
 func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64) (coredb.GetEntityByIDRow, error) {
-	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return coredb.GetEntityByIDRow{}, err
 	}
 	e, err := q.GetEntityByID(ctx, id)
@@ -77,7 +76,7 @@ func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64)
 
 // GetSelf returns the Profile for the authenticated caller's entity.
 func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Principal) (Profile, error) {
-	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return Profile{}, err
 	}
 	profile, err := ResolveProfileByEntityID(ctx, q, actor.EntityID)
@@ -89,7 +88,7 @@ func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Pri
 
 // ResolveProfile loads an entity by UUID then resolves its sub-type profile.
 func (s *EntityService) ResolveProfile(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	if err := s.az.Authorize(ctx, "read", entity.LegalEntity{}); err != nil {
+	if err := s.az.Authorize(ctx, "read", nil); err != nil {
 		return Profile{}, err
 	}
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
@@ -120,7 +119,7 @@ func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUI
 	}
 
 	eid := ent.ID
-	if err := s.az.Authorize(ctx, "delete", entity.LegalEntity{ID: &eid}); err != nil {
+	if err := s.az.Authorize(ctx, "delete", &eid); err != nil {
 		return err
 	}
 
