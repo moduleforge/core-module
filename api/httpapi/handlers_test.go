@@ -17,7 +17,7 @@ import (
 // buildNaturalPersonProfile returns a Profile for testing GET responses.
 func buildNaturalPersonProfile(givenName, familyName string) service.Profile {
 	entityUUID := uuid.New()
-	np := &coredb.NaturalPerson{
+	np := &coredb.GetNaturalPersonByEntityIDRow{
 		GivenName:  pgtype.Text{String: givenName, Valid: true},
 		FamilyName: pgtype.Text{String: familyName, Valid: true},
 	}

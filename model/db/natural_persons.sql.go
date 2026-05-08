@@ -24,14 +24,24 @@ type CreateNaturalPersonParams struct {
 	Ssn        []byte      `json:"ssn"`
 }
 
-func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error) {
+type CreateNaturalPersonRow struct {
+	ID         int64              `json:"id"`
+	EntityID   int64              `json:"entity_id"`
+	GivenName  pgtype.Text        `json:"given_name"`
+	FamilyName pgtype.Text        `json:"family_name"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Ssn        []byte             `json:"ssn"`
+}
+
+func (q *Queries) CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (CreateNaturalPersonRow, error) {
 	row := q.db.QueryRow(ctx, createNaturalPerson,
 		arg.EntityID,
 		arg.GivenName,
 		arg.FamilyName,
 		arg.Ssn,
 	)
-	var i NaturalPerson
+	var i CreateNaturalPersonRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
@@ -50,9 +60,19 @@ FROM natural_persons
 WHERE entity_id = $1
 `
 
-func (q *Queries) GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (NaturalPerson, error) {
+type GetNaturalPersonByEntityIDRow struct {
+	ID         int64              `json:"id"`
+	EntityID   int64              `json:"entity_id"`
+	GivenName  pgtype.Text        `json:"given_name"`
+	FamilyName pgtype.Text        `json:"family_name"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	Ssn        []byte             `json:"ssn"`
+}
+
+func (q *Queries) GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (GetNaturalPersonByEntityIDRow, error) {
 	row := q.db.QueryRow(ctx, getNaturalPersonByEntityID, entityID)
-	var i NaturalPerson
+	var i GetNaturalPersonByEntityIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,

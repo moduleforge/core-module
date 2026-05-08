@@ -16,9 +16,9 @@ type Corporation struct {
 	EntityID     int64              `json:"entity_id"`
 	LegalName    string             `json:"legal_name"`
 	Jurisdiction pgtype.Text        `json:"jurisdiction"`
+	Ein          []byte             `json:"ein"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	Ein          []byte             `json:"ein"`
 }
 
 type Entity struct {
@@ -39,9 +39,9 @@ type NaturalPerson struct {
 	EntityID   int64              `json:"entity_id"`
 	GivenName  pgtype.Text        `json:"given_name"`
 	FamilyName pgtype.Text        `json:"family_name"`
+	Ssn        []byte             `json:"ssn"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	Ssn        []byte             `json:"ssn"`
 }
 
 type ServiceAccount struct {

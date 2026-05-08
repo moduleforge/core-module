@@ -12,19 +12,20 @@ import (
 
 type Querier interface {
 	ArchiveEntity(ctx context.Context, argUuid uuid.UUID) error
-	CreateCorporation(ctx context.Context, arg CreateCorporationParams) (Corporation, error)
+	CreateCorporation(ctx context.Context, arg CreateCorporationParams) (CreateCorporationRow, error)
 	CreateEntity(ctx context.Context, fundamentalTypeID int64) (Entity, error)
 	CreateLegalEntity(ctx context.Context, entityID int64) (int64, error)
-	CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (NaturalPerson, error)
+	CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (CreateNaturalPersonRow, error)
 	CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error)
-	GetCorporationByEntityID(ctx context.Context, entityID int64) (Corporation, error)
+	GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error)
 	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
 	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error)
-	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (NaturalPerson, error)
+	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (GetNaturalPersonByEntityIDRow, error)
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
 	GetTypeByID(ctx context.Context, id int64) (Type, error)
 	GetTypeBySlug(ctx context.Context, slug string) (Type, error)
+	ListAllTypes(ctx context.Context) ([]Type, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
 	// NOTE: pass NULL for ein to leave it unchanged; pass an empty bytea
 	// to clear it. A non-empty bytea replaces it.

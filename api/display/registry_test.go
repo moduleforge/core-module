@@ -29,21 +29,21 @@ func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntit
 // interface. Only GetEntityByID is exercised by the display registry.
 
 func (s *stubQuerier) ArchiveEntity(_ context.Context, _ uuid.UUID) error                        { return nil }
-func (s *stubQuerier) CreateCorporation(_ context.Context, _ coredb.CreateCorporationParams) (coredb.Corporation, error) {
-	return coredb.Corporation{}, nil
+func (s *stubQuerier) CreateCorporation(_ context.Context, _ coredb.CreateCorporationParams) (coredb.CreateCorporationRow, error) {
+	return coredb.CreateCorporationRow{}, nil
 }
 func (s *stubQuerier) CreateEntity(_ context.Context, _ int64) (coredb.Entity, error) {
 	return coredb.Entity{}, nil
 }
 func (s *stubQuerier) CreateLegalEntity(_ context.Context, _ int64) (int64, error) { return 0, nil }
-func (s *stubQuerier) CreateNaturalPerson(_ context.Context, _ coredb.CreateNaturalPersonParams) (coredb.NaturalPerson, error) {
-	return coredb.NaturalPerson{}, nil
+func (s *stubQuerier) CreateNaturalPerson(_ context.Context, _ coredb.CreateNaturalPersonParams) (coredb.CreateNaturalPersonRow, error) {
+	return coredb.CreateNaturalPersonRow{}, nil
 }
 func (s *stubQuerier) CreateServiceAccount(_ context.Context, _ coredb.CreateServiceAccountParams) (coredb.ServiceAccount, error) {
 	return coredb.ServiceAccount{}, nil
 }
-func (s *stubQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (coredb.Corporation, error) {
-	return coredb.Corporation{}, nil
+func (s *stubQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (coredb.GetCorporationByEntityIDRow, error) {
+	return coredb.GetCorporationByEntityIDRow{}, nil
 }
 func (s *stubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
 	return coredb.GetEntityByUUIDRow{}, nil
@@ -51,8 +51,8 @@ func (s *stubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.Ge
 func (s *stubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
-func (s *stubQuerier) GetNaturalPersonByEntityID(_ context.Context, _ int64) (coredb.NaturalPerson, error) {
-	return coredb.NaturalPerson{}, nil
+func (s *stubQuerier) GetNaturalPersonByEntityID(_ context.Context, _ int64) (coredb.GetNaturalPersonByEntityIDRow, error) {
+	return coredb.GetNaturalPersonByEntityIDRow{}, nil
 }
 func (s *stubQuerier) GetServiceAccountByEntityID(_ context.Context, _ int64) (coredb.ServiceAccount, error) {
 	return coredb.ServiceAccount{}, nil
@@ -62,6 +62,9 @@ func (s *stubQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Type, erro
 }
 func (s *stubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb.Type, error) {
 	return coredb.Type{}, nil
+}
+func (s *stubQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
+	return nil, nil
 }
 func (s *stubQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
 func (s *stubQuerier) UpdateCorporation(_ context.Context, _ coredb.UpdateCorporationParams) error {

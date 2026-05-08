@@ -24,14 +24,24 @@ type CreateCorporationParams struct {
 	Ein          []byte      `json:"ein"`
 }
 
-func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationParams) (Corporation, error) {
+type CreateCorporationRow struct {
+	ID           int64              `json:"id"`
+	EntityID     int64              `json:"entity_id"`
+	LegalName    string             `json:"legal_name"`
+	Jurisdiction pgtype.Text        `json:"jurisdiction"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Ein          []byte             `json:"ein"`
+}
+
+func (q *Queries) CreateCorporation(ctx context.Context, arg CreateCorporationParams) (CreateCorporationRow, error) {
 	row := q.db.QueryRow(ctx, createCorporation,
 		arg.EntityID,
 		arg.LegalName,
 		arg.Jurisdiction,
 		arg.Ein,
 	)
-	var i Corporation
+	var i CreateCorporationRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
@@ -50,9 +60,19 @@ FROM corporations
 WHERE entity_id = $1
 `
 
-func (q *Queries) GetCorporationByEntityID(ctx context.Context, entityID int64) (Corporation, error) {
+type GetCorporationByEntityIDRow struct {
+	ID           int64              `json:"id"`
+	EntityID     int64              `json:"entity_id"`
+	LegalName    string             `json:"legal_name"`
+	Jurisdiction pgtype.Text        `json:"jurisdiction"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Ein          []byte             `json:"ein"`
+}
+
+func (q *Queries) GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error) {
 	row := q.db.QueryRow(ctx, getCorporationByEntityID, entityID)
-	var i Corporation
+	var i GetCorporationByEntityIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,

@@ -20,8 +20,8 @@ import (
 type Profile struct {
 	Entity         coredb.GetEntityByUUIDRow
 	Kind           string // "natural_person" | "corporation" | "service_account"
-	NaturalPerson  *coredb.NaturalPerson
-	Corporation    *coredb.Corporation
+	NaturalPerson  *coredb.GetNaturalPersonByEntityIDRow
+	Corporation    *coredb.GetCorporationByEntityIDRow
 	ServiceAccount *coredb.ServiceAccount
 	TaxID          string // plaintext; "" if none or not decrypted
 	TaxIDType      string // "SSN" | "EIN" | ""

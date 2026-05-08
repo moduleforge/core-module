@@ -150,13 +150,13 @@ type mockQuerier struct {
 	entities       map[uuid.UUID]coredb.GetEntityByUUIDRow
 	entitiesByID   map[int64]coredb.GetEntityByUUIDRow
 	legalEntities  map[int64]int64 // entity_id -> entity_id (anchor)
-	naturalPersons map[int64]coredb.NaturalPerson
-	corporations   map[int64]coredb.Corporation
+	naturalPersons map[int64]coredb.GetNaturalPersonByEntityIDRow
+	corporations   map[int64]coredb.GetCorporationByEntityIDRow
 	serviceAccts   map[int64]coredb.ServiceAccount
 	types          map[string]coredb.Type
 
 	createEntityFn         func(ctx context.Context, fundamentalTypeID int64) (coredb.Entity, error)
-	createNaturalPersonFn  func(ctx context.Context, arg coredb.CreateNaturalPersonParams) (coredb.NaturalPerson, error)
+	createNaturalPersonFn  func(ctx context.Context, arg coredb.CreateNaturalPersonParams) (coredb.CreateNaturalPersonRow, error)
 	updateNaturalPersonErr error
 	archiveEntityErr       error
 	nextID                 int64
@@ -167,8 +167,8 @@ func newMockQuerier() *mockQuerier {
 		entities:       make(map[uuid.UUID]coredb.GetEntityByUUIDRow),
 		entitiesByID:   make(map[int64]coredb.GetEntityByUUIDRow),
 		legalEntities:  make(map[int64]int64),
-		naturalPersons: make(map[int64]coredb.NaturalPerson),
-		corporations:   make(map[int64]coredb.Corporation),
+		naturalPersons: make(map[int64]coredb.GetNaturalPersonByEntityIDRow),
+		corporations:   make(map[int64]coredb.GetCorporationByEntityIDRow),
 		serviceAccts:   make(map[int64]coredb.ServiceAccount),
 		types:          make(map[string]coredb.Type),
 	}
@@ -228,17 +228,24 @@ func (m *mockQuerier) ArchiveEntity(_ context.Context, argUuid uuid.UUID) error 
 	return nil
 }
 
-func (m *mockQuerier) CreateCorporation(_ context.Context, arg coredb.CreateCorporationParams) (coredb.Corporation, error) {
+func (m *mockQuerier) CreateCorporation(_ context.Context, arg coredb.CreateCorporationParams) (coredb.CreateCorporationRow, error) {
 	id := m.nextSeq()
-	corp := coredb.Corporation{
+	row := coredb.CreateCorporationRow{
 		ID:           id,
 		EntityID:     arg.EntityID,
 		LegalName:    arg.LegalName,
 		Jurisdiction: arg.Jurisdiction,
 		Ein:          arg.Ein,
 	}
-	m.corporations[arg.EntityID] = corp
-	return corp, nil
+	// Store a GetCorporationByEntityIDRow for subsequent lookups.
+	m.corporations[arg.EntityID] = coredb.GetCorporationByEntityIDRow{
+		ID:           id,
+		EntityID:     arg.EntityID,
+		LegalName:    arg.LegalName,
+		Jurisdiction: arg.Jurisdiction,
+		Ein:          arg.Ein,
+	}
+	return row, nil
 }
 
 func (m *mockQuerier) CreateEntity(_ context.Context, fundamentalTypeID int64) (coredb.Entity, error) {
@@ -272,20 +279,27 @@ func (m *mockQuerier) CreateLegalEntity(_ context.Context, entityID int64) (int6
 	return entityID, nil
 }
 
-func (m *mockQuerier) CreateNaturalPerson(_ context.Context, arg coredb.CreateNaturalPersonParams) (coredb.NaturalPerson, error) {
+func (m *mockQuerier) CreateNaturalPerson(_ context.Context, arg coredb.CreateNaturalPersonParams) (coredb.CreateNaturalPersonRow, error) {
 	if m.createNaturalPersonFn != nil {
 		return m.createNaturalPersonFn(context.Background(), arg)
 	}
 	id := m.nextSeq()
-	np := coredb.NaturalPerson{
+	row := coredb.CreateNaturalPersonRow{
 		ID:         id,
 		EntityID:   arg.EntityID,
 		GivenName:  arg.GivenName,
 		FamilyName: arg.FamilyName,
 		Ssn:        arg.Ssn,
 	}
-	m.naturalPersons[arg.EntityID] = np
-	return np, nil
+	// Store a GetNaturalPersonByEntityIDRow for subsequent lookups.
+	m.naturalPersons[arg.EntityID] = coredb.GetNaturalPersonByEntityIDRow{
+		ID:         id,
+		EntityID:   arg.EntityID,
+		GivenName:  arg.GivenName,
+		FamilyName: arg.FamilyName,
+		Ssn:        arg.Ssn,
+	}
+	return row, nil
 }
 
 func (m *mockQuerier) CreateServiceAccount(_ context.Context, arg coredb.CreateServiceAccountParams) (coredb.ServiceAccount, error) {
@@ -299,11 +313,11 @@ func (m *mockQuerier) CreateServiceAccount(_ context.Context, arg coredb.CreateS
 	return sa, nil
 }
 
-func (m *mockQuerier) GetCorporationByEntityID(_ context.Context, entityID int64) (coredb.Corporation, error) {
+func (m *mockQuerier) GetCorporationByEntityID(_ context.Context, entityID int64) (coredb.GetCorporationByEntityIDRow, error) {
 	if corp, ok := m.corporations[entityID]; ok {
 		return corp, nil
 	}
-	return coredb.Corporation{}, pgx.ErrNoRows
+	return coredb.GetCorporationByEntityIDRow{}, pgx.ErrNoRows
 }
 
 func (m *mockQuerier) GetEntityByUUID(_ context.Context, argUuid uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
@@ -335,11 +349,11 @@ func (m *mockQuerier) GetLegalEntityByEntityID(_ context.Context, entityID int64
 	return 0, pgx.ErrNoRows
 }
 
-func (m *mockQuerier) GetNaturalPersonByEntityID(_ context.Context, entityID int64) (coredb.NaturalPerson, error) {
+func (m *mockQuerier) GetNaturalPersonByEntityID(_ context.Context, entityID int64) (coredb.GetNaturalPersonByEntityIDRow, error) {
 	if np, ok := m.naturalPersons[entityID]; ok {
 		return np, nil
 	}
-	return coredb.NaturalPerson{}, pgx.ErrNoRows
+	return coredb.GetNaturalPersonByEntityIDRow{}, pgx.ErrNoRows
 }
 
 func (m *mockQuerier) GetServiceAccountByEntityID(_ context.Context, entityID int64) (coredb.ServiceAccount, error) {
@@ -363,6 +377,14 @@ func (m *mockQuerier) GetTypeByID(_ context.Context, id int64) (coredb.Type, err
 		}
 	}
 	return coredb.Type{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
+	out := make([]coredb.Type, 0, len(m.types))
+	for _, t := range m.types {
+		out = append(out, t)
+	}
+	return out, nil
 }
 
 func (m *mockQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error {
@@ -420,7 +442,7 @@ func (m *mockQuerier) seedNaturalPerson(givenName, familyName string) uuid.UUID 
 	m.legalEntities[entityID] = entityID
 
 	npID := m.nextSeq()
-	m.naturalPersons[entityID] = coredb.NaturalPerson{
+	m.naturalPersons[entityID] = coredb.GetNaturalPersonByEntityIDRow{
 		ID:         npID,
 		EntityID:   entityID,
 		GivenName:  pgtype.Text{String: givenName, Valid: true},
