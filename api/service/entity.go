@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
@@ -26,10 +27,11 @@ type EntityServicer interface {
 // EntityService implements entity-level operations with authorization,
 // transactional mutation, and observer dispatch.
 type EntityService struct {
-	db         txhelper.DB
-	az         authz.Authorizer
-	obs        *observer.ObserverGroup
-	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	db             txhelper.DB
+	az             authz.Authorizer
+	obs            *observer.ObserverGroup
+	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	entityResolver *entity.Resolver
 }
 
 // Compile-time assertion.
@@ -43,12 +45,17 @@ func (s *EntityService) querier(tx pgx.Tx) coredb.Querier {
 }
 
 // GetByUUID fetches a single entity by its public UUID.
-// Returns ErrNotFound if no matching row exists.
-func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+// Returns ErrForbidden (masked 404) if the entity does not exist.
+func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
+	// Resolve UUID → internal ID; default policy masks missing as 403.
+	internalID, err := s.entityResolver.Resolve(ctx, q, entityUUID, "entity")
+	if err != nil {
 		return coredb.GetEntityByUUIDRow{}, err
 	}
-	e, err := q.GetEntityByUUID(ctx, id)
+	if err := s.az.Authorize(ctx, "read", &internalID); err != nil {
+		return coredb.GetEntityByUUIDRow{}, err
+	}
+	e, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return coredb.GetEntityByUUIDRow{}, ErrNotFound
@@ -61,7 +68,7 @@ func (s *EntityService) GetByUUID(ctx context.Context, q coredb.Querier, id uuid
 // GetByID fetches a single entity by internal ID.
 // Returns ErrNotFound if no matching row exists.
 func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64) (coredb.GetEntityByIDRow, error) {
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	if err := s.az.Authorize(ctx, "read", &id); err != nil {
 		return coredb.GetEntityByIDRow{}, err
 	}
 	e, err := q.GetEntityByID(ctx, id)
@@ -76,7 +83,8 @@ func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64)
 
 // GetSelf returns the Profile for the authenticated caller's entity.
 func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Principal) (Profile, error) {
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	eid := actor.EntityID
+	if err := s.az.Authorize(ctx, "read", &eid); err != nil {
 		return Profile{}, err
 	}
 	profile, err := ResolveProfileByEntityID(ctx, q, actor.EntityID)
@@ -87,18 +95,17 @@ func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Pri
 }
 
 // ResolveProfile loads an entity by UUID then resolves its sub-type profile.
+// Returns ErrForbidden (masked 404) if the entity does not exist.
 func (s *EntityService) ResolveProfile(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	// Resolve UUID → internal ID; default policy masks missing as 403.
+	id, err := s.entityResolver.Resolve(ctx, q, entityUUID, "entity")
+	if err != nil {
 		return Profile{}, err
 	}
-	ent, err := q.GetEntityByUUID(ctx, entityUUID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, ErrNotFound
-		}
-		return Profile{}, fmt.Errorf("entity.ResolveProfile: %w", err)
+	if err := s.az.Authorize(ctx, "read", &id); err != nil {
+		return Profile{}, err
 	}
-	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID)
+	profile, err := ResolveProfileByEntityID(ctx, q, id)
 	if err != nil {
 		return Profile{}, err
 	}

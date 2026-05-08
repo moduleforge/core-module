@@ -11,9 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -44,11 +46,13 @@ type NaturalPersonServicer interface {
 // NaturalPersonService implements natural person CRUD with authorization,
 // transactional mutation, and observer dispatch.
 type NaturalPersonService struct {
-	db         txhelper.DB
-	az         authz.Authorizer
-	obs        *observer.ObserverGroup
-	cipher     *fieldcrypto.Cipher
-	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	db             txhelper.DB
+	az             authz.Authorizer
+	obs            *observer.ObserverGroup
+	cipher         *fieldcrypto.Cipher
+	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	entityResolver *entity.Resolver
+	typeResolver   *types.Resolver
 }
 
 // Compile-time assertion.
@@ -71,8 +75,9 @@ func (s *NaturalPersonService) Create(
 	_ Principal,
 	in CreateNaturalPersonInput,
 ) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", nil); err != nil {
+	// 1. Authorize with the type ID so per-resource create policy can apply.
+	typeID := s.typeResolver.IDForSlugMust("natural_person")
+	if err := s.az.Authorize(ctx, "create", &typeID); err != nil {
 		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, err
 	}
 
@@ -159,24 +164,23 @@ func (s *NaturalPersonService) Create(
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
-// Returns ErrNotFound if the entity does not exist.
+// Returns ErrForbidden (masked 404) if the entity does not exist, or
+// ErrNotFound if the resolver has been configured to surface 404s for this resource.
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *NaturalPersonService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize. UUID has not been resolved to an internal ID yet.
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	// 1. Resolve UUID → internal ID; default policy masks missing as 403.
+	id, err := s.entityResolver.Resolve(ctx, q, entityUUID, "natural_person")
+	if err != nil {
 		return Profile{}, err
 	}
 
-	ent, err := q.GetEntityByUUID(ctx, entityUUID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, ErrNotFound
-		}
-		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID entity: %w", err)
+	// 2. Authorize against the resolved entity ID.
+	if err := s.az.Authorize(ctx, "read", &id); err != nil {
+		return Profile{}, err
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID, s.cipher)
+	profile, err := ResolveProfileByEntityID(ctx, q, id, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("natural_person.GetByEntityUUID profile: %w", err)
 	}

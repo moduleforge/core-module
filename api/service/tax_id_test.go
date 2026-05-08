@@ -17,11 +17,13 @@ func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -58,11 +60,13 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -88,11 +92,13 @@ func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
 	cipher := testCipher(t)
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     cipher,
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -235,11 +241,13 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -268,11 +276,13 @@ func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
 	cipher := testCipher(t)
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     cipher,
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -302,11 +312,13 @@ func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 	q := newMockQuerier()
 	cipher := testCipher(t)
 	npSvc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     cipher,
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
@@ -342,11 +354,13 @@ func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 	q := newMockQuerier()
 	cipher := testCipher(t)
 	corpSvc := &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     cipher,
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
@@ -382,10 +396,12 @@ func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 	q := newMockQuerier()
 	cipher := testCipher(t)
 	saSvc := &ServiceAccountService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
 	admin := Principal{IsAdmin: true}
@@ -458,11 +474,13 @@ func TestAuditRedaction_NoPlaintext(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 

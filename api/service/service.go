@@ -4,9 +4,11 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -38,13 +40,27 @@ type Services struct {
 // pass observer.NewObserverGroup() for a no-op group.
 //
 // cipher is used to encrypt and decrypt SSN and EIN fields; it must not be nil.
-func New(q coredb.Querier, db txhelper.DB, az authz.Authorizer, obs *observer.ObserverGroup, cipher *fieldcrypto.Cipher) *Services {
+//
+// entityResolver maps public UUIDs to internal entity IDs; use entity.NewResolver()
+// for the default 403-on-missing policy.
+//
+// typeResolver maps resource slugs to internal type IDs; must be pre-populated
+// via types.New at startup.
+func New(
+	q coredb.Querier,
+	db txhelper.DB,
+	az authz.Authorizer,
+	obs *observer.ObserverGroup,
+	cipher *fieldcrypto.Cipher,
+	entityResolver *entity.Resolver,
+	typeResolver *types.Resolver,
+) *Services {
 	newQ := func(tx pgx.Tx) coredb.Querier { return coredb.New(tx) }
 	return &Services{
-		Entity:         &EntityService{db: db, az: az, obs: obs, newQuerier: newQ},
-		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
-		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ},
-		ServiceAccount: &ServiceAccountService{db: db, az: az, obs: obs, newQuerier: newQ},
+		Entity:         &EntityService{db: db, az: az, obs: obs, newQuerier: newQ, entityResolver: entityResolver},
+		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
+		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
+		ServiceAccount: &ServiceAccountService{db: db, az: az, obs: obs, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
 		q:              q,
 	}
 }

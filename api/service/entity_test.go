@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
 )
 
@@ -21,10 +22,11 @@ func randomUUID(t *testing.T) uuid.UUID {
 
 func newEntityService(q *mockQuerier) *EntityService {
 	return &EntityService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
 	}
 }
 
@@ -88,9 +90,11 @@ func TestEntityService_GetByUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
 	svc := newEntityService(q)
 
+	// With the default resolver policy, a missing UUID is masked as ErrForbidden
+	// (not ErrNotFound) to prevent entity existence leaks.
 	_, err := svc.GetByUUID(context.Background(), q, randomUUID(t))
-	if !errors.Is(err, ErrNotFound) {
-		t.Errorf("expected ErrNotFound, got %v", err)
+	if !errors.Is(err, entity.ErrForbidden) {
+		t.Errorf("expected entity.ErrForbidden for missing UUID, got %v", err)
 	}
 }
 
@@ -112,13 +116,16 @@ func TestEntityService_GetByUUID_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
 	authzErr := errors.New("denied")
 	svc := &EntityService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
 	}
 
-	_, err := svc.GetByUUID(context.Background(), q, randomUUID(t))
+	// Seed the entity so resolver succeeds; authz should then deny.
+	entityUUID := q.seedNaturalPerson("Denied", "User")
+	_, err := svc.GetByUUID(context.Background(), q, entityUUID)
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}

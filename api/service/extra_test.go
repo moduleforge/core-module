@@ -14,10 +14,12 @@ import (
 
 func newSAService(q *mockQuerier) *ServiceAccountService {
 	return &ServiceAccountService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 }
 

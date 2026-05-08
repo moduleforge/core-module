@@ -10,8 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -450,6 +452,23 @@ func (m *mockQuerier) seedNaturalPerson(givenName, familyName string) uuid.UUID 
 	}
 
 	return entityUUID
+}
+
+// testEntityResolver returns an entity.Resolver with the default 403-on-missing
+// policy, suitable for unit tests.
+func testEntityResolver() *entity.Resolver {
+	return entity.NewResolver()
+}
+
+// testTypeResolver builds a types.Resolver from the mock querier's seeded type
+// map, so tests that call Create (which resolves the type ID via typeResolver)
+// work without a real database.
+func testTypeResolver(q *mockQuerier) *types.Resolver {
+	m := make(map[string]int64, len(q.types))
+	for slug, t := range q.types {
+		m[slug] = t.ID
+	}
+	return types.NewFromMap(m)
 }
 
 // Compile-time: mockQuerier must satisfy coredb.Querier.

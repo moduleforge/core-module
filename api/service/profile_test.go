@@ -127,10 +127,12 @@ func TestServiceAccountService_Create_WritesObserver(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &ServiceAccountService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 
@@ -153,10 +155,12 @@ func TestServiceAccountService_Create_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
 	authzErr := errors.New("forbidden")
 	svc := &ServiceAccountService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 
 	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateServiceAccountInput{Label: "x"})
@@ -210,7 +214,8 @@ func TestLegalEntityService_GetByEntityID_Found(t *testing.T) {
 
 func TestServices_New(t *testing.T) {
 	q := newMockQuerier()
-	svcs := New(q, newFakeDB(), allowAllAuthz{}, observer.NewObserverGroup(), testCipher(t))
+	svcs := New(q, newFakeDB(), allowAllAuthz{}, observer.NewObserverGroup(), testCipher(t),
+		testEntityResolver(), testTypeResolver(q))
 	if svcs == nil {
 		t.Fatal("expected non-nil Services")
 	}

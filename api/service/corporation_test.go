@@ -11,11 +11,13 @@ import (
 func newCorpService(t *testing.T, q *mockQuerier) *CorporationService {
 	t.Helper()
 	return &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 }
 
@@ -23,11 +25,13 @@ func TestCorporationService_Create_WritesObserver(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
@@ -59,11 +63,13 @@ func TestCorporationService_Create_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
 	authzErr := errors.New("unauthorized")
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 
 	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateCorporationInput{LegalName: "Foo"})
@@ -125,11 +131,13 @@ func TestCorporationService_Update_AuthzDenied(t *testing.T) {
 	}
 
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	ln := "Delta Inc"
 	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln}, Principal{})
@@ -142,11 +150,13 @@ func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &CorporationService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{IsAdmin: true}
 

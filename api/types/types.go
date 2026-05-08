@@ -60,3 +60,13 @@ func (r *Resolver) IDForSlugMust(slug string) int64 {
 	}
 	return id
 }
+
+// NewFromMap constructs a Resolver from a pre-built slug→ID map.
+// This is intended for use in tests only; production code must use New.
+func NewFromMap(m map[string]int64) *Resolver {
+	bySlug := make(map[string]int64, len(m))
+	for k, v := range m {
+		bySlug[k] = v
+	}
+	return &Resolver{bySlug: bySlug}
+}
