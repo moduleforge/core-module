@@ -23,10 +23,12 @@ import "context"
 //
 // operation is a stable, lower-case verb string describing the operation:
 //
-//	"read", "list", "search", "create", "update", "delete"
+//	"read", "list", "create", "update", "delete"
 //
-// Domain-specific verbs (e.g. "assume", "login", "grant", "revoke") are
-// permitted where the standard set is insufficient.
+// "search" is not a separate operation — searches authorize as "list" (same
+// security question: may this actor discover this resource?). Domain-specific
+// verbs (e.g. "assume", "login", "grant", "revoke") are permitted where the
+// standard set is insufficient.
 //
 // target is the internal entity ID of the object being acted on, or nil when
 // no specific target exists yet (create / list / search). The Authorizer
