@@ -145,6 +145,6 @@ func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUI
 	}
 
 	// 3. Post-commit observers.
-	s.obs.ObserveAfterCommit(ctx, "delete", "entity", &eid, nil, nil)
+	s.obs.ObserveAfterCommit(ctx, "delete", "entity", &eid, nil)
 	return nil
 }

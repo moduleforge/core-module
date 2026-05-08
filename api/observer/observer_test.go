@@ -18,19 +18,16 @@ import (
 // -- test helpers --
 
 // errObserver always returns a fixed error from Observe; ObserveAfterCommit
-// always returns a fixed error too.
+// is a no-op (errors are no longer returned by that method).
 type errObserver struct {
-	observeErr         error
-	afterCommitErr     error
+	observeErr error
 }
 
 func (o *errObserver) Observe(_ context.Context, _ pgx.Tx, _, _ string, _ *int64, _, _ any) error {
 	return o.observeErr
 }
 
-func (o *errObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _, _ any) error {
-	return o.afterCommitErr
-}
+func (o *errObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _ any) {}
 
 // countObserver records how many times Observe / ObserveAfterCommit were
 // called and optionally introduces a small delay to exercise parallelism.
@@ -48,19 +45,18 @@ func (o *countObserver) Observe(_ context.Context, _ pgx.Tx, _, _ string, _ *int
 	return nil
 }
 
-func (o *countObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _, _ any) error {
+func (o *countObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _ any) {
 	if o.delay > 0 {
 		time.Sleep(o.delay)
 	}
 	o.afterCommitCount.Add(1)
-	return nil
 }
 
 // logObserver records calls in a mutex-protected slice for test assertions.
 type logObserver struct {
-	mu   sync.Mutex
-	ops  []string
-	err  error
+	mu  sync.Mutex
+	ops []string
+	err error
 }
 
 func (o *logObserver) Observe(_ context.Context, _ pgx.Tx, op, _ string, _ *int64, _, _ any) error {
@@ -70,11 +66,10 @@ func (o *logObserver) Observe(_ context.Context, _ pgx.Tx, op, _ string, _ *int6
 	return o.err
 }
 
-func (o *logObserver) ObserveAfterCommit(_ context.Context, op, _ string, _ *int64, _, _ any) error {
+func (o *logObserver) ObserveAfterCommit(_ context.Context, op, _ string, _ *int64, _ any) {
 	o.mu.Lock()
 	o.ops = append(o.ops, op)
 	o.mu.Unlock()
-	return o.err
 }
 
 // newLogBuf returns a slog.Logger that writes to the returned buffer.
@@ -98,9 +93,8 @@ func TestEmptyGroup_Noop(t *testing.T) {
 	if err := g.MayObserve(ctx, nil, "create", "foo", nil, nil, nil); err != nil {
 		t.Fatalf("MayObserve on empty group: %v", err)
 	}
-	if err := g.ObserveAfterCommit(ctx, "create", "foo", nil, nil, nil); err != nil {
-		t.Fatalf("ObserveAfterCommit on empty group: %v", err)
-	}
+	// ObserveAfterCommit on empty group must not panic.
+	g.ObserveAfterCommit(ctx, "create", "foo", nil, nil)
 }
 
 func TestGroup_CallsAllObserversInParallel(t *testing.T) {
@@ -199,19 +193,18 @@ func TestMayObserve_OverridesPropagatePolicy(t *testing.T) {
 	}
 }
 
-func TestObserveAfterCommit_ErrorsLoggedNotPropagated(t *testing.T) {
-	logger, buf := newLogBuf()
-	sentinel := errors.New("post-commit error")
-	g := observer.NewObserverGroup(
-		&errObserver{afterCommitErr: sentinel},
-	).WithLogger(logger)
+func TestObserveAfterCommit_CallsAllObservers(t *testing.T) {
+	co1 := &countObserver{}
+	co2 := &countObserver{}
+	g := observer.NewObserverGroup(co1, co2)
 
-	err := g.ObserveAfterCommit(context.Background(), "create", "foo", nil, nil, nil)
-	if err != nil {
-		t.Fatalf("ObserveAfterCommit must not propagate errors; got: %v", err)
+	g.ObserveAfterCommit(context.Background(), "create", "foo", nil, nil)
+
+	if got := co1.afterCommitCount.Load(); got != 1 {
+		t.Errorf("co1: expected 1 post-commit call, got %d", got)
 	}
-	if !bytes.Contains(buf.Bytes(), []byte("post-commit error")) {
-		t.Errorf("expected post-commit error to be logged; log output: %s", buf.String())
+	if got := co2.afterCommitCount.Load(); got != 1 {
+		t.Errorf("co2: expected 1 post-commit call, got %d", got)
 	}
 }
 
@@ -222,7 +215,6 @@ func TestNoopObserver(t *testing.T) {
 	if err := obs.Observe(ctx, nil, "create", "foo", nil, nil, nil); err != nil {
 		t.Fatalf("NoopObserver.Observe: %v", err)
 	}
-	if err := obs.ObserveAfterCommit(ctx, "create", "foo", nil, nil, nil); err != nil {
-		t.Fatalf("NoopObserver.ObserveAfterCommit: %v", err)
-	}
+	// Must not panic.
+	obs.ObserveAfterCommit(ctx, "create", "foo", nil, nil)
 }

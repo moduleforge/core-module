@@ -125,7 +125,7 @@ func (s *ServiceAccountService) Create(
 		"uuid":  entityUUID.String(),
 		"label": in.Label,
 	}
-	s.obs.ObserveAfterCommit(ctx, "create", "service_account", &entityID, nil, after)
+	s.obs.ObserveAfterCommit(ctx, "create", "service_account", &entityID, after)
 
 	return sa, entityUUID, nil
 }

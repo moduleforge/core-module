@@ -154,7 +154,7 @@ func (s *CorporationService) Create(
 		"legal_name":   in.LegalName,
 		"jurisdiction": in.Jurisdiction,
 	}
-	s.obs.ObserveAfterCommit(ctx, "create", "corporation", &entityID, nil, after)
+	s.obs.ObserveAfterCommit(ctx, "create", "corporation", &entityID, after)
 
 	return corp, entityUUID, nil
 }
@@ -274,7 +274,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 	}
 
 	// 3. Post-commit observers.
-	s.obs.ObserveAfterCommit(ctx, "update", "corporation", &eid, nil, nil)
+	s.obs.ObserveAfterCommit(ctx, "update", "corporation", &eid, nil)
 	return nil
 }
 

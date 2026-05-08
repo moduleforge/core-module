@@ -19,6 +19,7 @@ package observer
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/sync/errgroup"
@@ -32,7 +33,7 @@ import (
 // / MayObserve) the service method uses.
 //
 // An implementation may implement only one of the two methods (the other
-// becoming a no-op returning nil) if it only cares about one phase.
+// becoming a no-op) if it only cares about one phase.
 type MutationObserver interface {
 	// Observe runs inside the operation's transaction. The error return is
 	// passed to the calling ObserverGroup, which decides whether to
@@ -48,20 +49,16 @@ type MutationObserver interface {
 	) error
 
 	// ObserveAfterCommit runs after the tx has successfully committed.
-	// Errors are logged by the caller (ObserverGroup / txhelper); they do
-	// not unwind the already-committed operation.
-	//
-	// Callers MUST pass nil for the before parameter — post-commit observers
-	// can re-fetch from the DB if they need before-state. The parameter is
-	// retained on the interface for symmetry with Observe but has no
-	// well-defined value at this phase.
+	// Errors are logged by the caller (ObserverGroup); they do not unwind
+	// the already-committed operation. Post-commit observers re-fetch from
+	// the DB if they need before-state.
 	ObserveAfterCommit(
 		ctx context.Context,
 		op string,
 		resource string,
 		targetEntityID *int64,
-		before, after any,
-	) error
+		after any,
+	)
 }
 
 // NoopObserver is a MutationObserver that does nothing. Useful in tests that
@@ -75,9 +72,7 @@ func (NoopObserver) Observe(_ context.Context, _ pgx.Tx, _, _ string, _ *int64, 
 	return nil
 }
 
-func (NoopObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _, _ any) error {
-	return nil
-}
+func (NoopObserver) ObserveAfterCommit(_ context.Context, _, _ string, _ *int64, _ any) {}
 
 // Policy controls how an ObserverGroup handles in-tx observation errors
 // when service methods call Observe (the default-policy variant).
@@ -204,49 +199,43 @@ func (g *ObserverGroup) dispatch(
 	}
 
 	// PolicySwallow: run all, log errors, return nil.
-	eg, egCtx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
 	for _, obs := range g.observers {
 		obs := obs
-		eg.Go(func() error {
-			if err := obs.Observe(egCtx, tx, op, resource, targetEntityID, before, after); err != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := obs.Observe(ctx, tx, op, resource, targetEntityID, before, after); err != nil {
 				g.log().ErrorContext(ctx, "observer: in-tx observe error (swallowed)",
 					"op", op, "resource", resource, "error", err)
 			}
-			return nil
-		})
+		}()
 	}
-	_ = eg.Wait() // goroutines never return non-nil; kept for symmetry
+	wg.Wait()
 	return nil
 }
 
 // ObserveAfterCommit runs all wrapped observers in parallel after a successful
-// commit. Errors are logged per-observer; this method always returns nil.
-// There are no Must/May variants because the transaction has already committed.
-//
-// Callers MUST pass nil for the before parameter — post-commit observers
-// can re-fetch from the DB if they need before-state. The parameter is
-// retained on the interface for symmetry with Observe but has no
-// well-defined value at this phase.
+// commit. There are no Must/May variants because the transaction has already
+// committed. Post-commit observers re-fetch from the DB if they need
+// before-state.
 func (g *ObserverGroup) ObserveAfterCommit(
 	ctx context.Context,
 	op, resource string, targetEntityID *int64,
-	before, after any,
-) error {
+	after any,
+) {
 	if len(g.observers) == 0 {
-		return nil
+		return
 	}
 
-	eg, egCtx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
 	for _, obs := range g.observers {
 		obs := obs
-		eg.Go(func() error {
-			if err := obs.ObserveAfterCommit(egCtx, op, resource, targetEntityID, before, after); err != nil {
-				g.log().ErrorContext(ctx, "observer: post-commit observe error (swallowed)",
-					"op", op, "resource", resource, "error", err)
-			}
-			return nil
-		})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			obs.ObserveAfterCommit(ctx, op, resource, targetEntityID, after)
+		}()
 	}
-	_ = eg.Wait()
-	return nil
+	wg.Wait()
 }

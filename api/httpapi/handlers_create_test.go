@@ -18,9 +18,6 @@ func adminPrincipal() *fakePrincipalExtractor {
 	return &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 }
 
-func fakeTxOK() *fakeTxBeginner {
-	return &fakeTxBeginner{tx: &fakeTx{}}
-}
 
 // --- POST /entities/natural-persons ---
 
@@ -31,7 +28,7 @@ func TestCreateNaturalPerson_201(t *testing.T) {
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
 	npSvc := &fakeNaturalPersonService{createNP: npResult, createUUID: entityUUID}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, npSvc, nil, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "Alice", FamilyName: "Smith"})
@@ -57,7 +54,7 @@ func TestCreateNaturalPerson_201(t *testing.T) {
 }
 
 func TestCreateNaturalPerson_400_BadJSON(t *testing.T) {
-	d := buildTestDepsWithTx(adminPrincipal(), nil, &fakeNaturalPersonService{}, nil, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBufferString("{bad"))
@@ -71,7 +68,7 @@ func TestCreateNaturalPerson_400_BadJSON(t *testing.T) {
 
 func TestCreateNaturalPerson_422_ServiceError(t *testing.T) {
 	npSvc := &fakeNaturalPersonService{err: service.ErrInvalidInput}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, npSvc, nil, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "", FamilyName: ""})
@@ -90,7 +87,7 @@ func TestCreateCorporation_201(t *testing.T) {
 	entityUUID := uuid.New()
 	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, corpSvc, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{LegalName: "Acme Corp"})
@@ -113,7 +110,7 @@ func TestCreateCorporation_201(t *testing.T) {
 }
 
 func TestCreateCorporation_400_BadJSON(t *testing.T) {
-	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, &fakeCorporationService{}, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, nil, &fakeCorporationService{}, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodPost, "/entities/corporations", bytes.NewBufferString("{bad"))
@@ -127,7 +124,7 @@ func TestCreateCorporation_400_BadJSON(t *testing.T) {
 
 func TestCreateCorporation_403_NonAdmin(t *testing.T) {
 	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDepsWithTx(ext, nil, nil, &fakeCorporationService{}, nil, fakeTxOK())
+	d := buildTestDeps(ext, nil, nil, &fakeCorporationService{}, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{LegalName: "X"})
@@ -146,7 +143,7 @@ func TestCreateServiceAccount_201(t *testing.T) {
 	entityUUID := uuid.New()
 	saResult := coredb.ServiceAccount{Label: "my-svc"}
 	saSvc := &fakeServiceAccountService{createSA: saResult, createUUID: entityUUID}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, nil, saSvc, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, nil, nil, saSvc)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createServiceAccountRequest{Label: "my-svc"})
@@ -169,7 +166,7 @@ func TestCreateServiceAccount_201(t *testing.T) {
 }
 
 func TestCreateServiceAccount_400_BadJSON(t *testing.T) {
-	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, nil, &fakeServiceAccountService{}, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodPost, "/entities/service-accounts", bytes.NewBufferString("{bad"))
@@ -183,7 +180,7 @@ func TestCreateServiceAccount_400_BadJSON(t *testing.T) {
 
 func TestCreateServiceAccount_403_NonAdmin(t *testing.T) {
 	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDepsWithTx(ext, nil, nil, nil, &fakeServiceAccountService{}, fakeTxOK())
+	d := buildTestDeps(ext, nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createServiceAccountRequest{Label: "x"})

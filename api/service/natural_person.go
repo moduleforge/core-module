@@ -209,7 +209,7 @@ func (s *NaturalPersonService) Create(
 		"given_name":  in.GivenName,
 		"family_name": in.FamilyName,
 	}
-	s.obs.ObserveAfterCommit(ctx, "create", "natural_person", &entityID, nil, after)
+	s.obs.ObserveAfterCommit(ctx, "create", "natural_person", &entityID, after)
 
 	return np, entityUUID, nil
 }
@@ -330,7 +330,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	}
 
 	// 3. Post-commit observers.
-	s.obs.ObserveAfterCommit(ctx, "update", "natural_person", &eid, nil, nil)
+	s.obs.ObserveAfterCommit(ctx, "update", "natural_person", &eid, nil)
 	return nil
 }
 

@@ -157,20 +157,6 @@ func buildTestDeps(
 	}
 }
 
-// buildTestDepsWithTx is an alias for buildTestDeps. The tx parameter is
-// accepted but ignored: handlers delegate all transactions to the service
-// layer, so handler tests never exercise a tx path.
-func buildTestDepsWithTx(
-	principal *fakePrincipalExtractor,
-	entity *fakeEntityService,
-	np *fakeNaturalPersonService,
-	corp *fakeCorporationService,
-	sa *fakeServiceAccountService,
-	_ *fakeTxBeginner,
-) Deps {
-	return buildTestDeps(principal, entity, np, corp, sa)
-}
-
 // noopLogger returns a slog.Logger that discards all output.
 func noopLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError + 1}))

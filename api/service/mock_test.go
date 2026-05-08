@@ -135,15 +135,13 @@ func (o *recordingObserver) Observe(_ context.Context, _ pgx.Tx, op, resource st
 	return o.observeErr
 }
 
-func (o *recordingObserver) ObserveAfterCommit(_ context.Context, op, resource string, targetEntityID *int64, before, after any) error {
+func (o *recordingObserver) ObserveAfterCommit(_ context.Context, op, resource string, targetEntityID *int64, after any) {
 	o.observeAfterCommitCalls = append(o.observeAfterCommitCalls, observeCall{
 		op:             op,
 		resource:       resource,
 		targetEntityID: targetEntityID,
-		before:         before,
 		after:          after,
 	})
-	return nil
 }
 
 // --- mock coredb.Querier ---

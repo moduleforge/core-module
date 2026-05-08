@@ -62,7 +62,7 @@ func TestCreateNaturalPerson_WithSSN_AdminSeesTaxID(t *testing.T) {
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
 	npSvc := &fakeNaturalPersonService{createNP: npResult, createUUID: entityUUID}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, npSvc, nil, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{
@@ -266,7 +266,7 @@ func TestCreateCorporation_WithEIN_AdminSeesTaxID(t *testing.T) {
 	entityUUID := uuid.New()
 	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
-	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, corpSvc, nil, fakeTxOK())
+	d := buildTestDeps(adminPrincipal(), nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{

@@ -19,15 +19,15 @@ type MutationObserver interface {
     Observe(ctx context.Context, tx pgx.Tx, op, resource string, targetEntityID *int64, before, after any) error
 
     // ObserveAfterCommit runs after the transaction successfully commits.
-    // Callers MUST pass nil for the before parameter (post-commit observers
-    // re-fetch from the DB if they need before-state). A non-nil error is
-    // logged; it does not unwind the committed operation.
-    ObserveAfterCommit(ctx context.Context, op, resource string, targetEntityID *int64, before, after any) error
+    // Post-commit observers re-fetch from the DB if they need before-state.
+    // The method has no error return; errors are logged internally by
+    // ObserverGroup and do not unwind the committed operation.
+    ObserveAfterCommit(ctx context.Context, op, resource string, targetEntityID *int64, after any)
 }
 ```
 
 - Used for **mutations only**. Reads do not call observers.
-- An implementation may care about only one of the two phases. The other method should be a no-op returning nil.
+- An implementation may care about only one of the two phases. The other method should be a no-op.
 - `op` is a short verb string: `"create"`, `"update"`, `"delete"`, plus domain-specific verbs (`"assume"`, `"login"`, `"grant"`, `"revoke"`) when audit needs them.
 - `resource` is the stable resource name from `Entity.Resource()` (see [`authorization-design.md` §4](authorization-design.md)).
 - `before` and `after` are JSON-serialisable snapshots; either may be nil (`before` is nil on create; `after` is nil on delete; both are nil for stateless events like `login`).
@@ -52,9 +52,7 @@ err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
 })
 ```
 
-`Run` begins a transaction, calls the function, then commits on success or rolls back on error. Service code never opens its own transaction — the helper owns the lifecycle.
-
-After a successful commit, `Run` dispatches any post-commit observer calls that were queued via `txhelper.QueuePostCommit(ctx, ...)` from inside the function. (Currently service code calls `ObserverGroup.ObserveAfterCommit` directly after `Run` returns; `QueuePostCommit` is available for future cases where the post-commit dispatch must be enqueued from deep inside the closure.)
+`Run` begins a transaction, calls the function, then commits on success or rolls back on error. Service code never opens its own transaction — the helper owns the lifecycle. After `Run` returns successfully, service methods call `ObserverGroup.ObserveAfterCommit` directly for post-commit dispatch.
 
 `txhelper.DB` is a minimal interface (`BeginTx`); `*pgxpool.Pool` satisfies it.
 
@@ -112,8 +110,8 @@ func (s *FooService) Update(ctx context.Context, in FooUpdate) (Foo, error) {
     })
     if err != nil { return Foo{}, err }
 
-    // 3. Post-commit observers. Errors are logged, not propagated.
-    s.observers.ObserveAfterCommit(ctx, "update", "foo", &out.ID, nil, out)
+    // 3. Post-commit observers.
+    s.observers.ObserveAfterCommit(ctx, "update", "foo", &out.ID, out)
     return out, nil
 }
 ```
