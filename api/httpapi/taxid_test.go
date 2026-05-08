@@ -18,7 +18,7 @@ import (
 // populated (as if ResolveProfileByEntityID was called with a cipher).
 func buildNPProfileWithSSN(entityID int64, givenName, familyName, ssn string) service.Profile {
 	entityUUID := uuid.New()
-	np := &coredb.NaturalPerson{
+	np := &coredb.GetNaturalPersonByEntityIDRow{
 		GivenName:  pgtype.Text{String: givenName, Valid: true},
 		FamilyName: pgtype.Text{String: familyName, Valid: true},
 	}
@@ -37,7 +37,7 @@ func buildNPProfileWithSSN(entityID int64, givenName, familyName, ssn string) se
 
 func buildCorpProfileWithEIN(entityID int64, legalName, ein string) service.Profile {
 	entityUUID := uuid.New()
-	corp := &coredb.Corporation{
+	corp := &coredb.GetCorporationByEntityIDRow{
 		LegalName: legalName,
 	}
 	return service.Profile{
@@ -57,7 +57,7 @@ func buildCorpProfileWithEIN(entityID int64, legalName, ein string) service.Prof
 
 func TestCreateNaturalPerson_WithSSN_AdminSeesTaxID(t *testing.T) {
 	entityUUID := uuid.New()
-	npResult := coredb.NaturalPerson{
+	npResult := coredb.CreateNaturalPersonRow{
 		GivenName:  pgtype.Text{String: "Alice", Valid: true},
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
@@ -193,7 +193,7 @@ func TestUpdateNaturalPerson_ClearSSN_TaxIDAbsent(t *testing.T) {
 			FundamentalTypeSlug: "natural_person",
 		},
 		Kind: "natural_person",
-		NaturalPerson: &coredb.NaturalPerson{
+		NaturalPerson: &coredb.GetNaturalPersonByEntityIDRow{
 			GivenName:  pgtype.Text{String: "Alice", Valid: true},
 			FamilyName: pgtype.Text{String: "Smith", Valid: true},
 		},
@@ -264,7 +264,7 @@ func TestUpdateNaturalPerson_OmitSSN_ExistingTaxIDPreserved(t *testing.T) {
 
 func TestCreateCorporation_WithEIN_AdminSeesTaxID(t *testing.T) {
 	entityUUID := uuid.New()
-	corpResult := coredb.Corporation{LegalName: "Acme Corp"}
+	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
 	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, corpSvc, nil, fakeTxOK())
 	router := NewRouter(d)
@@ -348,7 +348,7 @@ func TestProfileResponseFor_EmptyTaxIDOmitted(t *testing.T) {
 			FundamentalTypeSlug: "natural_person",
 		},
 		Kind: "natural_person",
-		NaturalPerson: &coredb.NaturalPerson{
+		NaturalPerson: &coredb.GetNaturalPersonByEntityIDRow{
 			GivenName:  pgtype.Text{String: "Joe", Valid: true},
 			FamilyName: pgtype.Text{String: "Doe", Valid: true},
 		},

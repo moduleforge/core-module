@@ -52,3 +52,37 @@ func (q *Queries) GetTypeBySlug(ctx context.Context, slug string) (Type, error) 
 	)
 	return i, err
 }
+
+const listAllTypes = `-- name: ListAllTypes :many
+SELECT id, slug, parent_id, concrete, name, description, created_at, deprecated_at
+FROM types
+`
+
+func (q *Queries) ListAllTypes(ctx context.Context) ([]Type, error) {
+	rows, err := q.db.Query(ctx, listAllTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Type
+	for rows.Next() {
+		var i Type
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.ParentID,
+			&i.Concrete,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.DeprecatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -26,7 +26,7 @@ func fakeTxOK() *fakeTxBeginner {
 
 func TestCreateNaturalPerson_201(t *testing.T) {
 	entityUUID := uuid.New()
-	npResult := coredb.NaturalPerson{
+	npResult := coredb.CreateNaturalPersonRow{
 		GivenName:  pgtype.Text{String: "Alice", Valid: true},
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
@@ -88,7 +88,7 @@ func TestCreateNaturalPerson_422_ServiceError(t *testing.T) {
 
 func TestCreateCorporation_201(t *testing.T) {
 	entityUUID := uuid.New()
-	corpResult := coredb.Corporation{LegalName: "Acme Corp"}
+	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
 	d := buildTestDepsWithTx(adminPrincipal(), nil, nil, corpSvc, nil, fakeTxOK())
 	router := NewRouter(d)

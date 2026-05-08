@@ -62,12 +62,12 @@ var _ service.EntityServicer = (*fakeEntityService)(nil)
 
 type fakeNaturalPersonService struct {
 	profile    service.Profile
-	createNP   coredb.NaturalPerson
+	createNP   coredb.CreateNaturalPersonRow
 	createUUID uuid.UUID
 	err        error
 }
 
-func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateNaturalPersonInput) (coredb.NaturalPerson, uuid.UUID, error) {
+func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
 	return f.createNP, f.createUUID, f.err
 }
 
@@ -83,12 +83,12 @@ var _ service.NaturalPersonServicer = (*fakeNaturalPersonService)(nil)
 
 type fakeCorporationService struct {
 	profile    service.Profile
-	createCorp coredb.Corporation
+	createCorp coredb.CreateCorporationRow
 	createUUID uuid.UUID
 	err        error
 }
 
-func (f *fakeCorporationService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateCorporationInput) (coredb.Corporation, uuid.UUID, error) {
+func (f *fakeCorporationService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error) {
 	return f.createCorp, f.createUUID, f.err
 }
 

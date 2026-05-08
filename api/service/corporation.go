@@ -36,7 +36,7 @@ type UpdateCorporationInput struct {
 
 // CorporationServicer defines corporation operations available to httpapi handlers.
 type CorporationServicer interface {
-	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateCorporationInput) (coredb.Corporation, uuid.UUID, error)
+	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateCorporationInput, actor Principal) error
 }
@@ -70,20 +70,20 @@ func (s *CorporationService) Create(
 	_ coredb.Querier,
 	_ Principal,
 	in CreateCorporationInput,
-) (coredb.Corporation, uuid.UUID, error) {
+) (coredb.CreateCorporationRow, uuid.UUID, error) {
 	// 1. Authorize.
 	if err := s.az.Authorize(ctx, "create", nil); err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, err
+		return coredb.CreateCorporationRow{}, uuid.UUID{}, err
 	}
 
 	in.LegalName = strings.TrimSpace(in.LegalName)
 	if in.LegalName == "" {
-		return coredb.Corporation{}, uuid.UUID{}, fmt.Errorf("%w: legal_name is required", ErrInvalidInput)
+		return coredb.CreateCorporationRow{}, uuid.UUID{}, fmt.Errorf("%w: legal_name is required", ErrInvalidInput)
 	}
 
 	// 2. Mutate inside a transaction; observers participate in the same tx.
 	var (
-		corp       coredb.Corporation
+		corp       coredb.CreateCorporationRow
 		entityUUID uuid.UUID
 		entityID   int64
 	)
@@ -140,7 +140,7 @@ func (s *CorporationService) Create(
 		return s.obs.Observe(ctx, tx, "create", "corporation", &entityID, nil, after)
 	})
 	if err != nil {
-		return coredb.Corporation{}, uuid.UUID{}, err
+		return coredb.CreateCorporationRow{}, uuid.UUID{}, err
 	}
 
 	// 3. Post-commit observers.

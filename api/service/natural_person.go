@@ -36,7 +36,7 @@ type UpdateNaturalPersonInput struct {
 
 // NaturalPersonServicer defines natural person operations available to httpapi handlers.
 type NaturalPersonServicer interface {
-	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateNaturalPersonInput) (coredb.NaturalPerson, uuid.UUID, error)
+	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateNaturalPersonInput, actor Principal) error
 }
@@ -70,24 +70,24 @@ func (s *NaturalPersonService) Create(
 	_ coredb.Querier,
 	_ Principal,
 	in CreateNaturalPersonInput,
-) (coredb.NaturalPerson, uuid.UUID, error) {
+) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
 	// 1. Authorize.
 	if err := s.az.Authorize(ctx, "create", nil); err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, err
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, err
 	}
 
 	in.GivenName = strings.TrimSpace(in.GivenName)
 	in.FamilyName = strings.TrimSpace(in.FamilyName)
 	if in.GivenName == "" {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("%w: given_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, fmt.Errorf("%w: given_name is required", ErrInvalidInput)
 	}
 	if in.FamilyName == "" {
-		return coredb.NaturalPerson{}, uuid.UUID{}, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
 	}
 
 	// 2. Mutate inside a transaction; observers participate in the same tx.
 	var (
-		np         coredb.NaturalPerson
+		np         coredb.CreateNaturalPersonRow
 		entityUUID uuid.UUID
 		entityID   int64
 	)
@@ -144,7 +144,7 @@ func (s *NaturalPersonService) Create(
 		return s.obs.Observe(ctx, tx, "create", "natural_person", &entityID, nil, after)
 	})
 	if err != nil {
-		return coredb.NaturalPerson{}, uuid.UUID{}, err
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, err
 	}
 
 	// 3. Post-commit observers.

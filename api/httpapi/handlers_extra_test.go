@@ -16,7 +16,7 @@ import (
 
 func buildCorpProfile() service.Profile {
 	entityUUID := uuid.New()
-	corp := &coredb.Corporation{
+	corp := &coredb.GetCorporationByEntityIDRow{
 		LegalName:    "Acme Corp",
 		Jurisdiction: pgtype.Text{String: "DE", Valid: true},
 	}

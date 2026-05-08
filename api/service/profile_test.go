@@ -28,7 +28,7 @@ func TestResolveProfileByEntityID_NaturalPerson(t *testing.T) {
 	}
 	q.entitiesByID[entityID] = row
 	q.legalEntities[entityID] = entityID
-	q.naturalPersons[entityID] = coredb.NaturalPerson{
+	q.naturalPersons[entityID] = coredb.GetNaturalPersonByEntityIDRow{
 		ID:         q.nextSeq(),
 		EntityID:   entityID,
 		GivenName:  pgtype.Text{String: "Alice", Valid: true},
@@ -65,7 +65,7 @@ func TestResolveProfileByEntityID_Corporation(t *testing.T) {
 	}
 	q.entitiesByID[entityID] = row
 	q.legalEntities[entityID] = entityID
-	q.corporations[entityID] = coredb.Corporation{
+	q.corporations[entityID] = coredb.GetCorporationByEntityIDRow{
 		ID:        q.nextSeq(),
 		EntityID:  entityID,
 		LegalName: "Acme Corp",
