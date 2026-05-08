@@ -19,9 +19,23 @@ type Authorizer interface {
 - **One `Authorizer` per app.** No fan-out. The application's composition root constructs a single instance and injects it into every peer-module service.
 - **Called pre-op on all operations**, including reads. Requests *must* be authorized before any action is taken.
 - **A non-nil return aborts immediately.** Callers return the error as-is; service methods do not wrap or suppress it. HTTP handlers map known sentinel errors (`ErrUnauthenticated`, `ErrForbidden`) to 401/403 status codes.
-- **`target` is the internal entity ID of the object being acted on**, or `nil` when no specific target exists yet (e.g. `create`, `list`, `search`). The Authorizer operates *before* any retrieval or instantiation of the target, so it never needs more than the ID. If policy needs the target's resource type, the implementation looks it up by ID.
+- **`target` is an `*int64` whose meaning depends on the operation** — see the call-shape table below. The Authorizer operates *before* any retrieval or instantiation of the target.
 - **The actor is resolved from `ctx`**, not from a method parameter. See [Operation context](#operation-context-opctx).
 - **`operation` and `target` are explicit method parameters** — they are method-specific and do not belong on the context. Putting them on `ctx` would create staleness bugs when one service method calls another.
+
+### Call-shape table
+
+| Operation | Target | Resolved via | Notes |
+|---|---|---|---|
+| `create` | `*int64` typeID | `TypeResolver` | The type ID of the entity being created (slug → ID via the `types` registry). Conveys "may this actor create entities of this type?" |
+| `list` (entity) | `*int64` typeID | `TypeResolver` | Same convention as create. "May this actor list entities of this type at all?" Row-level scoping is applied separately by the access function (see [Row-level scoping](#row-level-scoping)). |
+| `list` (dependent data) | `*int64` parent entityID | request input | e.g. contacts under a legal entity, tags under a subject. Authz delegates to the parent entity's read policy. |
+| `read` / `update` / `delete` | `*int64` entityID | `EntityResolver` for UUID-keyed routes | The specific entity being acted on. UUID inputs are resolved to entity IDs before the Authorize call. |
+| `assume` | `*int64` entityID | request input | The entity whose identity is being assumed. |
+| `login` | `*int64` entityID | resolved from credentials | The user_account entity being authenticated. |
+| `grant` / `revoke` | `*int64` entityID | request input | The entity being granted or revoked a permission. |
+
+The distinction between typeID and entityID targets is a convention enforced by the call site. Both are `int64` and there is no runtime tag distinguishing them. Implementations that need the distinction MUST consult this table.
 
 ## Operation context (`opctx`)
 
@@ -62,11 +76,11 @@ type Entity interface {
 }
 ```
 
-`Resource()` is the canonical slug. It corresponds to the `fundamental_type_slug` used in the entity-typing system (see [`entity-typing.md`](entity-typing.md)). It is consumed by observers (see [`state-management-design.md`](state-management-design.md)) and may be used by `Authorizer` implementations that want to route policy by type — but only after looking the target up by ID.
+`Resource()` is the canonical slug. It corresponds to the `fundamental_type_slug` used in the entity-typing system (see [`entity-typing.md`](entity-typing.md)). It is consumed by observers (see [`state-management-design.md`](state-management-design.md)) and by SQL access functions for row-level scoping (see [Row-level scoping](#row-level-scoping)).
 
 `PublicUUID()` is what callers should use whenever they need to display, log, or otherwise externally reference an entity. `EntityID()` stays internal.
 
-Service methods typically obtain the target ID for the `Authorize` call from request inputs (e.g. an entity UUID resolved to its internal ID, or a domain object's `EntityID()`). For create / list / search where no specific target exists, pass `nil`.
+For UUID-keyed routes (`GET /natural-persons/{uuid}`, etc.), services use the `EntityResolver` to translate UUID → internal ID before calling `Authorize`. The resolver applies a per-resource not-found policy (default: return `ErrForbidden` to mask existence; opt-in to 404 per resource via `EntityResolver.AllowNotFound(slug)`).
 
 ## Where the `Authorize()` call goes
 
@@ -82,7 +96,7 @@ func (s *FooService) Update(ctx context.Context, in FooUpdate) (Foo, error) {
 }
 ```
 
-Read methods collapse to:
+Read methods that already have an internal ID:
 
 ```go
 func (s *FooService) Get(ctx context.Context, id int64) (Foo, error) {
@@ -93,9 +107,81 @@ func (s *FooService) Get(ctx context.Context, id int64) (Foo, error) {
 }
 ```
 
-Operation strings are stable lower-case verbs: `read`, `list`, `search`, `create`, `update`, `delete`, plus domain-specific verbs (`assume`, `login`, `grant`, `revoke`) for special cases.
+UUID-keyed reads resolve UUID → ID first via `EntityResolver`, then authorize:
+
+```go
+func (s *FooService) GetByUUID(ctx context.Context, uuid uuid.UUID) (Foo, error) {
+    id, err := s.entityResolver.Resolve(ctx, s.q, uuid, "foo") // returns ErrForbidden if not found
+    if err != nil { return Foo{}, err }
+    if err := s.authz.Authorize(ctx, "read", &id); err != nil {
+        return Foo{}, err
+    }
+    return s.repo.Get(ctx, id)
+}
+```
+
+Create and entity-level list methods authorize against the type ID:
+
+```go
+func (s *FooService) Create(ctx context.Context, in CreateFooInput) (Foo, error) {
+    typeID := s.typeResolver.IDForSlugMust("foo")
+    if err := s.authz.Authorize(ctx, "create", &typeID); err != nil {
+        return Foo{}, err
+    }
+    // ...
+}
+```
+
+Operation strings are stable lower-case verbs: `read`, `list`, `create`, `update`, `delete`, plus domain-specific verbs (`assume`, `login`, `grant`, `revoke`) for special cases. **`search` is not a separate operation — searches use `list`.** A user authorized to `list` a resource is authorized to discover it by any filter; a user not authorized to `list` cannot search either. The two represent the same security question.
 
 `Authorize()` is called from the **service layer**, not from HTTP handlers. Handlers must not duplicate the call — the service is the authoritative gate. This keeps the contract uniform regardless of how a service is invoked (HTTP today; potentially gRPC, message-queue handlers, or scheduled jobs in future).
+
+## Row-level scoping
+
+`Authorize()` is a binary gate — it answers "may this actor perform this operation at all?" with a single return value. It does not answer "of the rows that match a list/search query, which ones may this actor see?" That second question — row-level scoping — is handled by **SQL set-returning policy functions**, not by the `Authorizer` interface.
+
+### Convention
+
+For each Entity resource that supports `list`, the schema declares a function:
+
+```sql
+CREATE OR REPLACE FUNCTION accessible_<resource>_ids_for_actor(p_actor_entity_id BIGINT)
+RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE AS $$
+    -- policy body: which entity IDs may this actor see?
+$$;
+```
+
+List/search sqlc queries `JOIN` against this function:
+
+```sql
+SELECT t.entity_id, t.owner_id, ..., e.uuid
+FROM tags t
+JOIN entities e ON e.id = t.entity_id
+JOIN accessible_tag_ids_for_actor(@actor_entity_id) acc ON acc.entity_id = t.entity_id
+WHERE ...
+LIMIT @limit OFFSET @offset;
+```
+
+This pushes row-level filtering into Postgres where the planner can index-scan, instead of fetching all rows and filtering in Go. Combined with mandatory pagination (`LIMIT`/`OFFSET`), the query returns at most `limit` rows that the actor may see.
+
+### Function bodies are app-level wiring, not migration content
+
+Each peer module ships **stubs** in its migration files (`0099_access_stubs.sql`, `0299_access_stubs.sql`, etc.) that define the function with a placeholder body returning the empty set. This satisfies `sqlc compile` and lets the schema migrate cleanly.
+
+At app startup, after migrations have been applied, the composition root calls `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `core-module/api/authz/setup`. The generator (an `AccessFuncGenerator` implementation supplied by the chosen Authorizer) replaces each stub body via `CREATE OR REPLACE FUNCTION` with the real policy. Different apps may use different generators (admin-or-own, grant-table-based, etc.) without changing the peer-module schemas.
+
+For tests, `setup.PermissiveGenerator(tableForSlug)` produces bodies that return all rows for all actors; `setup.DenyingGenerator()` produces bodies that return the empty set.
+
+### Two mechanisms, one design
+
+`Authorize` and the access functions are complementary:
+
+- `Authorize` runs in Go before any query. It gates the operation. Cheap to deny.
+- The access function runs in SQL as part of the list/search query. It scopes the result set. Cheap to evaluate when the function inlines (`LANGUAGE sql STABLE` single-SELECT bodies inline cleanly in Postgres 12+).
+
+A `list` operation must satisfy both: `Authorize(ctx, "list", &typeID)` permits the operation in principle; the access function then determines which specific rows are visible. A user denied at the gate gets 403; a user permitted at the gate but with no accessible rows gets an empty paged result.
+
+Single-target operations (`read`, `update`, `delete`) only consult `Authorize` — the entity ID is already known and there's no result set to scope.
 
 ## What the framework does not authorize
 

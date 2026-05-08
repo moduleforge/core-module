@@ -120,7 +120,9 @@ func (s *FooService) Update(ctx context.Context, in FooUpdate) (Foo, error) {
 
 There are no variations. The agent-facing one-pager at [`skill.cross-cutting.md`](../../../skill.cross-cutting.md) is the practical checklist; this section is the architectural specification.
 
-Read methods collapse to a single Authorize call followed by the fetch — no transaction, no observers (see [`authorization-design.md` §5](authorization-design.md)).
+Read methods collapse to a single Authorize call followed by the fetch — no transaction, no observers. UUID-keyed reads resolve UUID → internal ID via `EntityResolver` before authorizing (see [`authorization-design.md` "Where the Authorize() call goes"](authorization-design.md#where-the-authorize-call-goes)).
+
+List/search methods authorize against the type ID (resolved via `TypeResolver`) for entity-level lists, or against the parent entity ID for dependent-data lists. Row-level scoping is handled separately by SQL access functions; see [`authorization-design.md` "Row-level scoping"](authorization-design.md#row-level-scoping).
 
 ## App-side composition
 
