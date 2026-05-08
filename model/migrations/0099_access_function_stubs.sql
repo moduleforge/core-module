@@ -59,8 +59,32 @@ RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE AS $$
 $$;
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+DROP FUNCTION IF EXISTS accessible_authz_actor_group_ids_for_actor(BIGINT);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION accessible_authz_actor_group_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])
+RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE AS $$
+    SELECT 0::BIGINT AS entity_id WHERE FALSE
+$$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP FUNCTION IF EXISTS accessible_authz_target_group_ids_for_actor(BIGINT);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION accessible_authz_target_group_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])
+RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE AS $$
+    SELECT 0::BIGINT AS entity_id WHERE FALSE
+$$;
+-- +goose StatementEnd
+
 -- +goose Down
 
+DROP FUNCTION IF EXISTS accessible_authz_target_group_ids_for_actor(BIGINT, INT[]);
+DROP FUNCTION IF EXISTS accessible_authz_actor_group_ids_for_actor(BIGINT, INT[]);
 DROP FUNCTION IF EXISTS accessible_legal_entity_ids_for_actor(BIGINT, INT[]);
 DROP FUNCTION IF EXISTS accessible_service_account_ids_for_actor(BIGINT, INT[]);
 DROP FUNCTION IF EXISTS accessible_corporation_ids_for_actor(BIGINT, INT[]);

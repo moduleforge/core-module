@@ -119,6 +119,21 @@ UNION
 SELECT t.entity_id FROM tags t
 JOIN TargetChain tc ON tc.tid = t.entity_id`, nil
 
+	case "authz_actor_group":
+		// No own-predicate: actor groups are administrative objects, not owned
+		// by individual users. Access is controlled entirely by grants — typically
+		// "manage" operations granted to admins.
+		return sharedCTEPrefix + `
+SELECT ag.entity_id FROM authz_actor_groups ag
+JOIN TargetChain tc ON tc.tid = ag.entity_id`, nil
+
+	case "authz_target_group":
+		// No own-predicate: same rationale as authz_actor_group.
+		// Access is controlled entirely by grants.
+		return sharedCTEPrefix + `
+SELECT tg.entity_id FROM authz_target_groups tg
+JOIN TargetChain tc ON tc.tid = tg.entity_id`, nil
+
 	default:
 		return "", fmt.Errorf("GrantTableGenerator: unknown resource slug %q; update GenerateForResource to support it", slug)
 	}
