@@ -39,6 +39,11 @@ type UpdateNaturalPersonInput struct {
 // NaturalPersonServicer defines natural person operations available to httpapi handlers.
 type NaturalPersonServicer interface {
 	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error)
+	// CreateInTx creates a natural person within an already-open transaction.
+	// It does not call Authorize; the caller authorizes at its own level.
+	// Returns the new record, the entity's public UUID, the entity's internal ID,
+	// and any error. The caller must call ObserveAfterCommit after the tx commits.
+	CreateInTx(ctx context.Context, tx pgx.Tx, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, int64, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
 	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateNaturalPersonInput, actor Principal) error
 }
@@ -63,6 +68,98 @@ func (s *NaturalPersonService) querier(tx pgx.Tx) coredb.Querier {
 		return s.newQuerier(tx)
 	}
 	return coredb.New(tx)
+}
+
+// createNaturalPersonInTx executes the entity → legal_entity → natural_person
+// insert sequence using an already-open transaction. It does NOT call Authorize
+// (the caller is responsible) and does NOT call txhelper.Run (the caller owns
+// the transaction boundary). The in-tx observer (Observe) is called before the
+// function returns so the audit row participates in the same transaction.
+//
+// Returns the new record, the entity's public UUID, and any error.
+func (s *NaturalPersonService) createNaturalPersonInTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	in CreateNaturalPersonInput,
+) (coredb.CreateNaturalPersonRow, uuid.UUID, int64, error) {
+	q := s.querier(tx)
+
+	// Resolve the type ID for 'natural_person' from the registry.
+	t, err := q.GetTypeBySlug(ctx, "natural_person")
+	if err != nil {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("natural_person.createInTx resolve type: %w", err)
+	}
+
+	ent, err := q.CreateEntity(ctx, t.ID)
+	if err != nil {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("natural_person.createInTx entity: %w", err)
+	}
+
+	_, err = q.CreateLegalEntity(ctx, ent.ID)
+	if err != nil {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("natural_person.createInTx legal_entity: %w", err)
+	}
+
+	var ssnBlob []byte
+	ssnAudit := "unchanged"
+	if strings.TrimSpace(in.SSN) != "" {
+		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
+		if err != nil {
+			return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("encrypt ssn: %w", err)
+		}
+		ssnBlob = blob
+		ssnAudit = "set"
+	}
+
+	np, err := q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
+		EntityID:   ent.ID,
+		GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
+		FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
+		Ssn:        ssnBlob,
+	})
+	if err != nil {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("natural_person.createInTx natural_person: %w", err)
+	}
+
+	entityID := ent.ID
+	after := map[string]any{
+		"uuid":        ent.Uuid.String(),
+		"given_name":  in.GivenName,
+		"family_name": in.FamilyName,
+		"ssn":         ssnAudit,
+	}
+	if err := s.obs.Observe(ctx, tx, "create", "natural_person", &entityID, nil, after); err != nil {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, err
+	}
+
+	return np, ent.Uuid, entityID, nil
+}
+
+// CreateInTx inserts entity → legal_entity → natural_person rows using the
+// caller-supplied transaction. It does NOT call Authorize; composing services
+// (e.g. UserAccountService) authorize at their own level and compose the
+// NaturalPerson creation into a broader atomic operation.
+//
+// The in-tx observer (Observe) is called before the function returns so the
+// audit row participates in the caller's transaction. The caller is responsible
+// for calling ObserveAfterCommit after the transaction commits.
+//
+// Input must have non-empty GivenName and FamilyName (already validated by the
+// caller; this method trims whitespace and returns ErrInvalidInput if blank).
+func (s *NaturalPersonService) CreateInTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	in CreateNaturalPersonInput,
+) (coredb.CreateNaturalPersonRow, uuid.UUID, int64, error) {
+	in.GivenName = strings.TrimSpace(in.GivenName)
+	in.FamilyName = strings.TrimSpace(in.FamilyName)
+	if in.GivenName == "" {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("%w: given_name is required", ErrInvalidInput)
+	}
+	if in.FamilyName == "" {
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
+	}
+	return s.createNaturalPersonInTx(ctx, tx, in)
 }
 
 // Create inserts entity → legal_entity → natural_person rows atomically inside
@@ -98,55 +195,9 @@ func (s *NaturalPersonService) Create(
 	)
 
 	err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
-		q := s.querier(tx)
-
-		// Resolve the type ID for 'natural_person' from the registry.
-		t, err := q.GetTypeBySlug(ctx, "natural_person")
-		if err != nil {
-			return fmt.Errorf("natural_person.Create resolve type: %w", err)
-		}
-
-		ent, err := q.CreateEntity(ctx, t.ID)
-		if err != nil {
-			return fmt.Errorf("natural_person.Create entity: %w", err)
-		}
-
-		_, err = q.CreateLegalEntity(ctx, ent.ID)
-		if err != nil {
-			return fmt.Errorf("natural_person.Create legal_entity: %w", err)
-		}
-
-		var ssnBlob []byte
-		ssnAudit := "unchanged"
-		if strings.TrimSpace(in.SSN) != "" {
-			blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
-			if err != nil {
-				return fmt.Errorf("encrypt ssn: %w", err)
-			}
-			ssnBlob = blob
-			ssnAudit = "set"
-		}
-
-		np, err = q.CreateNaturalPerson(ctx, coredb.CreateNaturalPersonParams{
-			EntityID:   ent.ID,
-			GivenName:  pgtype.Text{String: in.GivenName, Valid: true},
-			FamilyName: pgtype.Text{String: in.FamilyName, Valid: true},
-			Ssn:        ssnBlob,
-		})
-		if err != nil {
-			return fmt.Errorf("natural_person.Create natural_person: %w", err)
-		}
-
-		entityUUID = ent.Uuid
-		entityID = ent.ID
-
-		after := map[string]any{
-			"uuid":        ent.Uuid.String(),
-			"given_name":  in.GivenName,
-			"family_name": in.FamilyName,
-			"ssn":         ssnAudit,
-		}
-		return s.obs.Observe(ctx, tx, "create", "natural_person", &entityID, nil, after)
+		var err error
+		np, entityUUID, entityID, err = s.createNaturalPersonInTx(ctx, tx, in)
+		return err
 	})
 	if err != nil {
 		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, err

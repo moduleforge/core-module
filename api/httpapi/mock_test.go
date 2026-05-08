@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/service"
 	coredb "github.com/moduleforge/core-model/db"
@@ -69,6 +70,10 @@ type fakeNaturalPersonService struct {
 
 func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
 	return f.createNP, f.createUUID, f.err
+}
+
+func (f *fakeNaturalPersonService) CreateInTx(_ context.Context, _ pgx.Tx, _ service.CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, int64, error) {
+	return f.createNP, f.createUUID, 0, f.err
 }
 
 func (f *fakeNaturalPersonService) GetByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID) (service.Profile, error) {
