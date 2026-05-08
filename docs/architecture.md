@@ -18,6 +18,12 @@ A module need not include all three.
 
 Modules are not applications. Each module is a library that exposes its domain as a coherent surface — schema fragments, service constructors, HTTP route mounters, React components — without prescribing how it gets used. **Applications** are built by *composing* modules: a composition root constructs whatever modules the application needs, wires them with shared dependencies (a database pool, a single authorization policy, a single observer group, a configuration object), and produces a runnable artifact. `users-module` contains a small example used for local debugging.
 
+The composition root has three application-level wiring responsibilities that no individual module owns:
+
+- **Authorization policy.** Construct one `Authorizer` implementation, then call `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `core-module/api/authz/setup` to install the SQL access functions for row-level scoping. Different apps may use different `AccessFuncGenerator` implementations (see [`authorization-design.md`](./architecture/authorization-design.md)).
+- **Cross-module routing.** Routes that span multiple modules — e.g. dependent-data routes like `/natural-persons/{uuid}/contacts` (a contacts list under a parent legal entity) — are registered at the composition root, not by either module. The convention `/{parent-resource}/{uuid}/{dependent-resource}` is documentation, not a framework. Each peer module exposes service methods (e.g. `ContactService.ListByLegalEntity`); the app wires the URL.
+- **Observer composition.** Build one `*observer.ObserverGroup` containing whichever cross-cutting observers the app composes (audit, outbox, cache invalidation, search-index sync); inject into every service.
+
 **Module design rules:**
 
 - **`core-module` defines the shared contracts.** The interfaces and helpers that let modules be composed cleanly — entity identity, authorization, state-change observation, transaction lifecycle, request context — all live in `core-module`. Other modules implement or use these contracts; they do not redefine them.

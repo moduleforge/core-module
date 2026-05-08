@@ -80,7 +80,10 @@ type Entity interface {
 
 `PublicUUID()` is what callers should use whenever they need to display, log, or otherwise externally reference an entity. `EntityID()` stays internal.
 
-For UUID-keyed routes (`GET /natural-persons/{uuid}`, etc.), services use the `EntityResolver` to translate UUID → internal ID before calling `Authorize`. The resolver applies a per-resource not-found policy (default: return `ErrForbidden` to mask existence; opt-in to 404 per resource via `EntityResolver.AllowNotFound(slug)`).
+For UUID-keyed routes (`GET /natural-persons/{uuid}`, etc.), services use the `EntityResolver` to translate UUID → internal ID before calling `Authorize`. The resolver applies a per-resource not-found policy:
+
+- **Default: `ErrForbidden`.** A missing UUID looks identical to "you don't have access" — the API does not reveal whether the entity exists. This is the privacy-conservative default and is what every resource uses today.
+- **Opt-in: `ErrNotFound`.** The composition root may call `EntityResolver.AllowNotFound("<slug>")` for resources where existence-leak is acceptable (typically: public reference data). No resource opts in today; the option is reserved for future use cases.
 
 ## Where the `Authorize()` call goes
 
@@ -182,6 +185,16 @@ For tests, `setup.PermissiveGenerator(tableForSlug)` produces bodies that return
 A `list` operation must satisfy both: `Authorize(ctx, "list", &typeID)` permits the operation in principle; the access function then determines which specific rows are visible. A user denied at the gate gets 403; a user permitted at the gate but with no accessible rows gets an empty paged result.
 
 Single-target operations (`read`, `update`, `delete`) only consult `Authorize` — the entity ID is already known and there's no result set to scope.
+
+### Future evolution
+
+The current `AdminOrOwnGenerator` encodes a simple "admin sees everything; non-admins see what they own" policy directly in SQL. Two evolutions are anticipated when use cases require them:
+
+1. **Grants table (`authz-module`).** A future dedicated `authz-module` (proposed migration range `0500-0599`) will own a `grants(actor_entity_id, target_entity_id, operation, granted_at, …)` table. A `GrantTableGenerator` replaces `AdminOrOwnGenerator` at the composition root; the generated function bodies query `grants` instead of inlining ownership rules. **Peer-module query files do not change** — they still JOIN `accessible_<resource>_ids_for_actor`. The function body is the only thing that swaps.
+
+2. **Trigger-maintained access tables.** If indirect-grant fan-out (e.g. group-of-users-grants-org-of-entities) creates measurable contention or perf issues, per-resource `*_access` tables (e.g. `tag_access(actor_entity_id, tag_entity_id, can_read)`) materialise the grants for fast JOIN. Triggers on `grants` keep the access tables in sync. Function bodies become `SELECT entity_id FROM tag_access WHERE actor_entity_id = $1 AND can_read` — still a single-SELECT `LANGUAGE sql STABLE` shape that inlines. Peer-module query files still don't change.
+
+These evolutions are explicitly *deferred*; they're noted here so that the current design does not foreclose them. The function-as-policy-boundary is the durable contract.
 
 ## What the framework does not authorize
 

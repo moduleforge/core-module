@@ -124,6 +124,57 @@ Read methods collapse to a single Authorize call followed by the fetch — no tr
 
 List/search methods authorize against the type ID (resolved via `TypeResolver`) for entity-level lists, or against the parent entity ID for dependent-data lists. Row-level scoping is handled separately by SQL access functions; see [`authorization-design.md` "Row-level scoping"](authorization-design.md#row-level-scoping).
 
+All list/search methods are paged. Each peer module defines a small `Pagination` struct (`Limit`, `Offset` with sane defaults and a hard cap) and threads it through service methods to the underlying sqlc query. The struct is module-local today; promoting to a shared `core-module/api/service` type is a consolidation candidate once the convention has settled.
+
+## Composing services into larger transactions
+
+The standard shape opens its own transaction via `txhelper.Run`. That is the correct default — most service methods are atomic per-call. But some operations require composing multiple service-level mutations into a single transaction (the canonical case: creating a `UserAccount` requires creating its underlying `NaturalPerson` first, and both rows must commit together or roll back together).
+
+For these cases, services that participate in larger transactions expose a **tx-composable variant** alongside their public method:
+
+```go
+// Public method: opens its own tx via txhelper.Run, calls the tx-composable
+// helper, dispatches observers post-commit. Use when the caller has no
+// existing transaction.
+func (s *NaturalPersonService) Create(ctx context.Context, in CreateNaturalPersonInput) (...) {
+    if err := s.az.Authorize(ctx, "create", &typeID); err != nil { return ... }
+    var out coredb.NaturalPerson
+    err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
+        var err error
+        out, _, _, err = s.createInTx(ctx, tx, in)
+        return err
+    })
+    // ...post-commit observers
+}
+
+// Tx-composable helper: takes an existing pgx.Tx, performs the mutation,
+// emits in-tx observers. Does NOT call Authorize (caller's responsibility)
+// and does NOT call txhelper.Run (caller owns the transaction).
+func (s *NaturalPersonService) CreateInTx(ctx context.Context, tx pgx.Tx, in CreateNaturalPersonInput) (..., error) {
+    return s.createInTx(ctx, tx, in)
+}
+```
+
+Composing services then write:
+
+```go
+func (s *UserAccountService) Create(ctx, in) (...) {
+    if err := s.az.Authorize(ctx, "create", &typeID); err != nil { return ... }
+    err := txhelper.Run(ctx, s.db, func(ctx, tx pgx.Tx) error {
+        np, _, npID, err := s.npService.CreateInTx(ctx, tx, npInput)  // entity+legal_entity+natural_person
+        if err != nil { return err }
+        ua, err := db.New(tx).CreateUserAccount(ctx, ...)              // user_account in same tx
+        if err != nil { return err }
+        // emit Observe for both the natural_person and user_account creations in this tx
+        ...
+    })
+}
+```
+
+The composing service authorizes once (against its own resource), and the tx-composable variant trusts that authorization. Each child mutation still emits its own observer event; the audit log captures the full atomic operation.
+
+Today this pattern is used only for `UserAccount` creation. The convention generalises: any service whose methods may be composed into a larger transaction exposes `*InTx` variants. Services that are never composed don't need them.
+
 ## App-side composition
 
 Cross-cutting behaviour is composed at the application's composition root. No module knows about any peer module:
