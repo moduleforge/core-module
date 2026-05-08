@@ -89,11 +89,11 @@ func TestGenerateFuncs_GeneratorError(t *testing.T) {
 func TestGenerateFuncs_MultipleSlugsSeparated(t *testing.T) {
 	t.Parallel()
 	gen := setup.PermissiveGenerator(map[string]string{
-		"natural_person": "natural_persons",
-		"tag":            "tags",
-		"contact":        "contacts",
+		"natural_person":  "natural_persons",
+		"tag":             "tags",
+		"service_account": "service_accounts",
 	})
-	slugs := []string{"natural_person", "tag", "contact"}
+	slugs := []string{"natural_person", "tag", "service_account"}
 	sql, err := setup.GenerateFuncs(gen, slugs)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -154,7 +154,7 @@ func TestPermissiveGenerator_MultipleResources(t *testing.T) {
 func TestDenyingGenerator_Body(t *testing.T) {
 	t.Parallel()
 	gen := setup.DenyingGenerator()
-	cases := []string{"natural_person", "corporation", "tag", "contact", "any_slug"}
+	cases := []string{"natural_person", "corporation", "tag", "service_account", "any_slug"}
 	for _, slug := range cases {
 		t.Run(slug, func(t *testing.T) {
 			t.Parallel()
@@ -243,21 +243,6 @@ func TestAdminOrOwnGenerator_LegalEntity(t *testing.T) {
 	}
 	if !strings.Contains(body, "UNION ALL") {
 		t.Errorf("legal_entity body missing UNION ALL; got:\n%s", body)
-	}
-}
-
-func TestAdminOrOwnGenerator_Contact(t *testing.T) {
-	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
-	body, err := gen.GenerateForResource("contact")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(body, "c.legal_entity_id = p_actor_entity_id") {
-		t.Errorf("contact body missing legal_entity_id clause; got:\n%s", body)
-	}
-	if !strings.Contains(body, "ua.is_admin") {
-		t.Errorf("contact body missing admin clause; got:\n%s", body)
 	}
 }
 

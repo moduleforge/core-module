@@ -7,9 +7,16 @@ import "fmt"
 // ARE, plus admins can see everything.
 //
 // This generator is application-aware: it encodes table names and ownership
-// columns for the bundled peer-module resources (natural_person, corporation,
-// service_account, legal_entity, tag, contact). Adding support for a new
+// columns for the bundled peer-module Entity resources (natural_person,
+// corporation, service_account, legal_entity, tag). Adding support for a new
 // resource requires updating GenerateForResource.
+//
+// Non-Entity dependent data (e.g. contacts, which attach to legal_entities and
+// have no row in the entities table) does NOT get its own access function.
+// List queries for dependent data JOIN the parent's access function instead —
+// for contacts that means JOINing accessible_legal_entity_ids_for_actor on
+// contacts.legal_entity_id. The Authorize call for a dependent-data list
+// passes the parent entity ID, not a per-resource type ID.
 //
 // The generator lives in core's authz/setup package because it is
 // application-level wiring code, not peer-module code — peer modules must not
@@ -31,7 +38,7 @@ func NewAdminOrOwnGenerator() *AdminOrOwnGenerator { return &AdminOrOwnGenerator
 // by GenerateFuncs.
 //
 // Supported slugs: natural_person, corporation, service_account, legal_entity,
-// tag, contact. Unknown slugs return an error.
+// tag. Unknown slugs return an error.
 func (*AdminOrOwnGenerator) GenerateForResource(slug string) (string, error) {
 	switch slug {
 	case "natural_person":
@@ -62,11 +69,6 @@ SELECT entity_id FROM accessible_corporation_ids_for_actor(p_actor_entity_id)`, 
 		return `SELECT t.entity_id FROM tags t
 WHERE t.owner_id = p_actor_entity_id
    OR t.subject_id = p_actor_entity_id
-   OR EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.account_holder = p_actor_entity_id AND ua.is_admin)`, nil
-
-	case "contact":
-		return `SELECT c.entity_id FROM contacts c
-WHERE c.legal_entity_id = p_actor_entity_id
    OR EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.account_holder = p_actor_entity_id AND ua.is_admin)`, nil
 
 	default:
