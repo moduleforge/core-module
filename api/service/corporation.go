@@ -11,9 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -44,11 +46,13 @@ type CorporationServicer interface {
 // CorporationService implements corporation CRUD with authorization,
 // transactional mutation, and observer dispatch.
 type CorporationService struct {
-	db         txhelper.DB
-	az         authz.Authorizer
-	obs        *observer.ObserverGroup
-	cipher     *fieldcrypto.Cipher
-	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	db             txhelper.DB
+	az             authz.Authorizer
+	obs            *observer.ObserverGroup
+	cipher         *fieldcrypto.Cipher
+	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	entityResolver *entity.Resolver
+	typeResolver   *types.Resolver
 }
 
 // Compile-time assertion.
@@ -71,8 +75,9 @@ func (s *CorporationService) Create(
 	_ Principal,
 	in CreateCorporationInput,
 ) (coredb.CreateCorporationRow, uuid.UUID, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", nil); err != nil {
+	// 1. Authorize with the type ID so per-resource create policy can apply.
+	typeID := s.typeResolver.IDForSlugMust("corporation")
+	if err := s.az.Authorize(ctx, "create", &typeID); err != nil {
 		return coredb.CreateCorporationRow{}, uuid.UUID{}, err
 	}
 
@@ -155,24 +160,22 @@ func (s *CorporationService) Create(
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
+// Returns ErrForbidden (masked 404) if the entity does not exist.
 // The cipher stored on the service is forwarded to ResolveProfileByEntityID so
 // that TaxID/TaxIDType are always populated when the cipher is configured.
 func (s *CorporationService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize. UUID has not been resolved to an internal ID yet, so pass
-	// nil; policy that requires a specific target denies non-admins by default.
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	// 1. Resolve UUID → internal ID; default policy masks missing as 403.
+	id, err := s.entityResolver.Resolve(ctx, q, entityUUID, "corporation")
+	if err != nil {
 		return Profile{}, err
 	}
 
-	ent, err := q.GetEntityByUUID(ctx, entityUUID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, ErrNotFound
-		}
-		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID entity: %w", err)
+	// 2. Authorize against the resolved entity ID.
+	if err := s.az.Authorize(ctx, "read", &id); err != nil {
+		return Profile{}, err
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID, s.cipher)
+	profile, err := ResolveProfileByEntityID(ctx, q, id, s.cipher)
 	if err != nil {
 		return Profile{}, fmt.Errorf("corporation.GetByEntityUUID profile: %w", err)
 	}

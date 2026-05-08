@@ -10,8 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -36,10 +38,12 @@ type ServiceAccountServicer interface {
 // ServiceAccountService implements service account CRUD with authorization,
 // transactional mutation, and observer dispatch.
 type ServiceAccountService struct {
-	db         txhelper.DB
-	az         authz.Authorizer
-	obs        *observer.ObserverGroup
-	newQuerier func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	db             txhelper.DB
+	az             authz.Authorizer
+	obs            *observer.ObserverGroup
+	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
+	entityResolver *entity.Resolver
+	typeResolver   *types.Resolver
 }
 
 // Compile-time assertion.
@@ -63,8 +67,9 @@ func (s *ServiceAccountService) Create(
 	_ Principal,
 	in CreateServiceAccountInput,
 ) (coredb.ServiceAccount, uuid.UUID, error) {
-	// 1. Authorize.
-	if err := s.az.Authorize(ctx, "create", nil); err != nil {
+	// 1. Authorize with the type ID so per-resource create policy can apply.
+	typeID := s.typeResolver.IDForSlugMust("service_account")
+	if err := s.az.Authorize(ctx, "create", &typeID); err != nil {
 		return coredb.ServiceAccount{}, uuid.UUID{}, err
 	}
 
@@ -126,22 +131,20 @@ func (s *ServiceAccountService) Create(
 }
 
 // GetByEntityUUID resolves the entity by UUID and returns its full Profile.
-// Requires admin authorization (callers should check before calling).
+// Returns ErrForbidden (masked 404) if the entity does not exist.
 func (s *ServiceAccountService) GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error) {
-	// 1. Authorize. UUID has not been resolved to an internal ID yet.
-	if err := s.az.Authorize(ctx, "read", nil); err != nil {
+	// 1. Resolve UUID → internal ID; default policy masks missing as 403.
+	id, err := s.entityResolver.Resolve(ctx, q, entityUUID, "service_account")
+	if err != nil {
 		return Profile{}, err
 	}
 
-	ent, err := q.GetEntityByUUID(ctx, entityUUID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, ErrNotFound
-		}
-		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID entity: %w", err)
+	// 2. Authorize against the resolved entity ID.
+	if err := s.az.Authorize(ctx, "read", &id); err != nil {
+		return Profile{}, err
 	}
 
-	profile, err := ResolveProfileByEntityID(ctx, q, ent.ID)
+	profile, err := ResolveProfileByEntityID(ctx, q, id)
 	if err != nil {
 		return Profile{}, fmt.Errorf("service_account.GetByEntityUUID profile: %w", err)
 	}

@@ -11,11 +11,13 @@ import (
 func newNPService(t *testing.T, q *mockQuerier) *NaturalPersonService {
 	t.Helper()
 	return &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 }
 
@@ -23,11 +25,13 @@ func TestNaturalPersonService_Create_WritesObserver(t *testing.T) {
 	q := newMockQuerier()
 	rec := &recordingObserver{}
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
@@ -69,11 +73,13 @@ func TestNaturalPersonService_Create_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
 	authzErr := errors.New("unauthorized")
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 
 	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateNaturalPersonInput{
@@ -114,11 +120,13 @@ func TestNaturalPersonService_Create_ObserverError_RollsBack(t *testing.T) {
 	observeErr := errors.New("observer failure")
 	rec := &recordingObserver{observeErr: observeErr}
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         allowAllAuthz{},
-		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(rec),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 
 	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: true}, CreateNaturalPersonInput{
@@ -223,14 +231,18 @@ func TestNaturalPersonService_GetByEntityUUID_AuthzDenied(t *testing.T) {
 	q := newMockQuerier()
 	authzErr := errors.New("denied")
 	svc := &NaturalPersonService{
-		db:         newFakeDB(),
-		az:         denyAllAuthz{err: authzErr},
-		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
-		newQuerier: mockQuerierFactory(q),
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
 	}
 
-	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(t))
+	// Seed the entity so resolver succeeds; authz should then deny.
+	entityUUID := q.seedNaturalPerson("Denied", "User")
+	_, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
