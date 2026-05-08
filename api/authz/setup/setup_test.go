@@ -40,6 +40,9 @@ func TestGenerateFuncs_WellFormedDDL(t *testing.T) {
 	if !strings.Contains(sql, "p_actor_entity_id BIGINT") {
 		t.Errorf("expected parameter p_actor_entity_id BIGINT in DDL")
 	}
+	if !strings.Contains(sql, "p_op_ids INT[]") {
+		t.Errorf("expected parameter p_op_ids INT[] in DDL")
+	}
 	if !strings.Contains(sql, "RETURNS TABLE(entity_id BIGINT)") {
 		t.Errorf("expected RETURNS TABLE(entity_id BIGINT) in DDL")
 	}
@@ -170,85 +173,87 @@ func TestDenyingGenerator_Body(t *testing.T) {
 	}
 }
 
-// --- AdminOrOwnGenerator tests ---
+// --- GrantTableGenerator tests ---
 
-func TestAdminOrOwnGenerator_Tag(t *testing.T) {
+func TestGrantTableGenerator_Tag(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	body, err := gen.GenerateForResource("tag")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Must reference owner_id and subject_id.
-	if !strings.Contains(body, "t.owner_id = p_actor_entity_id") {
-		t.Errorf("body missing owner_id clause; got:\n%s", body)
+	// Must contain the CTE skeleton.
+	if !strings.Contains(body, "ActorChain") {
+		t.Errorf("body missing ActorChain CTE; got:\n%s", body)
 	}
-	if !strings.Contains(body, "t.subject_id = p_actor_entity_id") {
-		t.Errorf("body missing subject_id clause; got:\n%s", body)
+	if !strings.Contains(body, "TargetChain") {
+		t.Errorf("body missing TargetChain CTE; got:\n%s", body)
 	}
-	// Must include admin EXISTS check.
-	if !strings.Contains(body, "EXISTS") {
-		t.Errorf("body missing EXISTS admin clause; got:\n%s", body)
+	if !strings.Contains(body, "p_op_ids") {
+		t.Errorf("body missing p_op_ids reference; got:\n%s", body)
 	}
-	if !strings.Contains(body, "ua.is_admin") {
-		t.Errorf("body missing is_admin check; got:\n%s", body)
+	// Must reference owner_id and subject_id (tag "own" semantics).
+	if !strings.Contains(body, "owner_id") {
+		t.Errorf("tag body missing owner_id own-clause; got:\n%s", body)
+	}
+	if !strings.Contains(body, "subject_id") {
+		t.Errorf("tag body missing subject_id own-clause; got:\n%s", body)
 	}
 }
 
-func TestAdminOrOwnGenerator_NaturalPerson(t *testing.T) {
+func TestGrantTableGenerator_NaturalPerson(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	body, err := gen.GenerateForResource("natural_person")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(body, "np.entity_id = p_actor_entity_id") {
-		t.Errorf("body missing self-access clause; got:\n%s", body)
+	if !strings.Contains(body, "ActorChain") {
+		t.Errorf("body missing ActorChain CTE; got:\n%s", body)
 	}
-	if !strings.Contains(body, "ua.is_admin") {
-		t.Errorf("body missing admin clause; got:\n%s", body)
+	// Own predicate: entity_id = actor.
+	if !strings.Contains(body, "np.entity_id = p_actor_entity_id") {
+		t.Errorf("natural_person body missing self-access clause; got:\n%s", body)
 	}
 }
 
-func TestAdminOrOwnGenerator_Corporation(t *testing.T) {
+func TestGrantTableGenerator_Corporation(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	body, err := gen.GenerateForResource("corporation")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Corporations are admin-only: body must have the admin EXISTS but must NOT
-	// contain an entity_id equality check for the actor.
-	if !strings.Contains(body, "ua.is_admin") {
-		t.Errorf("body missing admin clause; got:\n%s", body)
-	}
+	// Corporations: no "own" clause since non-admins are never corporations.
+	// The body should NOT contain an actor-equality own-predicate.
 	if strings.Contains(body, "c.entity_id = p_actor_entity_id") {
-		t.Errorf("corporation body must not include self-access clause (non-admins are never corporations); got:\n%s", body)
+		t.Errorf("corporation body must not include self-access clause; got:\n%s", body)
+	}
+	// But must still include the grants CTE path.
+	if !strings.Contains(body, "TargetChain") {
+		t.Errorf("corporation body missing TargetChain CTE; got:\n%s", body)
 	}
 }
 
-func TestAdminOrOwnGenerator_LegalEntity(t *testing.T) {
+func TestGrantTableGenerator_LegalEntity(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	body, err := gen.GenerateForResource("legal_entity")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Must compose via the concrete sub-type functions.
+	// Must compose via the concrete sub-type functions (as before).
 	if !strings.Contains(body, "accessible_natural_person_ids_for_actor") {
 		t.Errorf("legal_entity body missing natural_person delegation; got:\n%s", body)
 	}
 	if !strings.Contains(body, "accessible_corporation_ids_for_actor") {
 		t.Errorf("legal_entity body missing corporation delegation; got:\n%s", body)
 	}
-	if !strings.Contains(body, "UNION ALL") {
-		t.Errorf("legal_entity body missing UNION ALL; got:\n%s", body)
-	}
 }
 
-func TestAdminOrOwnGenerator_ServiceAccount(t *testing.T) {
+func TestGrantTableGenerator_ServiceAccount(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	body, err := gen.GenerateForResource("service_account")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -256,14 +261,11 @@ func TestAdminOrOwnGenerator_ServiceAccount(t *testing.T) {
 	if !strings.Contains(body, "sa.entity_id = p_actor_entity_id") {
 		t.Errorf("service_account body missing self-access clause; got:\n%s", body)
 	}
-	if !strings.Contains(body, "ua.is_admin") {
-		t.Errorf("service_account body missing admin clause; got:\n%s", body)
-	}
 }
 
-func TestAdminOrOwnGenerator_UnknownSlug(t *testing.T) {
+func TestGrantTableGenerator_UnknownSlug(t *testing.T) {
 	t.Parallel()
-	gen := setup.NewAdminOrOwnGenerator()
+	gen := setup.NewGrantTableGenerator()
 	_, err := gen.GenerateForResource("unknown_resource")
 	if err == nil {
 		t.Fatal("expected error for unknown slug; got nil")
@@ -279,9 +281,8 @@ func TestAdminOrOwnGenerator_UnknownSlug(t *testing.T) {
 func TestInterfaceCompliance(t *testing.T) {
 	t.Parallel()
 	var (
-		_ setup.AccessFuncGenerator = setup.NewAdminOrOwnGenerator()
+		_ setup.AccessFuncGenerator = setup.NewGrantTableGenerator()
 		_ setup.AccessFuncGenerator = setup.PermissiveGenerator(nil)
 		_ setup.AccessFuncGenerator = setup.DenyingGenerator()
 	)
 }
-

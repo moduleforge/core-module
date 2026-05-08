@@ -3,10 +3,13 @@
 //
 // Access policy functions have the signature:
 //
-//	accessible_<slug>_ids_for_actor(p_actor_entity_id BIGINT)
+//	accessible_<slug>_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])
 //	  RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE
 //
 // These functions are referenced by list/search queries as JOIN targets.
+// The p_op_ids parameter carries the satisfied-by closure for the requested
+// operation (e.g. SatisfiedBy("read")); the access function uses it to look up
+// grants over any of those operation IDs.
 // Because function bodies vary by Authorizer implementation, they are
 // generated at runtime via CREATE OR REPLACE FUNCTION DDL rather than being
 // baked into migration history.
@@ -31,7 +34,7 @@ type AccessFuncGenerator interface {
 // FUNCTION statements for all the supplied resource slugs. Each function has
 // the signature:
 //
-//	accessible_<slug>_ids_for_actor(p_actor_entity_id BIGINT)
+//	accessible_<slug>_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])
 //	  RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE
 //
 // The body of each function is obtained from gen. Slugs are processed in the
@@ -50,7 +53,7 @@ func GenerateFuncs(gen AccessFuncGenerator, slugs []string) (string, error) {
 		}
 
 		fmt.Fprintf(&sb,
-			"CREATE OR REPLACE FUNCTION accessible_%s_ids_for_actor(p_actor_entity_id BIGINT)\n"+
+			"CREATE OR REPLACE FUNCTION accessible_%s_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])\n"+
 				"RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE AS $$\n"+
 				"%s\n"+
 				"$$;",

@@ -43,3 +43,18 @@ import "context"
 type Authorizer interface {
 	Authorize(ctx context.Context, operation string, target *int64) error
 }
+
+// OpResolver resolves an operation slug to the set of operation IDs that
+// satisfy it (the reverse-implies / satisfied-by closure). Peer modules that
+// issue list queries against access functions use this to compute the op_ids
+// slice without importing the full authz-api module.
+//
+// The returned slice is owned by the resolver; callers MUST NOT mutate it.
+// Returns nil and an error for unknown slugs.
+//
+// OperationRegistry in authz-api implements this interface. Inject it at the
+// composition root (users-module main.go) and pass it down to every service
+// constructor that issues list queries.
+type OpResolver interface {
+	SatisfiedBy(slug string) ([]int32, error)
+}
