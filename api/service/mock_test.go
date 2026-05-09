@@ -80,7 +80,7 @@ func (t *fakeTx) CopyFrom(_ context.Context, _ pgx.Identifier, _ []string, _ pgx
 	return 0, nil
 }
 func (t *fakeTx) SendBatch(_ context.Context, _ *pgx.Batch) pgx.BatchResults { return nil }
-func (t *fakeTx) LargeObjects() pgx.LargeObjects                              { return pgx.LargeObjects{} }
+func (t *fakeTx) LargeObjects() pgx.LargeObjects                             { return pgx.LargeObjects{} }
 func (t *fakeTx) Prepare(_ context.Context, _, _ string) (*pgconn.StatementDescription, error) {
 	return nil, nil
 }
@@ -89,7 +89,7 @@ func (t *fakeTx) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag,
 }
 func (t *fakeTx) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) { return nil, nil }
 func (t *fakeTx) QueryRow(_ context.Context, _ string, _ ...any) pgx.Row        { return nil }
-func (t *fakeTx) Conn() *pgx.Conn                                                { return nil }
+func (t *fakeTx) Conn() *pgx.Conn                                               { return nil }
 
 var _ pgx.Tx = (*fakeTx)(nil)
 
@@ -447,6 +447,38 @@ func (m *mockQuerier) seedNaturalPerson(givenName, familyName string) uuid.UUID 
 		EntityID:   entityID,
 		GivenName:  pgtype.Text{String: givenName, Valid: true},
 		FamilyName: pgtype.Text{String: familyName, Valid: true},
+	}
+
+	return entityUUID
+}
+
+// seedCorporation inserts a fully formed entity → legal_entity → corporation
+// into the mock querier and returns the entity UUID. ein may be nil.
+func (m *mockQuerier) seedCorporation(legalName string, ein []byte) uuid.UUID {
+	entityID := m.nextSeq()
+	entityUUID := uuid.New()
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+
+	corpTypeID := m.types["corporation"].ID
+	row := coredb.GetEntityByUUIDRow{
+		ID:                  entityID,
+		Uuid:                entityUUID,
+		FundamentalTypeID:   corpTypeID,
+		FundamentalTypeSlug: "corporation",
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	m.entities[entityUUID] = row
+	m.entitiesByID[entityID] = row
+
+	m.legalEntities[entityID] = entityID
+
+	corpID := m.nextSeq()
+	m.corporations[entityID] = coredb.GetCorporationByEntityIDRow{
+		ID:        corpID,
+		EntityID:  entityID,
+		LegalName: legalName,
+		Ein:       ein,
 	}
 
 	return entityUUID

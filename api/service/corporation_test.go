@@ -188,3 +188,109 @@ func TestCorporationService_UpdateByEntityUUID_NotFound(t *testing.T) {
 		t.Error("expected error for missing entity")
 	}
 }
+
+// TestCorporationService_GetByEntityUUID_AuthzDenied verifies that a caller
+// blocked by the Authorizer receives ErrForbidden before any profile data is
+// read. This is the primary enforcement gate for the getCorporation path.
+func TestCorporationService_GetByEntityUUID_AuthzDenied(t *testing.T) {
+	q := newMockQuerier()
+	authzErr := errors.New("denied")
+	svc := &CorporationService{
+		db:             newFakeDB(),
+		az:             denyAllAuthz{err: authzErr},
+		obs:            observer.NewObserverGroup(),
+		cipher:         testCipher(t),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
+	}
+
+	// Seed the corporation so the resolver succeeds; authz should fire next and deny.
+	entityUUID := q.seedCorporation("Denied Corp", nil)
+	_, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
+	if !errors.Is(err, authzErr) {
+		t.Errorf("expected authz error, got %v", err)
+	}
+}
+
+// TestCorporationService_GetByEntityUUID_AdminSeesEIN verifies that an admin
+// caller (Authorize passes) reading a corporation with an EIN gets the EIN
+// included in the returned Profile. The service always decrypts and populates
+// TaxID/TaxIDType when a cipher is configured; the Authorize gate is the only
+// access control at the service layer.
+func TestCorporationService_GetByEntityUUID_AdminSeesEIN(t *testing.T) {
+	q := newMockQuerier()
+	cipher := testCipher(t)
+	svc := &CorporationService{
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
+	}
+
+	const plainEIN = "12-3456789"
+	einBlob, err := cipher.Encrypt(plainEIN)
+	if err != nil {
+		t.Fatalf("encrypt ein: %v", err)
+	}
+	entityUUID := q.seedCorporation("Visible Corp", einBlob)
+
+	profile, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
+	if err != nil {
+		t.Fatalf("GetByEntityUUID: unexpected error: %v", err)
+	}
+	if profile.Kind != "corporation" {
+		t.Errorf("kind: got %q, want corporation", profile.Kind)
+	}
+	if profile.TaxIDType != "EIN" {
+		t.Errorf("TaxIDType: got %q, want EIN", profile.TaxIDType)
+	}
+	if profile.TaxID != plainEIN {
+		t.Errorf("TaxID: got %q, want %q", profile.TaxID, plainEIN)
+	}
+}
+
+// TestCorporationService_GetByEntityUUID_GrantedCallerSeesEIN verifies that a
+// non-admin caller whose Authorize check passes (grant-based) also receives the
+// full profile including EIN. For corporations there is no "subject" own-predicate
+// (non-admins are never corporations), so any caller that clears the Authorize
+// gate is treated equivalently at the service layer. The HTTP handler's
+// profileResponse includes tax_id for every authorized caller; further field-level
+// restriction is a future hardening step documented in next-steps.md.
+func TestCorporationService_GetByEntityUUID_GrantedCallerSeesEIN(t *testing.T) {
+	q := newMockQuerier()
+	cipher := testCipher(t)
+	// allowAllAuthz simulates a non-admin caller whose grant-based check passed.
+	svc := &CorporationService{
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         cipher,
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
+	}
+
+	const plainEIN = "98-7654321"
+	einBlob, err := cipher.Encrypt(plainEIN)
+	if err != nil {
+		t.Fatalf("encrypt ein: %v", err)
+	}
+	entityUUID := q.seedCorporation("Granted Corp", einBlob)
+
+	profile, err := svc.GetByEntityUUID(context.Background(), q, entityUUID)
+	if err != nil {
+		t.Fatalf("GetByEntityUUID: unexpected error: %v", err)
+	}
+	// Any caller cleared by Authorize receives the full profile including EIN.
+	// No secondary subject-based strip happens at the service layer for corporations.
+	if profile.TaxID != plainEIN {
+		t.Errorf("TaxID: got %q, want %q", profile.TaxID, plainEIN)
+	}
+	if profile.TaxIDType != "EIN" {
+		t.Errorf("TaxIDType: got %q, want EIN", profile.TaxIDType)
+	}
+}
