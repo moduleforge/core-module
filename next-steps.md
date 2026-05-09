@@ -15,7 +15,6 @@ This file tracks pending manual verification and deferred work for `core-module`
 - `EntityService.GetByID` returns `ErrNotFound` unconditionally — no caller uses it today; sqlc query was never added. Add when needed.
 - `ServiceAccountService.UpdateByEntityUUID` returns `ErrInvalidInput` because no `UpdateServiceAccount` sqlc query exists. Wiring is in place; the sentinel is misleading (should be `ErrNotImplemented` → 501) until the query lands.
 - Entity forms (`<NaturalPersonForm>`, `<CorporationForm>`, `<ServiceAccountForm>`) exist in core-gui but the admin user-edit page in users-module renders its own inline form. Consolidation deferred ("leave admin pages alone — we can consolidate later").
-- `getCorporation` has no admin-or-self enforcement gate (pre-existing, not a regression). The tax_id response gate still correctly withholds `ein` for non-admin non-subject callers, but the general GET still leaks other fields.
 
 ## Tax-id encryption — future hardening
 
