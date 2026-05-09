@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 )
 
@@ -17,13 +18,8 @@ type createServiceAccountRequest struct {
 
 // createServiceAccount handles POST /entities/service-accounts (admin only).
 func (h *handlers) createServiceAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
-		return
-	}
-	if !p.IsAdmin {
-		jsonErr(w, http.StatusForbidden, "forbidden", "admin required")
 		return
 	}
 
@@ -36,7 +32,7 @@ func (h *handlers) createServiceAccount(w http.ResponseWriter, r *http.Request) 
 	in := service.CreateServiceAccountInput{Label: req.Label}
 
 	// The service manages its own transaction internally via txhelper.Run.
-	sa, entityUUID, err := h.d.Services.ServiceAccount.Create(r.Context(), h.d.Services.Querier(), *p, in)
+	sa, entityUUID, err := h.d.Services.ServiceAccount.Create(r.Context(), h.d.Services.Querier(), in)
 	if err != nil {
 		writeServiceErr(w, err)
 		return
@@ -50,13 +46,8 @@ func (h *handlers) createServiceAccount(w http.ResponseWriter, r *http.Request) 
 
 // getServiceAccount handles GET /entities/service-accounts/{uuid} (admin only).
 func (h *handlers) getServiceAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
-		return
-	}
-	if !p.IsAdmin {
-		jsonErr(w, http.StatusForbidden, "forbidden", "admin required")
 		return
 	}
 
@@ -82,13 +73,8 @@ type updateServiceAccountRequest struct {
 
 // updateServiceAccount handles PUT /entities/service-accounts/{uuid} (admin only).
 func (h *handlers) updateServiceAccount(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
-		return
-	}
-	if !p.IsAdmin {
-		jsonErr(w, http.StatusForbidden, "forbidden", "admin required")
 		return
 	}
 
@@ -111,7 +97,6 @@ func (h *handlers) updateServiceAccount(w http.ResponseWriter, r *http.Request) 
 		h.d.Services.Querier(),
 		entityUUID,
 		in,
-		*p,
 	); err != nil {
 		writeServiceErr(w, err)
 		return

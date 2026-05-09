@@ -14,10 +14,16 @@ import (
 	coredb "github.com/moduleforge/core-model/db"
 )
 
-func adminPrincipal() *fakePrincipalExtractor {
-	return &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
+// adminReq returns a request with actor entity ID 1 set in context.
+func adminReq(method, url string, body *bytes.Buffer) *http.Request {
+	var req *http.Request
+	if body != nil {
+		req = httptest.NewRequest(method, url, body)
+	} else {
+		req = httptest.NewRequest(method, url, nil)
+	}
+	return withActor(req, 1)
 }
-
 
 // --- POST /entities/natural-persons ---
 
@@ -28,11 +34,11 @@ func TestCreateNaturalPerson_201(t *testing.T) {
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
 	npSvc := &fakeNaturalPersonService{createNP: npResult, createUUID: entityUUID}
-	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "Alice", FamilyName: "Smith"})
-	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -54,10 +60,10 @@ func TestCreateNaturalPerson_201(t *testing.T) {
 }
 
 func TestCreateNaturalPerson_400_BadJSON(t *testing.T) {
-	d := buildTestDeps(adminPrincipal(), nil, &fakeNaturalPersonService{}, nil, nil)
+	d := buildTestDeps(nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBufferString("{bad"))
+	req := adminReq(http.MethodPost, "/entities/natural-persons", bytes.NewBufferString("{bad"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -68,11 +74,11 @@ func TestCreateNaturalPerson_400_BadJSON(t *testing.T) {
 
 func TestCreateNaturalPerson_422_ServiceError(t *testing.T) {
 	npSvc := &fakeNaturalPersonService{err: service.ErrInvalidInput}
-	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "", FamilyName: ""})
-	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -87,11 +93,11 @@ func TestCreateCorporation_201(t *testing.T) {
 	entityUUID := uuid.New()
 	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
-	d := buildTestDeps(adminPrincipal(), nil, nil, corpSvc, nil)
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{LegalName: "Acme Corp"})
-	req := httptest.NewRequest(http.MethodPost, "/entities/corporations", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/corporations", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -110,10 +116,10 @@ func TestCreateCorporation_201(t *testing.T) {
 }
 
 func TestCreateCorporation_400_BadJSON(t *testing.T) {
-	d := buildTestDeps(adminPrincipal(), nil, nil, &fakeCorporationService{}, nil)
+	d := buildTestDeps(nil, nil, &fakeCorporationService{}, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodPost, "/entities/corporations", bytes.NewBufferString("{bad"))
+	req := adminReq(http.MethodPost, "/entities/corporations", bytes.NewBufferString("{bad"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -123,12 +129,13 @@ func TestCreateCorporation_400_BadJSON(t *testing.T) {
 }
 
 func TestCreateCorporation_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDeps(ext, nil, nil, &fakeCorporationService{}, nil)
+	corpSvc := &fakeCorporationService{err: service.ErrForbidden}
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{LegalName: "X"})
 	req := httptest.NewRequest(http.MethodPost, "/entities/corporations", bytes.NewBuffer(body))
+	req = withActor(req, 2) // non-admin actor; authz denies via service
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -143,11 +150,11 @@ func TestCreateServiceAccount_201(t *testing.T) {
 	entityUUID := uuid.New()
 	saResult := coredb.ServiceAccount{Label: "my-svc"}
 	saSvc := &fakeServiceAccountService{createSA: saResult, createUUID: entityUUID}
-	d := buildTestDeps(adminPrincipal(), nil, nil, nil, saSvc)
+	d := buildTestDeps(nil, nil, nil, saSvc)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createServiceAccountRequest{Label: "my-svc"})
-	req := httptest.NewRequest(http.MethodPost, "/entities/service-accounts", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/service-accounts", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -166,10 +173,10 @@ func TestCreateServiceAccount_201(t *testing.T) {
 }
 
 func TestCreateServiceAccount_400_BadJSON(t *testing.T) {
-	d := buildTestDeps(adminPrincipal(), nil, nil, nil, &fakeServiceAccountService{})
+	d := buildTestDeps(nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodPost, "/entities/service-accounts", bytes.NewBufferString("{bad"))
+	req := adminReq(http.MethodPost, "/entities/service-accounts", bytes.NewBufferString("{bad"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -179,12 +186,13 @@ func TestCreateServiceAccount_400_BadJSON(t *testing.T) {
 }
 
 func TestCreateServiceAccount_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDeps(ext, nil, nil, nil, &fakeServiceAccountService{})
+	saSvc := &fakeServiceAccountService{err: service.ErrForbidden}
+	d := buildTestDeps(nil, nil, nil, saSvc)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createServiceAccountRequest{Label: "x"})
 	req := httptest.NewRequest(http.MethodPost, "/entities/service-accounts", bytes.NewBuffer(body))
+	req = withActor(req, 2) // non-admin; authz denies via service
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -196,8 +204,7 @@ func TestCreateServiceAccount_403_NonAdmin(t *testing.T) {
 // --- PUT /entities/service-accounts/{uuid} ---
 
 func TestUpdateServiceAccount_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, nil, nil, &fakeServiceAccountService{})
+	d := buildTestDeps(nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"label": "x"})
@@ -211,10 +218,10 @@ func TestUpdateServiceAccount_401(t *testing.T) {
 }
 
 func TestUpdateServiceAccount_400_BadJSON(t *testing.T) {
-	d := buildTestDeps(adminPrincipal(), nil, nil, nil, &fakeServiceAccountService{})
+	d := buildTestDeps(nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodPut, "/entities/service-accounts/"+uuid.New().String(), bytes.NewBufferString("{bad"))
+	req := adminReq(http.MethodPut, "/entities/service-accounts/"+uuid.New().String(), bytes.NewBufferString("{bad"))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

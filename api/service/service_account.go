@@ -30,9 +30,9 @@ type UpdateServiceAccountInput struct {
 
 // ServiceAccountServicer defines service account operations available to httpapi handlers.
 type ServiceAccountServicer interface {
-	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateServiceAccountInput) (coredb.ServiceAccount, uuid.UUID, error)
+	Create(ctx context.Context, q coredb.Querier, in CreateServiceAccountInput) (coredb.ServiceAccount, uuid.UUID, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
-	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateServiceAccountInput, actor Principal) error
+	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateServiceAccountInput) error
 }
 
 // ServiceAccountService implements service account CRUD with authorization,
@@ -64,7 +64,6 @@ func (s *ServiceAccountService) querier(tx pgx.Tx) coredb.Querier {
 func (s *ServiceAccountService) Create(
 	ctx context.Context,
 	_ coredb.Querier,
-	_ Principal,
 	in CreateServiceAccountInput,
 ) (coredb.ServiceAccount, uuid.UUID, error) {
 	// 1. Authorize with the type ID so per-resource create policy can apply.
@@ -160,7 +159,6 @@ func (s *ServiceAccountService) UpdateByEntityUUID(
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateServiceAccountInput,
-	_ Principal,
 ) error {
 	if in.Label == nil {
 		// Nothing to update.

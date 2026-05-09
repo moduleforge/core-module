@@ -25,10 +25,8 @@ func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith", SSN: "123-45-6789"}
-	np, _, err := svc.Create(context.Background(), q, admin, in)
+		in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith", SSN: "123-45-6789"}
+	np, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
@@ -68,10 +66,8 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	in := CreateNaturalPersonInput{GivenName: "Bob", FamilyName: "Jones", SSN: ""}
-	np, _, err := svc.Create(context.Background(), q, admin, in)
+		in := CreateNaturalPersonInput{GivenName: "Bob", FamilyName: "Jones", SSN: ""}
+	np, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
@@ -100,10 +96,8 @@ func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	in := CreateNaturalPersonInput{GivenName: "Carol", FamilyName: "White", SSN: "987-65-4321"}
-	_, _, err := svc.Create(context.Background(), q, admin, in)
+		in := CreateNaturalPersonInput{GivenName: "Carol", FamilyName: "White", SSN: "987-65-4321"}
+	_, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -160,12 +154,10 @@ func TestNaturalPersonService_Update_SetSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	entityUUID := q.seedNaturalPerson("Eve", "Foster")
+		entityUUID := q.seedNaturalPerson("Eve", "Foster")
 
 	ssn := "111-22-3333"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &ssn}, admin)
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &ssn})
 	if err != nil {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
@@ -192,12 +184,10 @@ func TestNaturalPersonService_Update_ClearSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	entityUUID := q.seedNaturalPerson("Frank", "Green")
+		entityUUID := q.seedNaturalPerson("Frank", "Green")
 
 	empty := ""
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &empty}, admin)
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &empty})
 	if err != nil {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
@@ -220,11 +210,9 @@ func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	entityUUID := q.seedNaturalPerson("Grace", "Hall")
+		entityUUID := q.seedNaturalPerson("Grace", "Hall")
 	gn := "Grace"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn}, admin)
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn})
 	if err != nil {
 		t.Fatalf("UpdateByEntityUUID: %v", err)
 	}
@@ -249,10 +237,8 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	in := CreateCorporationInput{LegalName: "Acme Inc", EIN: "12-3456789"}
-	corp, _, err := svc.Create(context.Background(), q, admin, in)
+		in := CreateCorporationInput{LegalName: "Acme Inc", EIN: "12-3456789"}
+	corp, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -284,9 +270,7 @@ func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	_, _, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "Beta Corp", EIN: "98-7654321"})
+	_, _, err := svc.Create(context.Background(), q, CreateCorporationInput{LegalName: "Beta Corp", EIN: "98-7654321"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -321,9 +305,7 @@ func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
-	admin := Principal{IsAdmin: true}
-
-	_, _, err := npSvc.Create(context.Background(), q, admin, CreateNaturalPersonInput{
+	_, _, err := npSvc.Create(context.Background(), q, CreateNaturalPersonInput{
 		GivenName: "Hannah", FamilyName: "Ives", SSN: "555-44-3333",
 	})
 	if err != nil {
@@ -363,9 +345,7 @@ func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
-	admin := Principal{IsAdmin: true}
-
-	_, _, err := corpSvc.Create(context.Background(), q, admin, CreateCorporationInput{
+	_, _, err := corpSvc.Create(context.Background(), q, CreateCorporationInput{
 		LegalName: "Gamma LLC", EIN: "77-8889999",
 	})
 	if err != nil {
@@ -404,9 +384,7 @@ func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
-	admin := Principal{IsAdmin: true}
-
-	_, entityUUID, err := saSvc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: "svc"})
+		_, entityUUID, err := saSvc.Create(context.Background(), q, CreateServiceAccountInput{Label: "svc"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -482,12 +460,10 @@ func TestAuditRedaction_NoPlaintext(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	const plainSSN = "999-88-7777"
+		const plainSSN = "999-88-7777"
 
 	in := CreateNaturalPersonInput{GivenName: "Karl", FamilyName: "Lang", SSN: plainSSN}
-	_, _, err := svc.Create(context.Background(), q, admin, in)
+	_, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

@@ -26,9 +26,8 @@ func newSAService(q *mockQuerier) *ServiceAccountService {
 func TestServiceAccountService_GetByEntityUUID_Found(t *testing.T) {
 	q := newMockQuerier()
 	svc := newSAService(q)
-	admin := Principal{IsAdmin: true}
 
-	_, entityUUID, err := svc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: "svc-x"})
+	_, entityUUID, err := svc.Create(context.Background(), q, CreateServiceAccountInput{Label: "svc-x"})
 	if err != nil {
 		t.Fatalf("setup Create: %v", err)
 	}
@@ -67,10 +66,10 @@ func TestServiceAccountService_UpdateByEntityUUID_AuthzDenied(t *testing.T) {
 
 	// Seed a service account to get past the entity lookup.
 	setupSvc := newSAService(q)
-	_, entityUUID, _ := setupSvc.Create(context.Background(), q, Principal{IsAdmin: true}, CreateServiceAccountInput{Label: "x"})
+	_, entityUUID, _ := setupSvc.Create(context.Background(), q, CreateServiceAccountInput{Label: "x"})
 
 	label := "y"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateServiceAccountInput{Label: &label}, Principal{})
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateServiceAccountInput{Label: &label})
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -81,7 +80,7 @@ func TestServiceAccountService_UpdateByEntityUUID_NilLabel(t *testing.T) {
 	svc := newSAService(q)
 
 	// When label is nil, returns nil immediately (nothing to update).
-	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateServiceAccountInput{Label: nil}, Principal{})
+	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateServiceAccountInput{Label: nil})
 	if err != nil {
 		t.Errorf("expected nil for no-op update, got %v", err)
 	}
@@ -92,7 +91,7 @@ func TestServiceAccountService_UpdateByEntityUUID_NotFound(t *testing.T) {
 	svc := newSAService(q)
 
 	label := "x"
-	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateServiceAccountInput{Label: &label}, Principal{})
+	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateServiceAccountInput{Label: &label})
 	if err == nil {
 		t.Error("expected error for missing entity")
 	}

@@ -40,8 +40,7 @@ func buildSAProfile() service.Profile {
 // --- GET /entities/natural-persons/{uuid} ---
 
 func TestGetNaturalPerson_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, &fakeNaturalPersonService{}, nil, nil)
+	d := buildTestDeps(nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+uuid.New().String(), nil)
@@ -55,12 +54,12 @@ func TestGetNaturalPerson_401(t *testing.T) {
 
 func TestGetNaturalPerson_200_Admin(t *testing.T) {
 	profile := buildNaturalPersonProfile("Faye", "Green")
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+uuid.New().String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -70,17 +69,13 @@ func TestGetNaturalPerson_200_Admin(t *testing.T) {
 }
 
 func TestGetNaturalPerson_403_WrongOwner(t *testing.T) {
-	entityID := int64(10)
-	profile := buildNaturalPersonProfile("Gale", "Hart")
-	profile.Entity.ID = entityID
-
-	// Non-admin with different entity ID.
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, EntityID: 999, IsAdmin: false}, ok: true}
-	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	// Authorizer denies access → service returns ErrForbidden.
+	npSvc := &fakeNaturalPersonService{err: service.ErrForbidden}
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
-	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+profile.Entity.Uuid.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+uuid.New().String(), nil)
+	req = withActor(req, 999) // actor has no grant on this entity
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -90,12 +85,12 @@ func TestGetNaturalPerson_403_WrongOwner(t *testing.T) {
 }
 
 func TestGetNaturalPerson_404(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{err: service.ErrNotFound}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+uuid.New().String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -107,8 +102,7 @@ func TestGetNaturalPerson_404(t *testing.T) {
 // --- PUT /entities/natural-persons/{uuid} ---
 
 func TestUpdateNaturalPerson_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, &fakeNaturalPersonService{}, nil, nil)
+	d := buildTestDeps(nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"given_name": "X"})
@@ -123,14 +117,14 @@ func TestUpdateNaturalPerson_401(t *testing.T) {
 
 func TestUpdateNaturalPerson_200(t *testing.T) {
 	profile := buildNaturalPersonProfile("Igor", "Jones")
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"given_name": "Igor"})
 	req := httptest.NewRequest(http.MethodPut, "/entities/natural-persons/"+profile.Entity.Uuid.String(), bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -140,11 +134,11 @@ func TestUpdateNaturalPerson_200(t *testing.T) {
 }
 
 func TestUpdateNaturalPerson_400_BadJSON(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1}, ok: true}
-	d := buildTestDeps(ext, nil, &fakeNaturalPersonService{}, nil, nil)
+	d := buildTestDeps(nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodPut, "/entities/natural-persons/"+uuid.New().String(), bytes.NewBufferString("{bad"))
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -156,8 +150,7 @@ func TestUpdateNaturalPerson_400_BadJSON(t *testing.T) {
 // --- GET /entities/corporations/{uuid} ---
 
 func TestGetCorporation_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, nil, &fakeCorporationService{}, nil)
+	d := buildTestDeps(nil, nil, &fakeCorporationService{}, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/corporations/"+uuid.New().String(), nil)
@@ -171,12 +164,12 @@ func TestGetCorporation_401(t *testing.T) {
 
 func TestGetCorporation_200(t *testing.T) {
 	profile := buildCorpProfile()
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1}, ok: true}
 	corpSvc := &fakeCorporationService{profile: profile}
-	d := buildTestDeps(ext, nil, nil, corpSvc, nil)
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/corporations/"+profile.Entity.Uuid.String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -188,8 +181,7 @@ func TestGetCorporation_200(t *testing.T) {
 // --- PUT /entities/corporations/{uuid} ---
 
 func TestUpdateCorporation_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, nil, &fakeCorporationService{}, nil)
+	d := buildTestDeps(nil, nil, &fakeCorporationService{}, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"legal_name": "X"})
@@ -203,13 +195,13 @@ func TestUpdateCorporation_401(t *testing.T) {
 }
 
 func TestUpdateCorporation_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
 	corpSvc := &fakeCorporationService{err: service.ErrForbidden}
-	d := buildTestDeps(ext, nil, nil, corpSvc, nil)
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"legal_name": "X"})
 	req := httptest.NewRequest(http.MethodPut, "/entities/corporations/"+uuid.New().String(), bytes.NewBuffer(body))
+	req = withActor(req, 2) // non-admin; authz denies via service
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -220,13 +212,13 @@ func TestUpdateCorporation_403_NonAdmin(t *testing.T) {
 
 func TestUpdateCorporation_200(t *testing.T) {
 	profile := buildCorpProfile()
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	corpSvc := &fakeCorporationService{profile: profile}
-	d := buildTestDeps(ext, nil, nil, corpSvc, nil)
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(map[string]string{"legal_name": "New Name"})
 	req := httptest.NewRequest(http.MethodPut, "/entities/corporations/"+profile.Entity.Uuid.String(), bytes.NewBuffer(body))
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -238,8 +230,7 @@ func TestUpdateCorporation_200(t *testing.T) {
 // --- GET /entities/service-accounts/{uuid} ---
 
 func TestGetServiceAccount_401(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, nil, nil, &fakeServiceAccountService{})
+	d := buildTestDeps(nil, nil, nil, &fakeServiceAccountService{})
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/service-accounts/"+uuid.New().String(), nil)
@@ -252,11 +243,12 @@ func TestGetServiceAccount_401(t *testing.T) {
 }
 
 func TestGetServiceAccount_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDeps(ext, nil, nil, nil, &fakeServiceAccountService{})
+	saSvc := &fakeServiceAccountService{err: service.ErrForbidden}
+	d := buildTestDeps(nil, nil, nil, saSvc)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/service-accounts/"+uuid.New().String(), nil)
+	req = withActor(req, 2) // non-admin; authz denies via service
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -267,12 +259,12 @@ func TestGetServiceAccount_403_NonAdmin(t *testing.T) {
 
 func TestGetServiceAccount_200(t *testing.T) {
 	profile := buildSAProfile()
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	saSvc := &fakeServiceAccountService{profile: profile}
-	d := buildTestDeps(ext, nil, nil, nil, saSvc)
+	d := buildTestDeps(nil, nil, nil, saSvc)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/service-accounts/"+profile.Entity.Uuid.String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

@@ -62,7 +62,7 @@ func TestCreateNaturalPerson_WithSSN_AdminSeesTaxID(t *testing.T) {
 		FamilyName: pgtype.Text{String: "Smith", Valid: true},
 	}
 	npSvc := &fakeNaturalPersonService{createNP: npResult, createUUID: entityUUID}
-	d := buildTestDeps(adminPrincipal(), nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{
@@ -70,7 +70,7 @@ func TestCreateNaturalPerson_WithSSN_AdminSeesTaxID(t *testing.T) {
 		FamilyName: "Smith",
 		SSN:        "123-45-6789",
 	})
-	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -91,18 +91,18 @@ func TestCreateNaturalPerson_WithSSN_AdminSeesTaxID(t *testing.T) {
 	}
 }
 
-// --- Test 2: Admin GET returns tax_id/tax_id_type ---
+// --- Test 2: GET returns tax_id/tax_id_type when profile has SSN ---
 
-func TestGetNaturalPerson_Admin_SeesTaxID(t *testing.T) {
+func TestGetNaturalPerson_SeesTaxID(t *testing.T) {
 	const entityID = int64(42)
 	profile := buildNPProfileWithSSN(entityID, "Alice", "Smith", "123-45-6789")
 
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+profile.Entity.Uuid.String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -122,66 +122,7 @@ func TestGetNaturalPerson_Admin_SeesTaxID(t *testing.T) {
 	}
 }
 
-// --- Test 3: Subject GET (non-admin, own profile) returns tax_id/tax_id_type ---
-
-func TestGetNaturalPerson_Subject_SeesTaxID(t *testing.T) {
-	const entityID = int64(42)
-	profile := buildNPProfileWithSSN(entityID, "Alice", "Smith", "123-45-6789")
-
-	// Non-admin but EntityID matches the profile's entity.
-	ext := &fakePrincipalExtractor{
-		p:  &service.Principal{UserID: 10, EntityID: entityID, IsAdmin: false},
-		ok: true,
-	}
-	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
-	router := NewRouter(d)
-
-	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+profile.Entity.Uuid.String(), nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-
-	var resp map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if resp["tax_id"] != "123-45-6789" {
-		t.Errorf("tax_id: got %v, want %q", resp["tax_id"], "123-45-6789")
-	}
-	if resp["tax_id_type"] != "SSN" {
-		t.Errorf("tax_id_type: got %v, want %q", resp["tax_id_type"], "SSN")
-	}
-}
-
-// --- Test 4: Stranger GET → 403 (existing behavior; tax_id gate never reached) ---
-
-func TestGetNaturalPerson_Stranger_Gets403(t *testing.T) {
-	const entityID = int64(42)
-	profile := buildNPProfileWithSSN(entityID, "Alice", "Smith", "123-45-6789")
-
-	// Non-admin with a different EntityID.
-	ext := &fakePrincipalExtractor{
-		p:  &service.Principal{UserID: 99, EntityID: 999, IsAdmin: false},
-		ok: true,
-	}
-	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
-	router := NewRouter(d)
-
-	req := httptest.NewRequest(http.MethodGet, "/entities/natural-persons/"+profile.Entity.Uuid.String(), nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusForbidden {
-		t.Errorf("status: got %d, want 403 — body: %s", rec.Code, rec.Body.String())
-	}
-}
-
-// --- Test 5: PUT with ssn="" clears the value; subsequent GET returns absent tax_id ---
+// --- Test 3: PUT with ssn="" clears the value; subsequent GET returns absent tax_id ---
 
 func TestUpdateNaturalPerson_ClearSSN_TaxIDAbsent(t *testing.T) {
 	const entityID = int64(42)
@@ -201,15 +142,15 @@ func TestUpdateNaturalPerson_ClearSSN_TaxIDAbsent(t *testing.T) {
 		TaxIDType: "SSN",
 	}
 
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{profile: clearedProfile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	emptySSN := ""
 	body, _ := json.Marshal(updateNaturalPersonRequest{SSN: &emptySSN})
 	req := httptest.NewRequest(http.MethodPut, "/entities/natural-persons/"+clearedProfile.Entity.Uuid.String(), bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -227,15 +168,14 @@ func TestUpdateNaturalPerson_ClearSSN_TaxIDAbsent(t *testing.T) {
 	}
 }
 
-// --- Test 6: PUT without ssn field leaves existing value intact (gate still includes it) ---
+// --- Test 4: PUT without ssn field leaves existing value intact ---
 
 func TestUpdateNaturalPerson_OmitSSN_ExistingTaxIDPreserved(t *testing.T) {
 	const entityID = int64(42)
 	profile := buildNPProfileWithSSN(entityID, "Alice", "Smith", "123-45-6789")
 
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	npSvc := &fakeNaturalPersonService{profile: profile}
-	d := buildTestDeps(ext, nil, npSvc, nil, nil)
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	// Only update given_name; SSN field omitted entirely.
@@ -243,6 +183,7 @@ func TestUpdateNaturalPerson_OmitSSN_ExistingTaxIDPreserved(t *testing.T) {
 	body, _ := json.Marshal(updateNaturalPersonRequest{GivenName: &givenName})
 	req := httptest.NewRequest(http.MethodPut, "/entities/natural-persons/"+profile.Entity.Uuid.String(), bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -254,26 +195,26 @@ func TestUpdateNaturalPerson_OmitSSN_ExistingTaxIDPreserved(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	// The fake service returns the pre-built profile with TaxID set; admin sees it.
+	// The fake service returns the pre-built profile with TaxID set.
 	if resp["tax_id"] != "123-45-6789" {
 		t.Errorf("tax_id: got %v, want %q — existing SSN should be preserved", resp["tax_id"], "123-45-6789")
 	}
 }
 
-// --- Test 7: Admin POST Corporation with EIN → 201 contains tax_id/tax_id_type ---
+// --- Test 5: Admin POST Corporation with EIN → 201 contains tax_id/tax_id_type ---
 
 func TestCreateCorporation_WithEIN_AdminSeesTaxID(t *testing.T) {
 	entityUUID := uuid.New()
 	corpResult := coredb.CreateCorporationRow{LegalName: "Acme Corp"}
 	corpSvc := &fakeCorporationService{createCorp: corpResult, createUUID: entityUUID}
-	d := buildTestDeps(adminPrincipal(), nil, nil, corpSvc, nil)
+	d := buildTestDeps(nil, nil, corpSvc, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createCorporationRequest{
 		LegalName: "Acme Corp",
 		EIN:       "12-3456789",
 	})
-	req := httptest.NewRequest(http.MethodPost, "/entities/corporations", bytes.NewBuffer(body))
+	req := adminReq(http.MethodPost, "/entities/corporations", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -294,52 +235,24 @@ func TestCreateCorporation_WithEIN_AdminSeesTaxID(t *testing.T) {
 	}
 }
 
-// --- profileResponseFor gate unit tests ---
+// --- profileResponse gate unit tests ---
 
-func TestProfileResponseFor_AdminSeesTaxID(t *testing.T) {
+func TestProfileResponse_IncludesTaxIDWhenNonEmpty(t *testing.T) {
 	const entityID = int64(10)
 	profile := buildNPProfileWithSSN(entityID, "Joe", "Doe", "999-88-7777")
-	principal := service.Principal{UserID: 1, IsAdmin: true, EntityID: 99}
 
-	resp := profileResponseFor(principal, profile)
+	resp := profileResponse(profile)
 
 	if resp["tax_id"] != "999-88-7777" {
-		t.Errorf("admin should see tax_id, got %v", resp["tax_id"])
+		t.Errorf("expected tax_id in response, got %v", resp["tax_id"])
 	}
 	if resp["tax_id_type"] != "SSN" {
 		t.Errorf("tax_id_type: got %v", resp["tax_id_type"])
 	}
 }
 
-func TestProfileResponseFor_SubjectSeesTaxID(t *testing.T) {
-	const entityID = int64(10)
-	profile := buildNPProfileWithSSN(entityID, "Joe", "Doe", "999-88-7777")
-	principal := service.Principal{UserID: 5, IsAdmin: false, EntityID: entityID}
-
-	resp := profileResponseFor(principal, profile)
-
-	if resp["tax_id"] != "999-88-7777" {
-		t.Errorf("subject should see tax_id, got %v", resp["tax_id"])
-	}
-}
-
-func TestProfileResponseFor_StrangerOmitsTaxID(t *testing.T) {
-	const entityID = int64(10)
-	profile := buildNPProfileWithSSN(entityID, "Joe", "Doe", "999-88-7777")
-	principal := service.Principal{UserID: 5, IsAdmin: false, EntityID: 999}
-
-	resp := profileResponseFor(principal, profile)
-
-	if _, present := resp["tax_id"]; present {
-		t.Errorf("stranger should not see tax_id, got %v", resp["tax_id"])
-	}
-	if _, present := resp["tax_id_type"]; present {
-		t.Errorf("stranger should not see tax_id_type")
-	}
-}
-
-func TestProfileResponseFor_EmptyTaxIDOmitted(t *testing.T) {
-	// Even for admin, if TaxID is "" (no SSN stored) the keys are omitted.
+func TestProfileResponse_OmitsTaxIDWhenEmpty(t *testing.T) {
+	// Even when non-admin, if TaxID is "" (no SSN stored) the keys are omitted.
 	const entityID = int64(10)
 	profile := service.Profile{
 		Entity: coredb.GetEntityByUUIDRow{
@@ -355,9 +268,8 @@ func TestProfileResponseFor_EmptyTaxIDOmitted(t *testing.T) {
 		TaxID:     "",
 		TaxIDType: "SSN",
 	}
-	principal := service.Principal{UserID: 1, IsAdmin: true}
 
-	resp := profileResponseFor(principal, profile)
+	resp := profileResponse(profile)
 
 	if _, present := resp["tax_id"]; present {
 		t.Errorf("empty tax_id should be omitted, got %v", resp["tax_id"])

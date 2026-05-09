@@ -12,8 +12,6 @@ import (
 type Deps struct {
 	// Services holds the entity CRUD implementations.
 	Services *service.Services
-	// Principal extracts caller identity from request context.
-	Principal service.PrincipalExtractor
 	// Logger is the structured logger for handler-level error messages.
 	Logger *slog.Logger
 }

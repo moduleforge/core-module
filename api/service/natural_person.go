@@ -38,14 +38,14 @@ type UpdateNaturalPersonInput struct {
 
 // NaturalPersonServicer defines natural person operations available to httpapi handlers.
 type NaturalPersonServicer interface {
-	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error)
+	Create(ctx context.Context, q coredb.Querier, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error)
 	// CreateInTx creates a natural person within an already-open transaction.
 	// It does not call Authorize; the caller authorizes at its own level.
 	// Returns the new record, the entity's public UUID, the entity's internal ID,
 	// and any error. The caller must call ObserveAfterCommit after the tx commits.
 	CreateInTx(ctx context.Context, tx pgx.Tx, in CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, int64, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
-	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateNaturalPersonInput, actor Principal) error
+	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateNaturalPersonInput) error
 }
 
 // NaturalPersonService implements natural person CRUD with authorization,
@@ -169,7 +169,6 @@ func (s *NaturalPersonService) CreateInTx(
 func (s *NaturalPersonService) Create(
 	ctx context.Context,
 	_ coredb.Querier,
-	_ Principal,
 	in CreateNaturalPersonInput,
 ) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
 	// 1. Authorize with the type ID so per-resource create policy can apply.
@@ -247,7 +246,6 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateNaturalPersonInput,
-	_ Principal,
 ) error {
 	// 1. Authorize — fetch entity first to build a richer target.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)

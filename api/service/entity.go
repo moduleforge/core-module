@@ -11,6 +11,7 @@ import (
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/txhelper"
 	coredb "github.com/moduleforge/core-model/db"
 )
@@ -19,8 +20,8 @@ import (
 type EntityServicer interface {
 	GetByUUID(ctx context.Context, q coredb.Querier, id uuid.UUID) (coredb.GetEntityByUUIDRow, error)
 	GetByID(ctx context.Context, q coredb.Querier, id int64) (coredb.GetEntityByIDRow, error)
-	GetSelf(ctx context.Context, q coredb.Querier, actor Principal) (Profile, error)
-	Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, actor Principal) error
+	GetSelf(ctx context.Context, q coredb.Querier) (Profile, error)
+	Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) error
 	ResolveProfile(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
 }
 
@@ -82,12 +83,17 @@ func (s *EntityService) GetByID(ctx context.Context, q coredb.Querier, id int64)
 }
 
 // GetSelf returns the Profile for the authenticated caller's entity.
-func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier, actor Principal) (Profile, error) {
-	eid := actor.EntityID
+// The actor entity ID is read from ctx via opctx.ActorEntityID; returns
+// ErrForbidden if the ctx carries no actor (unauthenticated request).
+func (s *EntityService) GetSelf(ctx context.Context, q coredb.Querier) (Profile, error) {
+	eid, ok := opctx.ActorEntityID(ctx)
+	if !ok {
+		return Profile{}, ErrForbidden
+	}
 	if err := s.az.Authorize(ctx, "read", &eid); err != nil {
 		return Profile{}, err
 	}
-	profile, err := ResolveProfileByEntityID(ctx, q, actor.EntityID)
+	profile, err := ResolveProfileByEntityID(ctx, q, eid)
 	if err != nil {
 		return Profile{}, fmt.Errorf("entity.GetSelf: %w", err)
 	}
@@ -115,7 +121,7 @@ func (s *EntityService) ResolveProfile(ctx context.Context, q coredb.Querier, en
 // Archive soft-deletes an entity. Requires admin authorization.
 // The caller-supplied q parameter is accepted for interface compatibility but
 // the service opens its own transaction via s.db.
-func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, _ Principal) error {
+func (s *EntityService) Archive(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) error {
 	// 1. Authorize — fetch entity first to build a richer target.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)
 	if err != nil {

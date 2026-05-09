@@ -9,6 +9,7 @@ import (
 
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/opctx"
 )
 
 // randomUUID returns a random UUID for use in tests that need a "missing" UUID.
@@ -41,7 +42,7 @@ func TestEntityService_Archive_AuthzDenied(t *testing.T) {
 	}
 
 	entityUUID := q.seedNaturalPerson("Grace", "Hopper")
-	err := svc.Archive(context.Background(), q, entityUUID, Principal{})
+	err := svc.Archive(context.Background(), q, entityUUID)
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -58,9 +59,9 @@ func TestEntityService_Archive_AdminSucceeds(t *testing.T) {
 	}
 
 	entityUUID := q.seedNaturalPerson("Grace", "Hopper")
-	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
+	ctx := opctx.WithActor(context.Background(), 1)
 
-	err := svc.Archive(context.Background(), q, entityUUID, admin)
+	err := svc.Archive(ctx, q, entityUUID)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -80,7 +81,7 @@ func TestEntityService_Archive_NotFound(t *testing.T) {
 	q := newMockQuerier()
 	svc := newEntityService(q)
 
-	err := svc.Archive(context.Background(), q, randomUUID(t), Principal{IsAdmin: true})
+	err := svc.Archive(context.Background(), q, randomUUID(t))
 	if err == nil {
 		t.Error("expected error for missing entity")
 	}
@@ -164,8 +165,8 @@ func TestEntityService_GetSelf(t *testing.T) {
 	entityUUID := q.seedNaturalPerson("Carol", "White")
 	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
 
-	actor := Principal{EntityID: entity.ID}
-	profile, err := svc.GetSelf(context.Background(), q, actor)
+	ctx := opctx.WithActor(context.Background(), entity.ID)
+	profile, err := svc.GetSelf(ctx, q)
 	if err != nil {
 		t.Fatalf("GetSelf: unexpected error: %v", err)
 	}
@@ -204,7 +205,8 @@ func TestEntityService_Archive_ObserverError_RollsBack(t *testing.T) {
 	}
 
 	entityUUID := q.seedNaturalPerson("Test", "User")
-	err := svc.Archive(context.Background(), q, entityUUID, Principal{IsAdmin: true})
+	ctx := opctx.WithActor(context.Background(), 1)
+	err := svc.Archive(ctx, q, entityUUID)
 	if err == nil {
 		t.Fatal("expected error from observer, got nil")
 	}

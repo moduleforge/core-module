@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 )
 
@@ -19,13 +20,8 @@ type createNaturalPersonRequest struct {
 
 // createNaturalPerson handles POST /entities/natural-persons (admin only).
 func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
-		return
-	}
-	if !p.IsAdmin {
-		jsonErr(w, http.StatusForbidden, "forbidden", "admin required")
 		return
 	}
 
@@ -42,7 +38,7 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The service manages its own transaction internally via txhelper.Run.
-	np, entityUUID, err := h.d.Services.NaturalPerson.Create(r.Context(), h.d.Services.Querier(), *p, in)
+	np, entityUUID, err := h.d.Services.NaturalPerson.Create(r.Context(), h.d.Services.Querier(), in)
 	if err != nil {
 		writeServiceErr(w, err)
 		return
@@ -64,8 +60,7 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 
 // getNaturalPerson handles GET /entities/natural-persons/{uuid}.
 func (h *handlers) getNaturalPerson(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -82,13 +77,7 @@ func (h *handlers) getNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Non-admin callers may only retrieve their own profile.
-	if !p.IsAdmin && p.EntityID != profile.Entity.ID {
-		jsonErr(w, http.StatusForbidden, "forbidden", "access denied")
-		return
-	}
-
-	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
+	jsonOK(w, http.StatusOK, profileResponse(profile))
 }
 
 // updateNaturalPersonRequest is the body for PUT /entities/natural-persons/{uuid}.
@@ -102,8 +91,7 @@ type updateNaturalPersonRequest struct {
 
 // updateNaturalPerson handles PUT /entities/natural-persons/{uuid}.
 func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -131,7 +119,6 @@ func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		h.d.Services.Querier(),
 		entityUUID,
 		in,
-		*p,
 	); err != nil {
 		writeServiceErr(w, err)
 		return
@@ -143,5 +130,5 @@ func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
+	jsonOK(w, http.StatusOK, profileResponse(profile))
 }

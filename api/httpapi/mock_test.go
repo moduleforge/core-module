@@ -8,19 +8,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
-// --- fake PrincipalExtractor ---
-
-type fakePrincipalExtractor struct {
-	p  *service.Principal
-	ok bool
-}
-
-func (f *fakePrincipalExtractor) FromContext(_ context.Context) (*service.Principal, bool) {
-	return f.p, f.ok
+// actorCtx returns a context with the given actor entity ID set.
+// Use entityID=0 to simulate an unauthenticated request (opctx stores int64;
+// 0 is never a valid DB entity ID, but FromContext returns (0, false) for
+// missing keys, so we model unauthenticated by omitting the actor entirely).
+func actorCtx(entityID int64) context.Context {
+	return opctx.WithActor(context.Background(), entityID)
 }
 
 // --- fake service implementations ---
@@ -47,11 +45,11 @@ func (f *fakeEntityService) GetByID(_ context.Context, _ coredb.Querier, _ int64
 	return row, f.err
 }
 
-func (f *fakeEntityService) GetSelf(_ context.Context, _ coredb.Querier, _ service.Principal) (service.Profile, error) {
+func (f *fakeEntityService) GetSelf(_ context.Context, _ coredb.Querier) (service.Profile, error) {
 	return f.profile, f.err
 }
 
-func (f *fakeEntityService) Archive(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.Principal) error {
+func (f *fakeEntityService) Archive(_ context.Context, _ coredb.Querier, _ uuid.UUID) error {
 	return f.err
 }
 
@@ -68,7 +66,7 @@ type fakeNaturalPersonService struct {
 	err        error
 }
 
-func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
+func (f *fakeNaturalPersonService) Create(_ context.Context, _ coredb.Querier, _ service.CreateNaturalPersonInput) (coredb.CreateNaturalPersonRow, uuid.UUID, error) {
 	return f.createNP, f.createUUID, f.err
 }
 
@@ -80,7 +78,7 @@ func (f *fakeNaturalPersonService) GetByEntityUUID(_ context.Context, _ coredb.Q
 	return f.profile, f.err
 }
 
-func (f *fakeNaturalPersonService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateNaturalPersonInput, _ service.Principal) error {
+func (f *fakeNaturalPersonService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateNaturalPersonInput) error {
 	return f.err
 }
 
@@ -93,7 +91,7 @@ type fakeCorporationService struct {
 	err        error
 }
 
-func (f *fakeCorporationService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error) {
+func (f *fakeCorporationService) Create(_ context.Context, _ coredb.Querier, _ service.CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error) {
 	return f.createCorp, f.createUUID, f.err
 }
 
@@ -101,7 +99,7 @@ func (f *fakeCorporationService) GetByEntityUUID(_ context.Context, _ coredb.Que
 	return f.profile, f.err
 }
 
-func (f *fakeCorporationService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateCorporationInput, _ service.Principal) error {
+func (f *fakeCorporationService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateCorporationInput) error {
 	return f.err
 }
 
@@ -114,7 +112,7 @@ type fakeServiceAccountService struct {
 	err        error
 }
 
-func (f *fakeServiceAccountService) Create(_ context.Context, _ coredb.Querier, _ service.Principal, _ service.CreateServiceAccountInput) (coredb.ServiceAccount, uuid.UUID, error) {
+func (f *fakeServiceAccountService) Create(_ context.Context, _ coredb.Querier, _ service.CreateServiceAccountInput) (coredb.ServiceAccount, uuid.UUID, error) {
 	return f.createSA, f.createUUID, f.err
 }
 
@@ -122,7 +120,7 @@ func (f *fakeServiceAccountService) GetByEntityUUID(_ context.Context, _ coredb.
 	return f.profile, f.err
 }
 
-func (f *fakeServiceAccountService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateServiceAccountInput, _ service.Principal) error {
+func (f *fakeServiceAccountService) UpdateByEntityUUID(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ service.UpdateServiceAccountInput) error {
 	return f.err
 }
 
@@ -130,7 +128,6 @@ var _ service.ServiceAccountServicer = (*fakeServiceAccountService)(nil)
 
 // buildTestDeps constructs a Deps with the given service overrides.
 func buildTestDeps(
-	principal *fakePrincipalExtractor,
 	entity *fakeEntityService,
 	np *fakeNaturalPersonService,
 	corp *fakeCorporationService,
@@ -151,9 +148,8 @@ func buildTestDeps(
 	}
 
 	return Deps{
-		Services:  svcs,
-		Principal: principal,
-		Logger:    noopLogger(),
+		Services: svcs,
+		Logger:   noopLogger(),
 	}
 }
 

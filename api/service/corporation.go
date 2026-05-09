@@ -38,9 +38,9 @@ type UpdateCorporationInput struct {
 
 // CorporationServicer defines corporation operations available to httpapi handlers.
 type CorporationServicer interface {
-	Create(ctx context.Context, q coredb.Querier, actor Principal, in CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error)
+	Create(ctx context.Context, q coredb.Querier, in CreateCorporationInput) (coredb.CreateCorporationRow, uuid.UUID, error)
 	GetByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID) (Profile, error)
-	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateCorporationInput, actor Principal) error
+	UpdateByEntityUUID(ctx context.Context, q coredb.Querier, entityUUID uuid.UUID, in UpdateCorporationInput) error
 }
 
 // CorporationService implements corporation CRUD with authorization,
@@ -72,7 +72,6 @@ func (s *CorporationService) querier(tx pgx.Tx) coredb.Querier {
 func (s *CorporationService) Create(
 	ctx context.Context,
 	_ coredb.Querier,
-	_ Principal,
 	in CreateCorporationInput,
 ) (coredb.CreateCorporationRow, uuid.UUID, error) {
 	// 1. Authorize with the type ID so per-resource create policy can apply.
@@ -191,7 +190,6 @@ func (s *CorporationService) UpdateByEntityUUID(
 	q coredb.Querier,
 	entityUUID uuid.UUID,
 	in UpdateCorporationInput,
-	_ Principal,
 ) error {
 	// 1. Authorize — fetch entity first to build a richer target.
 	ent, err := q.GetEntityByUUID(ctx, entityUUID)

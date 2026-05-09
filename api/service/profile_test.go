@@ -134,9 +134,7 @@ func TestServiceAccountService_Create_WritesObserver(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
-
-	sa, entityUUID, err := svc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: "my-service"})
+	sa, entityUUID, err := svc.Create(context.Background(), q, CreateServiceAccountInput{Label: "my-service"})
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
@@ -163,7 +161,7 @@ func TestServiceAccountService_Create_AuthzDenied(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 
-	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateServiceAccountInput{Label: "x"})
+	_, _, err := svc.Create(context.Background(), q, CreateServiceAccountInput{Label: "x"})
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -172,9 +170,7 @@ func TestServiceAccountService_Create_AuthzDenied(t *testing.T) {
 func TestServiceAccountService_Create_EmptyLabel(t *testing.T) {
 	q := newMockQuerier()
 	svc := newSAService(q)
-	admin := Principal{IsAdmin: true}
-
-	_, _, err := svc.Create(context.Background(), q, admin, CreateServiceAccountInput{Label: ""})
+	_, _, err := svc.Create(context.Background(), q, CreateServiceAccountInput{Label: ""})
 	if !isErrInvalid(err) {
 		t.Errorf("expected ErrInvalidInput, got %v", err)
 	}

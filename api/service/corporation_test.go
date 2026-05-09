@@ -33,10 +33,9 @@ func TestCorporationService_Create_WritesObserver(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
 
 	in := CreateCorporationInput{LegalName: "Acme Corp", Jurisdiction: "DE"}
-	corp, entityUUID, err := svc.Create(context.Background(), q, admin, in)
+	corp, entityUUID, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
@@ -72,7 +71,7 @@ func TestCorporationService_Create_AuthzDenied(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 
-	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateCorporationInput{LegalName: "Foo"})
+	_, _, err := svc.Create(context.Background(), q, CreateCorporationInput{LegalName: "Foo"})
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -81,9 +80,8 @@ func TestCorporationService_Create_AuthzDenied(t *testing.T) {
 func TestCorporationService_Create_EmptyLegalName(t *testing.T) {
 	q := newMockQuerier()
 	svc := newCorpService(t, q)
-	admin := Principal{IsAdmin: true}
 
-	_, _, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "   "})
+	_, _, err := svc.Create(context.Background(), q, CreateCorporationInput{LegalName: "   "})
 	if !errors.Is(err, ErrInvalidInput) {
 		t.Errorf("expected ErrInvalidInput, got %v", err)
 	}
@@ -102,10 +100,9 @@ func TestCorporationService_GetByEntityUUID_NotFound(t *testing.T) {
 func TestCorporationService_GetByEntityUUID_Found(t *testing.T) {
 	q := newMockQuerier()
 	svc := newCorpService(t, q)
-	admin := Principal{IsAdmin: true}
 
 	// Create via the service to set up all rows.
-	_, entityUUID, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "Beta LLC"})
+	_, entityUUID, err := svc.Create(context.Background(), q, CreateCorporationInput{LegalName: "Beta LLC"})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
@@ -125,7 +122,7 @@ func TestCorporationService_Update_AuthzDenied(t *testing.T) {
 
 	// First create via allow-all service.
 	setupSvc := newCorpService(t, q)
-	_, entityUUID, err := setupSvc.Create(context.Background(), q, Principal{IsAdmin: true}, CreateCorporationInput{LegalName: "Gamma Inc"})
+	_, entityUUID, err := setupSvc.Create(context.Background(), q, CreateCorporationInput{LegalName: "Gamma Inc"})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
@@ -140,7 +137,7 @@ func TestCorporationService_Update_AuthzDenied(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 	ln := "Delta Inc"
-	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln}, Principal{})
+	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln})
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -158,9 +155,8 @@ func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{IsAdmin: true}
 
-	_, entityUUID, err := svc.Create(context.Background(), q, admin, CreateCorporationInput{LegalName: "Epsilon Corp"})
+	_, entityUUID, err := svc.Create(context.Background(), q, CreateCorporationInput{LegalName: "Epsilon Corp"})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
@@ -169,7 +165,7 @@ func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 	rec.observeAfterCommitCalls = nil
 
 	ln := "Epsilon Corporation"
-	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln}, admin)
+	err = svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateCorporationInput{LegalName: &ln})
 	if err != nil {
 		t.Fatalf("Update: unexpected error: %v", err)
 	}
@@ -185,10 +181,9 @@ func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 func TestCorporationService_UpdateByEntityUUID_NotFound(t *testing.T) {
 	q := newMockQuerier()
 	svc := newCorpService(t, q)
-	admin := Principal{IsAdmin: true}
 
 	ln := "X"
-	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateCorporationInput{LegalName: &ln}, admin)
+	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateCorporationInput{LegalName: &ln})
 	if err == nil {
 		t.Error("expected error for missing entity")
 	}

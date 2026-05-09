@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 )
 
@@ -19,13 +20,8 @@ type createCorporationRequest struct {
 
 // createCorporation handles POST /entities/corporations (admin only).
 func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
-		return
-	}
-	if !p.IsAdmin {
-		jsonErr(w, http.StatusForbidden, "forbidden", "admin required")
 		return
 	}
 
@@ -42,7 +38,7 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The service manages its own transaction internally via txhelper.Run.
-	corp, entityUUID, err := h.d.Services.Corporation.Create(r.Context(), h.d.Services.Querier(), *p, in)
+	corp, entityUUID, err := h.d.Services.Corporation.Create(r.Context(), h.d.Services.Querier(), in)
 	if err != nil {
 		writeServiceErr(w, err)
 		return
@@ -64,8 +60,7 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 
 // getCorporation handles GET /entities/corporations/{uuid}.
 func (h *handlers) getCorporation(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -82,7 +77,7 @@ func (h *handlers) getCorporation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
+	jsonOK(w, http.StatusOK, profileResponse(profile))
 }
 
 // updateCorporationRequest is the body for PUT /entities/corporations/{uuid}.
@@ -96,8 +91,7 @@ type updateCorporationRequest struct {
 
 // updateCorporation handles PUT /entities/corporations/{uuid} (admin only).
 func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -125,7 +119,6 @@ func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 		h.d.Services.Querier(),
 		entityUUID,
 		in,
-		*p,
 	); err != nil {
 		writeServiceErr(w, err)
 		return
@@ -137,5 +130,5 @@ func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponseFor(*p, profile))
+	jsonOK(w, http.StatusOK, profileResponse(profile))
 }

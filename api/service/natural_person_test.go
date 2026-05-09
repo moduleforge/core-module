@@ -33,10 +33,8 @@ func TestNaturalPersonService_Create_WritesObserver(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-	admin := Principal{UserID: 1, EntityID: 1, IsAdmin: true}
-
 	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith"}
-	np, entityUUID, err := svc.Create(context.Background(), q, admin, in)
+	np, entityUUID, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
@@ -82,7 +80,7 @@ func TestNaturalPersonService_Create_AuthzDenied(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 
-	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: false}, CreateNaturalPersonInput{
+	_, _, err := svc.Create(context.Background(), q, CreateNaturalPersonInput{
 		GivenName: "Bob", FamilyName: "Jones",
 	})
 	if !errors.Is(err, authzErr) {
@@ -93,8 +91,6 @@ func TestNaturalPersonService_Create_AuthzDenied(t *testing.T) {
 func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 	q := newMockQuerier()
 	svc := newNPService(t, q)
-	admin := Principal{IsAdmin: true}
-
 	cases := []struct {
 		name string
 		in   CreateNaturalPersonInput
@@ -107,7 +103,7 @@ func TestNaturalPersonService_Create_ValidationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := svc.Create(context.Background(), q, admin, tc.in)
+			_, _, err := svc.Create(context.Background(), q, tc.in)
 			if !errors.Is(err, ErrInvalidInput) {
 				t.Errorf("expected ErrInvalidInput, got %v", err)
 			}
@@ -129,7 +125,7 @@ func TestNaturalPersonService_Create_ObserverError_RollsBack(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 
-	_, _, err := svc.Create(context.Background(), q, Principal{IsAdmin: true}, CreateNaturalPersonInput{
+	_, _, err := svc.Create(context.Background(), q, CreateNaturalPersonInput{
 		GivenName: "Dave", FamilyName: "Test",
 	})
 	if err == nil {
@@ -157,7 +153,7 @@ func TestNaturalPersonService_Update_AuthzDenied(t *testing.T) {
 
 	entityUUID := q.seedNaturalPerson("Charlie", "Brown")
 	gn := "Changed"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn}, Principal{})
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn})
 	if !errors.Is(err, authzErr) {
 		t.Errorf("expected authz error, got %v", err)
 	}
@@ -176,7 +172,7 @@ func TestNaturalPersonService_Update_Success(t *testing.T) {
 
 	entityUUID := q.seedNaturalPerson("Eve", "Foster")
 	fn := "Forster"
-	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{FamilyName: &fn}, Principal{IsAdmin: true})
+	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{FamilyName: &fn})
 	if err != nil {
 		t.Fatalf("expected success for update, got %v", err)
 	}
@@ -193,7 +189,7 @@ func TestNaturalPersonService_Update_NotFound(t *testing.T) {
 	svc := newNPService(t, q)
 
 	name := "Bob"
-	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateNaturalPersonInput{GivenName: &name}, Principal{IsAdmin: true})
+	err := svc.UpdateByEntityUUID(context.Background(), q, randomUUID(t), UpdateNaturalPersonInput{GivenName: &name})
 	if err == nil {
 		t.Error("expected error for missing entity")
 	}

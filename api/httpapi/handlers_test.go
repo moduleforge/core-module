@@ -10,9 +10,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 	coredb "github.com/moduleforge/core-model/db"
 )
+
+// withActor attaches the given entity ID to the request context.
+func withActor(r *http.Request, entityID int64) *http.Request {
+	return r.WithContext(opctx.WithActor(r.Context(), entityID))
+}
 
 // buildNaturalPersonProfile returns a Profile for testing GET responses.
 func buildNaturalPersonProfile(givenName, familyName string) service.Profile {
@@ -31,13 +37,15 @@ func buildNaturalPersonProfile(givenName, familyName string) service.Profile {
 // --- POST /entities/natural-persons ---
 
 func TestCreateNaturalPerson_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
-	d := buildTestDeps(ext, nil, &fakeNaturalPersonService{}, nil, nil)
+	// Non-admin: actor is set but service returns ErrForbidden (authz).
+	npSvc := &fakeNaturalPersonService{err: service.ErrForbidden}
+	d := buildTestDeps(nil, npSvc, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "Bob", FamilyName: "Jones"})
 	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req = withActor(req, 2)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -47,11 +55,11 @@ func TestCreateNaturalPerson_403_NonAdmin(t *testing.T) {
 }
 
 func TestCreateNaturalPerson_401_Unauthenticated(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, nil, &fakeNaturalPersonService{}, nil, nil)
+	d := buildTestDeps(nil, &fakeNaturalPersonService{}, nil, nil)
 	router := NewRouter(d)
 
 	body, _ := json.Marshal(createNaturalPersonRequest{GivenName: "Bob", FamilyName: "Jones"})
+	// No actor in context → unauthenticated.
 	req := httptest.NewRequest(http.MethodPost, "/entities/natural-persons", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -64,8 +72,7 @@ func TestCreateNaturalPerson_401_Unauthenticated(t *testing.T) {
 // --- DELETE /entities/{uuid} ---
 
 func TestArchiveEntity_401_Unauthenticated(t *testing.T) {
-	ext := &fakePrincipalExtractor{ok: false}
-	d := buildTestDeps(ext, &fakeEntityService{}, nil, nil, nil)
+	d := buildTestDeps(&fakeEntityService{}, nil, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodDelete, "/entities/"+uuid.New().String(), nil)
@@ -78,12 +85,12 @@ func TestArchiveEntity_401_Unauthenticated(t *testing.T) {
 }
 
 func TestArchiveEntity_404_NotFound(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	entSvc := &fakeEntityService{err: service.ErrNotFound}
-	d := buildTestDeps(ext, entSvc, nil, nil, nil)
+	d := buildTestDeps(entSvc, nil, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodDelete, "/entities/"+uuid.New().String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -93,12 +100,12 @@ func TestArchiveEntity_404_NotFound(t *testing.T) {
 }
 
 func TestArchiveEntity_403_NonAdmin(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 2, IsAdmin: false}, ok: true}
 	entSvc := &fakeEntityService{err: service.ErrForbidden}
-	d := buildTestDeps(ext, entSvc, nil, nil, nil)
+	d := buildTestDeps(entSvc, nil, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodDelete, "/entities/"+uuid.New().String(), nil)
+	req = withActor(req, 2)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -108,12 +115,12 @@ func TestArchiveEntity_403_NonAdmin(t *testing.T) {
 }
 
 func TestArchiveEntity_204_Success(t *testing.T) {
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1, IsAdmin: true}, ok: true}
 	entSvc := &fakeEntityService{err: nil}
-	d := buildTestDeps(ext, entSvc, nil, nil, nil)
+	d := buildTestDeps(entSvc, nil, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodDelete, "/entities/"+uuid.New().String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -126,12 +133,12 @@ func TestArchiveEntity_204_Success(t *testing.T) {
 
 func TestGetEntity_200_HappyPath(t *testing.T) {
 	profile := buildNaturalPersonProfile("Frank", "Zappa")
-	ext := &fakePrincipalExtractor{p: &service.Principal{UserID: 1}, ok: true}
 	entSvc := &fakeEntityService{profile: profile}
-	d := buildTestDeps(ext, entSvc, nil, nil, nil)
+	d := buildTestDeps(entSvc, nil, nil, nil)
 	router := NewRouter(d)
 
 	req := httptest.NewRequest(http.MethodGet, "/entities/"+uuid.New().String(), nil)
+	req = withActor(req, 1)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

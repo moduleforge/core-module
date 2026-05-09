@@ -5,13 +5,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/moduleforge/core-api/opctx"
 )
 
 // getEntity handles GET /entities/{uuid} — resolves any entity UUID to its
 // profile, picking the appropriate subtype automatically.
 func (h *handlers) getEntity(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -34,8 +35,7 @@ func (h *handlers) getEntity(w http.ResponseWriter, r *http.Request) {
 // archiveEntity handles DELETE /entities/{uuid} (admin only) — soft-deletes
 // an entity by setting archived_at.
 func (h *handlers) archiveEntity(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.d.Principal.FromContext(r.Context())
-	if !ok {
+	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
 		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
@@ -46,7 +46,7 @@ func (h *handlers) archiveEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.d.Services.Entity.Archive(r.Context(), h.d.Services.Querier(), entityUUID, *p); err != nil {
+	if err := h.d.Services.Entity.Archive(r.Context(), h.d.Services.Querier(), entityUUID); err != nil {
 		writeServiceErr(w, err)
 		return
 	}
