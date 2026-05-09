@@ -186,15 +186,147 @@ A `list` operation must satisfy both: `Authorize(ctx, "list", &typeID)` permits 
 
 Single-target operations (`read`, `update`, `delete`) only consult `Authorize` — the entity ID is already known and there's no result set to scope.
 
-### Future evolution
+### Production policy — `GrantTableGenerator` (Phase 2, active)
 
-The current `AdminOrOwnGenerator` encodes a simple "admin sees everything; non-admins see what they own" policy directly in SQL. Two evolutions are anticipated when use cases require them:
+The current production policy replaces `AdminOrOwnGenerator` with a data-driven `GrantTableGenerator` backed by the `authz-module` schema (migration range `0500–0599`). The high-level pieces are:
 
-1. **Grants table (`authz-module`).** A future dedicated `authz-module` (proposed migration range `0500-0599`) will own a `grants(actor_entity_id, target_entity_id, operation, granted_at, …)` table. A `GrantTableGenerator` replaces `AdminOrOwnGenerator` at the composition root; the generated function bodies query `grants` instead of inlining ownership rules. **Peer-module query files do not change** — they still JOIN `accessible_<resource>_ids_for_actor`. The function body is the only thing that swaps.
+#### Operation registry and `OpResolver`
 
-2. **Trigger-maintained access tables.** If indirect-grant fan-out (e.g. group-of-users-grants-org-of-entities) creates measurable contention or perf issues, per-resource `*_access` tables (e.g. `tag_access(actor_entity_id, tag_entity_id, can_read)`) materialise the grants for fast JOIN. Triggers on `grants` keep the access tables in sync. Function bodies become `SELECT entity_id FROM tag_access WHERE actor_entity_id = $1 AND can_read` — still a single-SELECT `LANGUAGE sql STABLE` shape that inlines. Peer-module query files still don't change.
+`authz-module` owns an `authz_operations` table seeded with 11 operations:
 
-These evolutions are explicitly *deferred*; they're noted here so that the current design does not foreclose them. The function-as-policy-boundary is the durable contract.
+| slug | implies |
+|---|---|
+| `read` | — |
+| `sread` | `read` |
+| `list` | `read` |
+| `update` | `read` |
+| `delete` | `read` |
+| `swrite` | `sread`, `update` |
+| `manage` | all other ops (the all-ops grant) |
+| `assume` | — |
+| `login` | — |
+| `grant` | — |
+| `revoke` | — |
+
+`OperationRegistry` (in `authz-module/api/authz`) loads these at startup and caches two transitive-closure views:
+
+- **Forward implies**: what does this op grant transitively? (For management UI display.)
+- **Reverse / `SatisfiedBy`**: which ops, if granted, satisfy a request for this op? This closure drives every `Authorize` call and every `JOIN ... op_ids` in list queries.
+
+The `OpResolver` interface in `core-module/api/authz` exposes `SatisfiedBy` to peer modules without requiring them to import `authz-api`:
+
+```go
+type OpResolver interface {
+    SatisfiedBy(slug string) ([]int32, error)
+}
+```
+
+`OperationRegistry` implements `OpResolver`. It is injected at the composition root and passed to every service constructor that issues list queries.
+
+The `SatisfiedByMust` / `SatisfiedBy` distinction: `Must` panics on unknown slugs and is used at composition root init time; `SatisfiedBy` returns an error and is used at call sites inside service methods.
+
+#### Actor and target groups — schema and cycle prevention
+
+`authz-module` adds two additional entity types:
+
+- `authz_actor_groups` — nestable groups of actors (UserAccounts or other actor groups). CTI under `entities`.
+- `authz_target_groups` — nestable groups of targets (any Entity). CTI under `entities`.
+
+Join tables (`authz_actor_group_members`, `authz_target_group_members`) reference `entities.id`. Cycle prevention is enforced at write time via database triggers; the triggers walk the membership chain and reject an insert that would create a cycle. Member-type rules (actor group members must be user_accounts or actor groups; target group members may be any entity) are likewise enforced by triggers using `core-module`'s `type_is_or_descends_from()` helper function.
+
+Both group types carry `ON DELETE CASCADE` from `entities`, so archiving the underlying entity removes group membership automatically.
+
+#### Grants table
+
+```sql
+CREATE TABLE grants (
+    id           BIGINT PRIMARY KEY,
+    actor_id     BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    operation_id INT    NOT NULL REFERENCES authz_operations(id),
+    target_id    BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    granted_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    granted_by   BIGINT NOT NULL REFERENCES entities(id),
+    UNIQUE (actor_id, operation_id, target_id)
+);
+```
+
+Both `actor_id` and `target_id` cascade on entity delete. Revoking a grant is a hard delete (not an archive); the unique constraint prevents duplicate grants.
+
+#### Access function shape (Phase 2)
+
+The access function signature gained an `op_ids` parameter in Phase 2:
+
+```sql
+accessible_<resource>_ids_for_actor(p_actor_entity_id BIGINT, p_op_ids INT[])
+RETURNS TABLE(entity_id BIGINT) LANGUAGE sql STABLE
+```
+
+The shared recursive-CTE prefix generated by `GrantTableGenerator`:
+
+```sql
+WITH RECURSIVE
+    ActorChain AS (
+        SELECT p_actor_entity_id AS aid
+        UNION
+        SELECT agm.group_id
+        FROM authz_actor_group_members agm
+        JOIN ActorChain ac ON agm.member_id = ac.aid
+    ),
+    GrantedTarget AS (
+        SELECT g.target_id AS tid
+        FROM grants g
+        JOIN ActorChain ac ON g.actor_id = ac.aid
+        WHERE g.operation_id = ANY(p_op_ids)
+    ),
+    TargetChain AS (
+        SELECT tid FROM GrantedTarget
+        UNION
+        SELECT atgm.member_id
+        FROM authz_target_group_members atgm
+        JOIN TargetChain tc ON atgm.group_id = tc.tid
+    )
+```
+
+This is prepended to each per-resource UNION of (a) the "own" predicate (actor owns the row directly) and (b) a JOIN against `TargetChain` to include grant-reachable rows.
+
+List/search sqlc queries pass `SatisfiedBy("read")` (or the appropriate op slug) as `op_ids`:
+
+```sql
+JOIN accessible_tag_ids_for_actor(@actor_entity_id, sqlc.arg(op_ids)::int[]) acc
+  ON acc.entity_id = t.entity_id
+```
+
+Service layer:
+
+```go
+opIDs, err := s.opRes.SatisfiedBy("read")
+if err != nil { return nil, fmt.Errorf("resolve op_ids: %w", err) }
+return s.repo.List(ctx, ListParams{ActorEntityID: actorID, OpIds: opIDs, Limit: p.Limit, Offset: p.Offset})
+```
+
+#### Single-row Authorize semantics
+
+For `Authorize(ctx, "update", &target)`:
+
+1. Resolve `"update"` → satisfied-by closure via `OperationRegistry.SatisfiedBy`.
+2. Short-circuit if actor has `is_admin = true` (current simplification; see below).
+3. Otherwise: recursive-CTE query that walks UP from the actor (via `ActorChain`) and UP from the target (via `TargetChain`), returning `EXISTS(SELECT 1 FROM grants WHERE actor_id IN ActorChain AND target_id IN TargetChain AND operation_id = ANY(op_ids))`.
+
+"Own" semantics for single-row reads are expressed per-resource either as a separate predicate or folded into the access-function body; the impl chooses the cleaner approach per resource.
+
+#### `is_admin` short-circuit (current simplification)
+
+The `Authorizer` implementation checks `is_admin` in Go before issuing any grants query. Admins bypass row-level scoping entirely — they see all rows and pass every `Authorize` call. This is the current simplification (Q8-A from phase-2-design.md). The `manage` operation is available for grant-driven admin equivalents in the future; the short-circuit is documented as a simplification rather than a long-term design decision.
+
+#### Admin API for authz management (Phase 2.4)
+
+`authz-module/api` provides CRUD endpoints for operations, actor groups, target groups, grants, and memberships under `/v1/authz/*`. All endpoints are admin-only via the `is_admin` short-circuit. See the phase-2-design.md §Phase 2.4 for the full endpoint list.
+
+### Future evolution — Phase 3
+
+**Trigger-maintained access tables.** If indirect-grant fan-out (e.g. group-of-users grants org-of-entities) creates measurable contention or perf issues, per-resource `*_access` tables (e.g. `tag_access(actor_entity_id, tag_entity_id, can_read)`) materialise the grants for fast JOIN. Triggers on `grants` keep the access tables in sync. Function bodies become `SELECT entity_id FROM tag_access WHERE actor_entity_id = $1 AND can_read` — still a single-SELECT `LANGUAGE sql STABLE` shape that inlines. Peer-module query files still don't change.
+
+The function-as-policy-boundary is the durable contract across both Phase 2 and Phase 3.
 
 ## What the framework does not authorize
 
