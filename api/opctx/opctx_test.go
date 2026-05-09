@@ -43,11 +43,11 @@ func TestActorEntityID(t *testing.T) {
 	})
 }
 
-// TestAssumedActorEntityID verifies round-trip set/get and the missing-value case.
-func TestAssumedActorEntityID(t *testing.T) {
+// TestSudoActorEntityID verifies round-trip set/get and the missing-value case.
+func TestSudoActorEntityID(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
-		ctx := opctx.WithAssumedActor(context.Background(), 99)
-		id, ok := opctx.AssumedActorEntityID(ctx)
+		ctx := opctx.WithSudoActor(context.Background(), 99)
+		id, ok := opctx.SudoActorEntityID(ctx)
 		if !ok {
 			t.Fatal("expected ok=true, got false")
 		}
@@ -57,7 +57,7 @@ func TestAssumedActorEntityID(t *testing.T) {
 	})
 
 	t.Run("not set returns zero and false", func(t *testing.T) {
-		id, ok := opctx.AssumedActorEntityID(context.Background())
+		id, ok := opctx.SudoActorEntityID(context.Background())
 		if ok {
 			t.Fatal("expected ok=false, got true")
 		}
@@ -99,7 +99,7 @@ func TestRequestID(t *testing.T) {
 func TestKeysDoNotCollide(t *testing.T) {
 	ctx := context.Background()
 	ctx = opctx.WithActor(ctx, 10)
-	ctx = opctx.WithAssumedActor(ctx, 20)
+	ctx = opctx.WithSudoActor(ctx, 20)
 	ctx = opctx.WithRequestID(ctx, "req-xyz")
 
 	actorID, ok := opctx.ActorEntityID(ctx)
@@ -107,9 +107,9 @@ func TestKeysDoNotCollide(t *testing.T) {
 		t.Errorf("ActorEntityID: want (10, true), got (%d, %v)", actorID, ok)
 	}
 
-	assumedID, ok := opctx.AssumedActorEntityID(ctx)
-	if !ok || assumedID != 20 {
-		t.Errorf("AssumedActorEntityID: want (20, true), got (%d, %v)", assumedID, ok)
+	sudoID, ok := opctx.SudoActorEntityID(ctx)
+	if !ok || sudoID != 20 {
+		t.Errorf("SudoActorEntityID: want (20, true), got (%d, %v)", sudoID, ok)
 	}
 
 	reqID := opctx.RequestID(ctx)
@@ -118,24 +118,24 @@ func TestKeysDoNotCollide(t *testing.T) {
 	}
 }
 
-// TestActorDoesNotLeakToAssumed confirms actor and assumed-actor keys are independent.
-func TestActorDoesNotLeakToAssumed(t *testing.T) {
-	// Set only actor; assumed-actor must remain absent.
+// TestActorDoesNotLeakToSudoActor confirms actor and sudo-actor keys are independent.
+func TestActorDoesNotLeakToSudoActor(t *testing.T) {
+	// Set only actor; sudo-actor must remain absent.
 	ctx := opctx.WithActor(context.Background(), 55)
 
-	_, ok := opctx.AssumedActorEntityID(ctx)
+	_, ok := opctx.SudoActorEntityID(ctx)
 	if ok {
-		t.Fatal("AssumedActorEntityID should not be set when only actor was set")
+		t.Fatal("SudoActorEntityID should not be set when only actor was set")
 	}
 }
 
-// TestAssumedDoesNotLeakToActor confirms assumed-actor does not bleed into actor.
-func TestAssumedDoesNotLeakToActor(t *testing.T) {
-	// Set only assumed-actor; actor must remain absent.
-	ctx := opctx.WithAssumedActor(context.Background(), 77)
+// TestSudoActorDoesNotLeakToActor confirms sudo-actor does not bleed into actor.
+func TestSudoActorDoesNotLeakToActor(t *testing.T) {
+	// Set only sudo-actor; actor must remain absent.
+	ctx := opctx.WithSudoActor(context.Background(), 77)
 
 	_, ok := opctx.ActorEntityID(ctx)
 	if ok {
-		t.Fatal("ActorEntityID should not be set when only assumed-actor was set")
+		t.Fatal("ActorEntityID should not be set when only sudo-actor was set")
 	}
 }

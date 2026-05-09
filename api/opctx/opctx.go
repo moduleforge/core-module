@@ -4,7 +4,7 @@
 // Three values are defined:
 //
 //   - ActorEntityID: the internal entity ID of the authenticated user.
-//   - AssumedActorEntityID: the internal entity ID of a user being impersonated
+//   - SudoActorEntityID: the internal entity ID of a user being impersonated
 //     by an admin ("assume identity" feature). Absent when no assumption is active.
 //   - RequestID: an opaque correlation string set by HTTP middleware, used for
 //     logging and distributed tracing.
@@ -28,7 +28,7 @@ type contextKey struct{ name string }
 
 var (
 	actorEntityIDKey        = contextKey{"actorEntityID"}
-	assumedActorEntityIDKey = contextKey{"assumedActorEntityID"}
+	sudoActorEntityIDKey = contextKey{"sudoActorEntityID"}
 	requestIDKey            = contextKey{"requestID"}
 )
 
@@ -38,11 +38,11 @@ func WithActor(ctx context.Context, entityID int64) context.Context {
 	return context.WithValue(ctx, actorEntityIDKey, entityID)
 }
 
-// WithAssumedActor returns a new context carrying the given assumed-actor
+// WithSudoActor returns a new context carrying the given sudo-actor
 // entity ID (the user an admin is currently impersonating).
-// It replaces any previously set assumed-actor entity ID.
-func WithAssumedActor(ctx context.Context, entityID int64) context.Context {
-	return context.WithValue(ctx, assumedActorEntityIDKey, entityID)
+// It replaces any previously set sudo-actor entity ID.
+func WithSudoActor(ctx context.Context, entityID int64) context.Context {
+	return context.WithValue(ctx, sudoActorEntityIDKey, entityID)
 }
 
 // WithRequestID returns a new context carrying the given request correlation ID.
@@ -58,10 +58,10 @@ func ActorEntityID(ctx context.Context) (int64, bool) {
 	return id, ok
 }
 
-// AssumedActorEntityID returns the entity ID being impersonated by an admin,
+// SudoActorEntityID returns the entity ID being impersonated by an admin,
 // or 0, false if no impersonation is active.
-func AssumedActorEntityID(ctx context.Context) (int64, bool) {
-	id, ok := ctx.Value(assumedActorEntityIDKey).(int64)
+func SudoActorEntityID(ctx context.Context) (int64, bool) {
+	id, ok := ctx.Value(sudoActorEntityIDKey).(int64)
 	return id, ok
 }
 

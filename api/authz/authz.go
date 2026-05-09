@@ -6,7 +6,7 @@
 // package defines only the contract.
 //
 // The acting user's identity is resolved from ctx by the implementation using
-// the opctx package (ActorEntityID, AssumedActorEntityID). operation and target
+// the opctx package (ActorEntityID, SudoActorEntityID). operation and target
 // are explicit parameters because they differ per service call and context
 // values survive call boundaries poorly when they are method-specific.
 //
@@ -37,7 +37,7 @@ import "context"
 // implementation looks it up by ID.
 //
 // The Authorizer resolves the effective actor from ctx via the opctx accessors.
-// When AssumedActorEntityID is set on ctx, the Authorizer must treat that ID as
+// When SudoActorEntityID is set on ctx, the Authorizer must treat that ID as
 // the effective actor for all policy checks (the admin's own identity is not the
 // subject of the request for the duration of an assume session).
 type Authorizer interface {

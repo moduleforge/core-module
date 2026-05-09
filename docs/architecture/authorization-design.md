@@ -44,7 +44,7 @@ The following values travel on `context.Context` through the service layer. They
 | Key | Type | Set by | Meaning |
 |-----|------|--------|---------|
 | `actor_entity_id` | `int64` | auth middleware | Internal entity ID of the authenticated user. |
-| `assumed_actor_entity_id` | `*int64` | auth middleware | Internal entity ID of the user whose identity an admin has assumed. Nil when no assumption is active. |
+| `sudo_actor_entity_id` | `*int64` | auth middleware | Internal entity ID of the user whose identity an admin has assumed. Nil when no assumption is active. |
 | `request_id` | `string` | HTTP middleware | Request correlation ID for logging and tracing. |
 
 `opctx` lives in `core-module/api/opctx`. It is deliberately narrow: only ambient request properties go here. Richer policy data (roles, scopes, tenancy, app context) is the `Authorizer` implementation's concern, not `opctx`'s — the implementation can resolve those from the actor's entity ID via its own DB lookups.

@@ -55,7 +55,7 @@ These were considered and ruled out for service-layer interface treatment:
 
 ## Why context carries actor, not action or target
 
-`context.Context` carries the actor entity ID (and optional assumed-actor entity ID) because these are ambient properties of the entire request — they do not change across call boundaries within a single request.
+`context.Context` carries the actor entity ID (and optional sudo-actor entity ID) because these are ambient properties of the entire request — they do not change across call boundaries within a single request.
 
 Action and target are method parameters, not context values, because they are method-specific: each service method knows its own action name and the entity it is operating on. Placing action on `ctx` would require the caller to set it before the call and the callee to trust it — this couples the two code sites and creates staleness bugs when one service method calls another (the inner call would see the outer call's action on `ctx`). Explicit parameters eliminate this hazard.
 

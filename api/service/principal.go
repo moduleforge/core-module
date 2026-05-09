@@ -7,7 +7,7 @@ import "context"
 
 // Principal is the normalized caller identity passed to service methods
 // for authorization checks. It intentionally omits email, roles, and
-// assumed-user info — those belong in the consumer's richer context type.
+// sudo-user info — those belong in the consumer's richer context type.
 type Principal struct {
 	UserID   int64
 	EntityID int64
