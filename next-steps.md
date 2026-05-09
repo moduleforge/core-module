@@ -22,13 +22,6 @@ This file tracks pending manual verification and deferred work for `core-module`
 - **Key rotation.** No mechanism for rotating the AES-256-GCM key. A future hardening step would embed a key-id prefix in the blob and introduce a re-encryption migration.
 - **AAD binding.** Ciphertext is not bound to the row's primary key, so a ciphertext could in principle be copied between rows. A source comment documents this as future work.
 
-## Cross-cutting framework — observation/observer cosmetic
-
-- `ObserverGroup.ObserveAfterCommit` returns `error` but always returns nil and every caller discards it. Consider dropping the return type. Lint warnings tolerable today.
-- `ObserveAfterCommit` `before` parameter is now mandated nil by convention (doc-enforced, not type-enforced). Consider dropping the parameter entirely from the interface signature.
-- `_ = eg.Wait()` discard pattern in `observer.go` swallow / post-commit branches is correct today (closures always return nil) but a future maintainer adding a `return err` inside would not get a compile warning. Consider switching those branches to `sync.WaitGroup`.
-- `txhelper.QueuePostCommit` and `fake_tx_test.go` references were already removed in a prior round; these items are closed.
-
 ## Phase 1 (SQL access-fn) — Phase 1 followups
 
 These surfaced during the round and are not blocking; capture before context-clear:
