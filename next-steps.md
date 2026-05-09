@@ -27,7 +27,6 @@ These surfaced during the round and are not blocking; capture before context-cle
 
 - **`GrantTableGenerator` + slug-list maintenance.** `users-module/api/cmd/server/main.go` hardcodes the slug list passed to `setup.ApplyFuncs`; `GrantTableGenerator.GenerateForResource` hardcodes per-slug bodies. Adding a new entity type requires updating both. Acceptable today; defer a registration helper until a real new-entity-type scenario.
 - **`EntityResolver.AllowNotFound` is unused.** No resource has opted into 404 transparency. Reasonable default for a privacy-conservative system; flag if a UI starts relying on 404 to distinguish missing vs. forbidden.
-- **`Pagination` is module-defined.** Each peer module redefines a tiny `Pagination` struct with a `normalize()` method (limit cap 200, default 50). Conventions are consistent; consolidate to a single `core-module/api/service.Pagination` once the shape has stabilised across enough call sites.
 
 ## Phase 3: trigger-maintained access tables
 
