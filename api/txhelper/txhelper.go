@@ -31,6 +31,32 @@ func Run(
 	return RunWithLogger(ctx, db, fn, nil)
 }
 
+// RunSerializable is like Run but opens the transaction at the Serializable
+// isolation level. Use for operations where a TOCTOU race between a read and
+// a write could cause data-integrity violations (e.g. last-identity safety
+// checks in Unlink and RemovePassword).
+func RunSerializable(
+	ctx context.Context,
+	db DB,
+	fn func(ctx context.Context, tx pgx.Tx) error,
+) error {
+	tx, err := db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	if err != nil {
+		return fmt.Errorf("txhelper: begin tx: %w", err)
+	}
+
+	if err := fn(ctx, tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("txhelper: commit: %w", err)
+	}
+
+	return nil
+}
+
 // RunWithLogger is like Run but accepts a *slog.Logger. When logger is nil,
 // slog.Default() is used.
 func RunWithLogger(
