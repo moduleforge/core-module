@@ -15,7 +15,8 @@ phases:
           status: todo
           git:
             branch: phase-01-task-01-replace-package-lock-json-with
-            commit: []
+            commit:
+                - c310fb7
             merge: null
     - number: 0
       slug: makefile-update
