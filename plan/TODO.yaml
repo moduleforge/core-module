@@ -1,0 +1,39 @@
+plan: bun-migration
+phases:
+  - id: 1
+    slug: lockfile-migration
+    title: Lockfile migration
+    status: todo
+    tasks:
+      - id: "001"
+        slug: replace-lockfile
+        title: Replace package-lock.json with bun.lock
+        status: todo
+        doc: plan/phase-01-lockfile-migration/001-replace-lockfile.md
+        depends_on: []
+
+  - id: 2
+    slug: makefile-update
+    title: Makefile update
+    status: todo
+    tasks:
+      - id: "001"
+        slug: update-npm-to-bun
+        title: Replace npm with bun in root Makefile
+        status: todo
+        doc: plan/phase-02-makefile-update/001-update-npm-to-bun.md
+        depends_on:
+          - "phase-01/001"
+
+  - id: 3
+    slug: verify
+    title: Verify
+    status: todo
+    tasks:
+      - id: "001"
+        slug: verify-build-and-typecheck
+        title: Verify build and typecheck pass with bun
+        status: todo
+        doc: plan/phase-03-verify/001-verify-build-and-typecheck.md
+        depends_on:
+          - "phase-02/001"
