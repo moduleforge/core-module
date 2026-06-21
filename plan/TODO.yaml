@@ -26,7 +26,7 @@ phases:
           slug: update-npm-to-bun
           title: Replace npm with bun in root Makefile
           path: ""
-          done: false
+          done: true
           tier: ""
           status: todo
           git:
