@@ -59,4 +59,6 @@ notes: Session-binding manifest produced by `project-flow-check`. Regenerated on
 
 ## Active plans
 
-_No active plans._
+| Slug | Branch | Worktree | Status |
+|------|--------|----------|--------|
+| bun-migration | plan/bun-migration | /Users/zane/playground/moduleforge/core-module/worktree/plan/bun-migration | healthy |
