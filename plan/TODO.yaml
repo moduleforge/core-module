@@ -29,6 +29,10 @@ phases:
           done: false
           tier: ""
           status: todo
+          git:
+            branch: phase-02-task-01-replace-npm-with-bun-in-root-m
+            commit: []
+            merge: null
     - number: 0
       slug: verify
       title: Verify

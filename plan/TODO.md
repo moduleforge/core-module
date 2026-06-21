@@ -12,7 +12,7 @@ Tracking document for the active plan.
 
 ### Phase 00 — Makefile update
 
-- [ ] [000-update-npm-to-bun.md](./phase-00-makefile-update/000-update-npm-to-bun.md) — tier `` · branch `…` · commit `…` · merge `…`
+- [ ] [000-update-npm-to-bun.md](./phase-00-makefile-update/000-update-npm-to-bun.md) — tier `` · branch `phase-02-task-01-replace-npm-with-bun-in-root-m` · commit `…` · merge `…`
 
 ### Phase 00 — Verify
 
