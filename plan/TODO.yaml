@@ -31,7 +31,8 @@ phases:
           status: todo
           git:
             branch: phase-02-task-01-replace-npm-with-bun-in-root-m
-            commit: []
+            commit:
+                - 924917d
             merge: null
     - number: 0
       slug: verify
