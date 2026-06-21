@@ -10,7 +10,7 @@ phases:
           slug: replace-lockfile
           title: Replace package-lock.json with bun.lock
           path: ""
-          done: false
+          done: true
           tier: ""
           status: todo
           git:

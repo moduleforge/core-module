@@ -8,7 +8,7 @@ Tracking document for the active plan.
 
 ### Phase 00 — Lockfile migration
 
-- [ ] [000-replace-lockfile.md](./phase-00-lockfile-migration/000-replace-lockfile.md) — tier `` · branch `phase-01-task-01-replace-package-lock-json-with` · commit `c310fb7` · merge `…`
+- [x] [000-replace-lockfile.md](./phase-00-lockfile-migration/000-replace-lockfile.md) — tier `` · branch `phase-01-task-01-replace-package-lock-json-with` · commit `c310fb7` · merge `…`
 
 ### Phase 00 — Makefile update
 
