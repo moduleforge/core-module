@@ -33,7 +33,7 @@ phases:
             branch: phase-02-task-01-replace-npm-with-bun-in-root-m
             commit:
                 - 924917d
-            merge: null
+            merge: 2d85ee4
     - number: 0
       slug: verify
       title: Verify
