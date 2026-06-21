@@ -42,7 +42,7 @@ phases:
           slug: verify-build-and-typecheck
           title: Verify build and typecheck pass with bun
           path: ""
-          done: false
+          done: true
           tier: ""
           status: todo
           git:
