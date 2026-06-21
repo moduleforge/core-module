@@ -17,7 +17,7 @@ phases:
             branch: phase-01-task-01-replace-package-lock-json-with
             commit:
                 - c310fb7
-            merge: null
+            merge: ef9fbc5
     - number: 0
       slug: makefile-update
       title: Makefile update
