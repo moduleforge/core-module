@@ -45,3 +45,7 @@ phases:
           done: false
           tier: ""
           status: todo
+          git:
+            branch: phase-03-task-01-verify-build-and-typecheck-pas
+            commit: []
+            merge: null

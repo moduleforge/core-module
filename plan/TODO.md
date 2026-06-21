@@ -16,4 +16,4 @@ Tracking document for the active plan.
 
 ### Phase 00 — Verify
 
-- [ ] [000-verify-build-and-typecheck.md](./phase-00-verify/000-verify-build-and-typecheck.md) — tier `` · branch `…` · commit `…` · merge `…`
+- [ ] [000-verify-build-and-typecheck.md](./phase-00-verify/000-verify-build-and-typecheck.md) — tier `` · branch `phase-03-task-01-verify-build-and-typecheck-pas` · commit `…` · merge `…`
