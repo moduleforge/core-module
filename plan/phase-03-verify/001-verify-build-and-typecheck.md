@@ -41,3 +41,28 @@ If any step fails, capture the error output and report it for diagnosis before a
 - [ ] `gui/dist/index.mjs` exists
 - [ ] `gui/dist/index.d.ts` exists
 - [ ] No `npm` warnings in output (e.g. "npm warn" lines)
+
+## Status
+
+outcome: validation failed
+date: 2026-06-21
+worktree: /Users/zane/playground/moduleforge/core-module/worktree/phase-03-task-01-verify-build-and-typecheck-pas
+
+### Validation summary
+
+- `make build` — FAILED (exit 2). `gui/` build step fails: `tsup: command not found` (exit 127). Root cause: `gui/node_modules` is not installed; bun dependencies were never installed in the worktree.
+- `make test` — FAILED (exit 2). Go tests for `model` and `api` all pass. `gui/` typecheck step fails: `tsc: command not found` (exit 127). Same root cause: `node_modules` absent.
+- `gui/dist/index.js` — does not exist (no build ran).
+- `gui/dist/index.mjs` — does not exist.
+- `gui/dist/index.d.ts` — does not exist.
+- No `npm` warnings — not applicable (build did not reach any npm invocation; no `npm warn` lines observed).
+
+### Root cause
+
+`gui/node_modules` is absent. `tsup` and `tsc` are devDependencies resolved from the local node_modules tree (via `bun.lock`). Without `bun install` having been run inside `gui/`, the bun shims for these binaries do not exist and both `make build` and `make test` fail at the `gui/` step with exit 127.
+
+### Flagged for manager
+
+- `gui/` bun dependencies must be installed (`cd gui && bun install`) before this verification can pass. The `dependencies_installed` pass-through for this task was `none`, which does not cover the bun/JavaScript side of the project.
+- Consider whether `prepare-task-worktree` should install bun dependencies (run `bun install`) for mixed Go+Bun projects, or whether a follow-up task should explicitly install them as a prerequisite step.
+- Go sub-projects (`model`, `api`) built and tested cleanly — no issues on that side.
