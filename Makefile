@@ -30,7 +30,7 @@ build: ## Build model, api, and gui
 		$(MAKE) --no-print-directory -C $$d build; \
 	done
 	@echo "==> build: core-module/$(GUI_DIR)"
-	@cd $(GUI_DIR) && npm run build
+	@cd $(GUI_DIR) && bun run build
 
 .PHONY: test
 test: ## Test model and api; typecheck gui
@@ -39,7 +39,7 @@ test: ## Test model and api; typecheck gui
 		$(MAKE) --no-print-directory -C $$d test; \
 	done
 	@echo "==> typecheck: core-module/$(GUI_DIR)"
-	@cd $(GUI_DIR) && npm run typecheck
+	@cd $(GUI_DIR) && bun run typecheck
 
 .PHONY: clean
 clean: ## Clean model, api, and gui build artifacts
@@ -48,14 +48,14 @@ clean: ## Clean model, api, and gui build artifacts
 		$(MAKE) --no-print-directory -C $$d clean; \
 	done
 	@echo "==> clean: core-module/$(GUI_DIR)"
-	@cd $(GUI_DIR) && npm run clean
+	@cd $(GUI_DIR) && bun run clean
 
 .PHONY: preview
 preview: ## Run Ladle component workbench for gui (localhost:61000)
 	@echo "==> preview: core-module/$(GUI_DIR) — installing deps if needed"
-	@cd $(GUI_DIR) && npm install --silent
+	@cd $(GUI_DIR) && bun install --silent
 	@echo "==> preview: starting Ladle on http://localhost:61000"
-	@cd $(GUI_DIR) && npm run dev
+	@cd $(GUI_DIR) && bun run dev
 
 .PHONY: help
 help: ## Show this help
