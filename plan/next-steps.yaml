@@ -1,0 +1,7 @@
+version: 1
+items:
+    - title: bun postinstall blocked script
+      id: wj8D
+      date: "2026-06-21"
+      tag: follow-up
+      text: '[phase-01-lockfile-migration/001-replace-lockfile.md] bun install reported one blocked postinstall script in gui/. Pre-existing condition unrelated to the lockfile swap. Run `bun pm untrusted` in gui/ to inspect if action is needed.'
