@@ -52,7 +52,14 @@ The compiler (`mfgen`) reads one `moduleforge.app.yaml` and follows it to each m
 
 ```yaml
 module: <string>           # required
-goModule: <string>         # required
+goModule: <string>         # required (== go.api.modulePath)
+go:                        # required
+  api:
+    modulePath: <string>
+    dir: <string>
+  model:
+    modulePath: <string>
+    dir: <string>
 migrations:
   range:
     first: <int>           # required
@@ -82,6 +89,29 @@ requires:
 | `migrations.range.last` | int | yes | Last migration file number this module owns (inclusive) |
 
 The compiler validates that no two selected modules have overlapping ranges. See [Migration range rules](#5-migration-range-rules).
+
+### `go`
+
+The top-level `go:` section declares the Go sub-module paths for the module's component packages.
+
+```yaml
+go:
+  api:
+    modulePath: <string>   # required — Go module path of the api sub-module
+    dir: <string>          # optional — path to the api sub-module root, relative to the module repo root (default ./api)
+  model:
+    modulePath: <string>   # required — Go module path of the model sub-module
+    dir: <string>          # optional — path to the model sub-module root, relative to the module repo root (default ./model)
+```
+
+| Field | Type | Required | Purpose |
+|---|---|---|---|
+| `go.api.modulePath` | string | yes | Go module path of the module's API package (e.g. `github.com/moduleforge/core-api`). Used by the compiler to build import paths for the module's handlers, services, and middleware, and as the target of the generated `replace`/`require` directive. Must equal the `module:` value used to select this module in `moduleforge.app.yaml`. Must be a valid Go module path (see V8). |
+| `go.api.dir` | string | no | Directory of the API sub-module relative to the module repo root. Defaults to `./api`. Appended to `localPath` to form the `replace` target. |
+| `go.model.modulePath` | string | yes | Go module path of the module's model/db package (e.g. `github.com/moduleforge/core-model`). Used for the `queries:`/`txQueryFactory:` arg-sources and the model `replace`/`require` directive. Must be a valid Go module path. |
+| `go.model.dir` | string | no | Directory of the model sub-module relative to the module repo root. Defaults to `./model`. |
+
+**Note:** The top-level `goModule:` field remains and must equal `go.api.modulePath`. The `go:` section additionally declares the `model` sub-module path, which `goModule:` alone cannot express. New manifests should populate both for consistency.
 
 ### `provides.routes[]`
 
@@ -165,8 +195,8 @@ app: <string>              # required
 goModule: <string>         # required
 outputDir: <string>        # required
 modules:
-  - path: <string>         # required
-    manifest: <string>     # required
+  - module: <string>       # required
+    localPath: <string>    # optional
 config:
   <key>: <value>           # arbitrary key-value pairs
 infra:
@@ -188,10 +218,26 @@ infra:
 
 Each entry selects one module to include in the generated application.
 
+```yaml
+modules:
+  - module: <string>         # required
+    localPath: <string>      # optional
+```
+
 | Field | Type | Required | Purpose |
 |---|---|---|---|
-| `path` | string | yes | Filesystem path to the module repo root, relative to the aggregator repo root where `mfgen` is run (e.g. `./audit-module`). The compiler reads `<path>/moduleforge.module.yaml`. |
-| `manifest` | string | yes | Name of the manifest file to load from `path`. Normally `moduleforge.module.yaml`. |
+| `module` | string | yes | The Go module path of the module's `api` sub-module (e.g. `github.com/moduleforge/core-api`). Must match the `go.api.modulePath` declared in the selected module's `moduleforge.module.yaml`. The compiler uses this as the identity of the module and as the import-path root for its API packages. Must be a valid Go module path (see V8). |
+| `localPath` | string | no | Filesystem path to the module repo root, relative to the directory containing `moduleforge.app.yaml`, used for local development (e.g. `../core-module`). When present and the directory exists on disk, the compiler reads the module manifest from `<localPath>/moduleforge.module.yaml` and emits `replace` directives in the generated `go.mod` pointing at the local source. When absent, the module is treated as a published dependency resolved at a pinned version. |
+
+#### Module reference resolution
+
+- **`localPath` present and directory exists** → local mode. The compiler:
+  - reads `<localPath>/moduleforge.module.yaml`,
+  - derives import paths from that manifest's `go:` section,
+  - emits `replace <go.api.modulePath> => <abs-localPath>/<go.api.dir>` and `replace <go.model.modulePath> => <abs-localPath>/<go.model.dir>` in the generated `go.mod`.
+- **`localPath` absent (or present but directory missing)** → published mode. The module is expected to be available as a published Go module at a pinned version, and the compiler emits a `require <module> <version>` directive with no `replace`.
+
+> **Note:** Published-mode resolution (download at pinned version) is reserved; the current compiler requires every selected module to declare a `localPath` that exists on disk and errors otherwise.
 
 ### `config`
 
@@ -418,7 +464,7 @@ The compiler runs five sequential stages. Each stage must complete successfully 
 
 **Actions:**
 1. Load and unmarshal `moduleforge.app.yaml` into the app manifest struct.
-2. For each entry in `modules:`, load and unmarshal `<path>/<manifest>` into a module manifest struct.
+2. For each entry in `modules:`, resolve `localPath` relative to the app manifest's directory; if it exists on disk, load and unmarshal `<localPath>/moduleforge.module.yaml` into a module manifest struct. If `localPath` is absent or missing on disk, the compiler errors (published-mode resolution is reserved).
 3. Collect all manifests into an in-memory set.
 
 **Output:** A populated set of manifest structs: one `AppManifest` and N `ModuleManifest` values.
@@ -496,6 +542,14 @@ Audit-module is the simple case: one service, one observer, one route group, no 
 module: audit
 goModule: github.com/moduleforge/audit-api
 
+go:
+  api:
+    modulePath: github.com/moduleforge/audit-api
+    dir: ./api
+  model:
+    modulePath: github.com/moduleforge/audit-model
+    dir: ./model
+
 migrations:
   range:
     first: 400
@@ -568,6 +622,14 @@ After the phase-3 refactors, users-module exposes route groups via `RegisterRout
 ```yaml
 module: users
 goModule: github.com/moduleforge/users-module
+
+go:
+  api:
+    modulePath: github.com/moduleforge/users-module/api
+    dir: ./api
+  model:
+    modulePath: github.com/moduleforge/users-module/model
+    dir: ./model
 
 migrations:
   range:
@@ -713,18 +775,18 @@ goModule: github.com/myorg/moduleforge-app
 outputDir: cmd/app
 
 modules:
-  - path: ./core-module
-    manifest: moduleforge.module.yaml
-  - path: ./users-module
-    manifest: moduleforge.module.yaml
-  - path: ./audit-module
-    manifest: moduleforge.module.yaml
-  - path: ./authz-module
-    manifest: moduleforge.module.yaml
-  - path: ./contacts-module
-    manifest: moduleforge.module.yaml
-  - path: ./tags-module
-    manifest: moduleforge.module.yaml
+  - module: github.com/moduleforge/core-api
+    localPath: ./core-module
+  - module: github.com/moduleforge/users-module/api
+    localPath: ./users-module
+  - module: github.com/moduleforge/audit-api
+    localPath: ./audit-module
+  - module: github.com/moduleforge/authz-api
+    localPath: ./authz-module
+  - module: github.com/moduleforge/contacts-api
+    localPath: ./contacts-module
+  - module: github.com/moduleforge/tags-api
+    localPath: ./tags-module
 
 config:
   auth:
@@ -762,6 +824,8 @@ infra:
 
 **Key annotations:**
 
+- Each `module:` value is the Go module path of the selected module's `api` sub-module. It must match `go.api.modulePath` in the corresponding `moduleforge.module.yaml`.
+- Each `localPath:` value is resolved relative to the directory containing `moduleforge.app.yaml`. When the directory exists on disk, the compiler reads the module manifest from `<localPath>/moduleforge.module.yaml` and emits `replace` directives in the generated `go.mod` for both the `api` and `model` sub-modules declared in the manifest's `go:` section.
 - `infra:pool` is the shared `*pgxpool.Pool`. Every module that lists `infra:pool` in `requires.infra` gets this singleton. The compiler constructs it once.
 - `infra:cfg` makes the loaded config available as a named infra singleton. Modules reference specific fields via `field:cfg.LocalAuth.JWTSecret`, `field:cfg.Auth.AdminRole`, etc.
 - `config:auth.adminRole` resolves to `cfg.Auth.AdminRole` in the generated code.
@@ -901,31 +965,9 @@ The `condition:` field holds a Go boolean expression evaluated at composition-ro
 - Should conditionally-mounted routes still appear in generated OpenAPI specs (as optional/tagged) or be omitted entirely?
 - Can `condition:` be expressed at the module level by passing config values through as `provided` flags, or is app-level always required?
 
-### 4. `go:` section — Go sub-module path declarations (phase-4, in use)
+### 4. `go:` section — Go sub-module path declarations
 
-**What it is.** A top-level `go:` section in `moduleforge.module.yaml` that declares the Go sub-module paths for a module's component packages (`api`, `model`, etc.). This section is already present in `users-module/moduleforge.module.yaml` and is the leading candidate for the final format, but the compiler does not yet consume it. It is listed here to document the intended shape and prevent ad-hoc variation across module manifests.
-
-**Where it appears.** `users-module` currently carries a `go:` block; other modules do not yet. The section will become load-bearing in the phase-4 compiler change that moves from a flat `goModule:` path to per-sub-module references in `moduleforge.app.yaml`.
-
-**Current shape (from users-module, reflects real usage).**
-
-```yaml
-go:
-  api:
-    modulePath: github.com/moduleforge/users-module/api
-    dir: ./api
-  model:
-    modulePath: github.com/moduleforge/users-module/model
-```
-
-Each named sub-module entry supports:
-
-| Field | Type | Purpose |
-|---|---|---|
-| `modulePath` | string | The Go module path for this sub-module (used in `go.mod` `require` and `replace` directives) |
-| `dir` | string | Optional path to the sub-module root, relative to the module repo root. Omit when the sub-module does not have a separate directory on disk. |
-
-**Status.** Phase-4 planned. The `go:` section is ignored by the current compiler. Module authors may add it now to prepare for the upcoming compiler change, using the shape above. Do not deviate from this shape — the phase-4 compiler will validate it.
+Resolved. See [§2 `go` field reference](#go). The `go:` section is now load-bearing and consumed by the compiler for import-path derivation and `replace`/`require` directive generation.
 
 ### 5. `gui:` section — GUI component package declarations (phase-4 deferred)
 
