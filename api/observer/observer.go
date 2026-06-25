@@ -66,6 +66,11 @@ type MutationObserver interface {
 // ObserverGroup (NewObserverGroup()) is also a valid no-op.
 type NoopObserver struct{}
 
+// NewNoopObserver returns a NoopObserver value. Provided as a constructor
+// function so the generated wiring can reference it via a constructor symbol
+// rather than a struct literal.
+func NewNoopObserver() NoopObserver { return NoopObserver{} }
+
 var _ MutationObserver = NoopObserver{}
 
 func (NoopObserver) Observe(_ context.Context, _ pgx.Tx, _, _ string, _ *int64, _, _ any) error {

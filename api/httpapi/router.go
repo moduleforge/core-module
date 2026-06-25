@@ -16,6 +16,11 @@ type Deps struct {
 	Logger *slog.Logger
 }
 
+// NewDeps constructs a Deps value from its components.
+func NewDeps(svcs *service.Services, logger *slog.Logger) Deps {
+	return Deps{Services: svcs, Logger: logger}
+}
+
 type handlers struct {
 	d Deps
 }

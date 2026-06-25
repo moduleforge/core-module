@@ -70,3 +70,10 @@ func New(
 func (s *Services) Querier() coredb.Querier {
 	return s.q
 }
+
+// NaturalPersonFromServices extracts the NaturalPersonServicer from a Services
+// aggregate. Used by the generated wiring to inject the NaturalPerson service
+// into modules that require it without constructing a second Services instance.
+func NaturalPersonFromServices(svcs *Services) NaturalPersonServicer {
+	return svcs.NaturalPerson
+}
