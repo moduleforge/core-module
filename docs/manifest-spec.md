@@ -100,6 +100,8 @@ Each entry in `provides.routes` describes one mountable HTTP route group.
 
 **`register` vs `mountFromModule`:** Some modules expose routes through a `RegisterRoutes(r chi.Router, handler)` function (audit-module, authz-module). Others expose `NewRouter(deps) chi.Router` that returns a full mountable router (core-module, contacts-module, tags-module). Use `register` for the former and `mountFromModule` for the latter.
 
+**`constructor` and `register` together:** When `register:` is present, `constructor:` is still required. The two fields serve distinct roles: `constructor` builds the handler struct (e.g. `audithttpapi.NewAuditHandler`), and `register` is the function that mounts routes from that handler onto a chi router (e.g. `audithttpapi.RegisterRoutes`). The compiler first constructs the handler using `constructor` + `args`, then calls `register(r, handler)` inside a `r.Route(prefix, ...)` block. Omitting `constructor` when `register:` is set is a validation error (V5).
+
 ### `provides.services[]`
 
 Each entry in `provides.services` declares a named service value that other modules may consume via `requires.services`.
@@ -814,3 +816,142 @@ All files written by `mfgen` begin with:
 ```
 
 The presence of this line on the first line of `main.go` in `outputDir` is the compiler's signal that the file is safe to overwrite. Any `main.go` that does not begin with this exact line is treated as non-generated (validation rule V6).
+
+---
+
+## Known gaps
+
+The following patterns are not yet representable in the manifest format. Each is a confirmed requirement discovered during the authoring of real module and application manifests. They are deferred to the phase-4 compiler-design work and must not be inferred from example files until a spec revision documents the final form.
+
+### 1. Post-construction / deferred method wiring
+
+**What it is.** Some services require a two-phase initialization: the object is constructed normally, but one or more collaborators are injected *after construction* by calling a setter method on the already-constructed instance. The current arg-source vocabulary (§4) covers only constructor *inputs*; there is no form for "after constructing X, call X.SetY(z)."
+
+**Where it appears.** `users-module` and `core-module` both carry `TODO(phase-4/compiler-design)` markers on services that need this pattern. The canonical example is `userResolver`: it is constructed with `nil` as its observer argument, then `SetObserverGroup` is called on it after the observer group is assembled. A `firstUserGrant` hook service similarly needs to register itself onto `authHandler` and `userResolver` via setter calls after both are constructed.
+
+**Proposed sketch (not yet valid format).**
+
+```yaml
+services:
+  userResolver:
+    constructor: resolver.NewUserResolver
+    args:
+      - source: service
+        name: naturalPersonService
+      - source: nil          # deferred; set via SetObserverGroup after construction
+    postConstruct:
+      - method: SetObserverGroup
+        args:
+          - source: generated
+            name: observerGroup
+```
+
+The `nil` arg-source and `postConstruct` block are placeholders for the eventual design. The compiler must topologically sort post-construction calls alongside regular dependency resolution.
+
+### 2. Composition-root inline closures
+
+**What it is.** Some wiring points require a small inline function (closure) that captures one or more already-constructed services and adapts their interface for a consumer. These closures have no module-level identity — they exist only at the composition root — and cannot be expressed as named services or `symbol:` references because they are anonymous function literals.
+
+**Where it appears.** `users-module` requires two such closures: `grantAdminFn` and `revokeAdminFn`, each adapting a method of `authzClient` into a `func(ctx, userID)` signature expected by `userResolver`. Both are flagged `TODO(phase-4/compiler-design): inline closure; not representable as a module service or symbol today`.
+
+**Proposed sketch (not yet valid format).**
+
+```yaml
+# In moduleforge.app.yaml, under a future `closures:` or `adapters:` section:
+closures:
+  grantAdminFn:
+    signature: "func(context.Context, string) error"
+    body: "authzClient.GrantAdmin"   # method reference with automatic ctx/arg threading
+  revokeAdminFn:
+    signature: "func(context.Context, string) error"
+    body: "authzClient.RevokeAdmin"
+```
+
+The final form may be a method-reference shorthand, a lambda expression, or a generated adapter type. This requires a phase-4 compiler-design decision on how much Go expression power the manifest should expose.
+
+### 3. Conditional route mounting (app-level config predicate)
+
+**What it is.** Some routes should be mounted only when a specific app-level configuration value satisfies a predicate. The current spec §6 route model derives all routes unconditionally from `provides.routes[]`. There is no mechanism for a module to say "mount this route only if `cfg.X != Y`," because modules do not have access to app-level config keys at manifest-resolution time — the full config tree is only available at the composition root.
+
+**Why it must be app-level.** A per-module `provides.routes[]` entry cannot express a condition that references app-level config, because the module manifest is authored and resolved before the app config shape is known. The predicate must live in the app manifest, where the full config tree is in scope.
+
+**Where it appears.** The `users-module` example app required conditional mounting of a token-display route: show `GET /v1/self/token` only when `cfg.Onboarding.TokenDisplay != config.TokenDisplayNone`. This condition references an app-level config key that no individual module manifest can observe.
+
+**Proposed sketch (not yet valid format).**
+
+```yaml
+# In moduleforge.app.yaml, under a future top-level `routing:` section:
+# Mount GET /v1/self/token only when onboarding token display is enabled.
+routing:
+  - module: users
+    handler: accountHandler
+    routes:
+      - method: GET
+        path: /v1/self/token
+        condition: cfg.Onboarding.TokenDisplay != config.TokenDisplayNone
+```
+
+The `condition:` field holds a Go boolean expression evaluated at composition-root generation time. If the condition is a compile-time constant (i.e., the config value is a literal in `moduleforge.app.yaml`'s `config:` block), the compiler can resolve it statically and either include or omit the route from the generated output. If the config value is a runtime variable, the generated code wraps the `router.Handle(...)` call in an `if` guard.
+
+**Open questions for phase-4 design.**
+- Should `condition:` be a restricted predicate language (config-key comparisons only) or allow arbitrary Go boolean expressions? The former is safer and statically analyzable; the latter is more powerful but harder to validate.
+- Should conditionally-mounted routes still appear in generated OpenAPI specs (as optional/tagged) or be omitted entirely?
+- Can `condition:` be expressed at the module level by passing config values through as `provided` flags, or is app-level always required?
+
+### 4. `go:` section — Go sub-module path declarations (phase-4, in use)
+
+**What it is.** A top-level `go:` section in `moduleforge.module.yaml` that declares the Go sub-module paths for a module's component packages (`api`, `model`, etc.). This section is already present in `users-module/moduleforge.module.yaml` and is the leading candidate for the final format, but the compiler does not yet consume it. It is listed here to document the intended shape and prevent ad-hoc variation across module manifests.
+
+**Where it appears.** `users-module` currently carries a `go:` block; other modules do not yet. The section will become load-bearing in the phase-4 compiler change that moves from a flat `goModule:` path to per-sub-module references in `moduleforge.app.yaml`.
+
+**Current shape (from users-module, reflects real usage).**
+
+```yaml
+go:
+  api:
+    modulePath: github.com/moduleforge/users-module/api
+    dir: ./api
+  model:
+    modulePath: github.com/moduleforge/users-module/model
+```
+
+Each named sub-module entry supports:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `modulePath` | string | The Go module path for this sub-module (used in `go.mod` `require` and `replace` directives) |
+| `dir` | string | Optional path to the sub-module root, relative to the module repo root. Omit when the sub-module does not have a separate directory on disk. |
+
+**Status.** Phase-4 planned. The `go:` section is ignored by the current compiler. Module authors may add it now to prepare for the upcoming compiler change, using the shape above. Do not deviate from this shape — the phase-4 compiler will validate it.
+
+### 5. `gui:` section — GUI component package declarations (phase-4 deferred)
+
+**What it is.** A top-level `gui:` section in `moduleforge.module.yaml` that declares the module's GUI component package: its yalc/npm package name and version. Intended to let the compiler (or a companion tool) assemble the frontend dependency set the same way it assembles the backend service graph.
+
+**Where it appears.** Not present in any current module manifest. Reserved for phase-4 frontend-integration work.
+
+**Proposed sketch (not yet valid format).**
+
+```yaml
+gui:
+  package: "@moduleforge/audit-ui"
+  version: "1.2.0"
+```
+
+**Status.** Phase-4 deferred. No compiler support exists. The final field names and whether versioning is managed here or via a lockfile are open design questions.
+
+### 6. `openapi:` section — OpenAPI spec file declarations (phase-4 deferred)
+
+**What it is.** A top-level `openapi:` section in `moduleforge.module.yaml` that declares one or more OpenAPI spec files contributed by the module. Intended to let a companion documentation-generation tool merge per-module specs into a single app-level OpenAPI document.
+
+**Where it appears.** Not present in any current module manifest. Reserved for phase-4 documentation-generation work.
+
+**Proposed sketch (not yet valid format).**
+
+```yaml
+openapi:
+  - path: api/openapi/audit.yaml
+    prefix: /v1/audit
+```
+
+**Status.** Phase-4 deferred. No tooling support exists. Open questions include: whether the compiler validates spec files against the route entries declared in `provides.routes`, and whether path prefixes are derived from `provides.routes[].prefix` automatically or must be restated here.
