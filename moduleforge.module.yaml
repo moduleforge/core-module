@@ -1,0 +1,128 @@
+module: core
+goModule: github.com/moduleforge/core-api
+
+go:
+  api:
+    modulePath: github.com/moduleforge/core-api
+    dir: ./api
+  model:
+    modulePath: github.com/moduleforge/core-model
+    dir: ./model
+
+migrations:
+  range:
+    first: 1
+    last: 99
+
+provides:
+  services:
+    # typeResolver maps resource slugs to internal type IDs. Populated once
+    # at startup from the types table; the table is append-only so the cache
+    # is safe to hold for the lifetime of the process. Also consumed by
+    # service.New (below) and available to other modules as a shared
+    # infrastructure singleton.
+    - name: typeResolver
+      type: "*types.Resolver"
+      constructor: types.New
+      args:
+        - context        # context.Context for startup-time DB query
+        - queries:coredb # coredb.New(pool) — reads the types table at boot
+
+    # entityResolver maps entity UUIDs to internal int64 IDs with the
+    # default 403-on-missing policy (masks entity existence from callers
+    # who lack access). No constructor arguments; zero-value initialisation.
+    - name: entityResolver
+      type: "*entity.Resolver"
+      constructor: entity.NewResolver
+      args: []
+
+    # cipher loads the AES-256-GCM field encryption key from
+    # CORE_FIELD_KEY_HEX at startup. Used by service.New to encrypt/decrypt
+    # SSN and EIN fields on NaturalPerson and Corporation records.
+    - name: cipher
+      type: "*fieldcrypto.Cipher"
+      constructor: fieldcrypto.NewFromEnv
+      args: []
+
+    # coreServices is the aggregate of all entity service implementations:
+    # EntityServicer, NaturalPersonServicer, CorporationServicer, and
+    # ServiceAccountServicer. Constructed once; embedded in corehttpapi.Deps.
+    - name: coreServices
+      type: "*service.Services"
+      constructor: service.New
+      args:
+        - queries:coredb          # coredb.New(pool) — pool-backed base querier for reads
+        - infra:pool              # *pgxpool.Pool — used to open write transactions
+        - service:authorizer      # authz.Authorizer from authz-module
+        - service:observerGroup   # *observer.ObserverGroup assembled by the compiler
+        - service:cipher          # *fieldcrypto.Cipher (provided above)
+        - service:entityResolver  # *entity.Resolver (provided above)
+        - service:typeResolver    # *types.Resolver (provided above)
+
+    # naturalPersonService exposes the NaturalPersonServicer from coreServices
+    # for direct injection into other modules (e.g. users-module). In source,
+    # NaturalPersonService is constructed inside service.New and accessed via
+    # the Services.NaturalPerson field — there is no standalone constructor.
+    # The compiler must emit: naturalPersonService := coreServices.NaturalPerson
+    # This is a field-extraction pattern not yet represented in the manifest
+    # spec's arg-source vocabulary; flagged for compiler design resolution.
+    - name: naturalPersonService
+      type: "service.NaturalPersonServicer"
+      constructor: service.New
+      args:
+        - queries:coredb
+        - infra:pool
+        - service:authorizer
+        - service:observerGroup
+        - service:cipher
+        - service:entityResolver
+        - service:typeResolver
+
+    # coreDeps packages coreServices and the structured logger into a single
+    # corehttpapi.Deps value consumed by corehttpapi.NewRouter. There is no
+    # NewDeps constructor in source; the compiler must emit a struct literal:
+    # coreDeps := corehttpapi.Deps{Services: coreServices, Logger: logger}
+    # This struct-literal construction pattern is not yet in the spec; flagged
+    # for compiler design resolution.
+    - name: coreDeps
+      type: "corehttpapi.Deps"
+      constructor: corehttpapi.NewDeps
+      args:
+        - service:coreServices    # *service.Services
+        - infra:logger            # *slog.Logger
+
+    # noopObserver is a MutationObserver that does nothing. Used as a
+    # sentinel by modules that conditionally need an observer but have no
+    # real implementation. observer.NoopObserver is a zero-value struct;
+    # the compiler emits: noopObserver := observer.NoopObserver{}
+    - name: noopObserver
+      type: "observer.NoopObserver"
+      constructor: observer.NoopObserver
+      args: []
+
+  observers:
+    # noopObserver implements MutationObserver as a no-op sentinel. Registered
+    # in the app's ObserverGroup so it is available to modules that require a
+    # concrete observer where none is otherwise wired. policy: swallow because
+    # a no-op observer never returns errors.
+    - name: noopSentinel
+      service: noopObserver
+      policy: swallow
+
+  routes:
+    # Core exposes entity CRUD under /v1 via NewRouter, which returns a full
+    # chi.Router. The compiler emits: r.Mount("/v1", corehttpapi.NewRouter(coreDeps))
+    # Other modules that expose routes under /v1 must also be mounted on the
+    # same parent router; the compiler resolves overlap via routing scope rules.
+    - prefix: /v1
+      mountFromModule: corehttpapi.NewRouter
+      args:
+        - service:coreDeps        # corehttpapi.Deps{Services: coreServices, Logger: logger}
+      scope: verified
+
+requires:
+  services:
+    - name: authorizer            # authz.Authorizer from authz-module
+  infra:
+    - name: pool                  # *pgxpool.Pool for all DB access
+    - name: logger                # *slog.Logger injected into corehttpapi.Deps
