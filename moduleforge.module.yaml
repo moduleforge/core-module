@@ -58,13 +58,8 @@ provides:
       args:
         - service:coreServices
 
-    # coreDeps packages coreServices and the logger into corehttpapi.Deps.
-    - name: coreDeps
-      type: "corehttpapi.Deps"
-      constructor: corehttpapi.NewDeps
-      args:
-        - service:coreServices
-        - infra:logger
+    # coreDeps (corehttpapi.NewDeps) removed: only used by core route mount which is
+    # deferred pending innerMount generator support (see generation-gaps.md G-new).
 
     # noopObserver is a MutationObserver that does nothing.
     - name: noopObserver
@@ -77,16 +72,14 @@ provides:
       service: noopObserver
       policy: swallow
 
-  routes:
-    - prefix: /v1
-      mountFromModule: corehttpapi.NewRouter
-      args:
-        - service:coreDeps
-      scope: verified
+  # routes: core entity endpoints (/v1/*) cannot be declared here via mountFromModule
+  # because chi panics when r.Mount("/v1") and r.Route("/v1") both exist at the same
+  # level. The core router must be mounted at r.Mount("/", coreRouter) INSIDE the
+  # host app's /v1 route group — a generator gap (see generation-gaps.md G-new).
+  # Tracked for future generator work: innerMount support in route entries.
 
 requires:
   services:
     - name: authorizer
   infra:
     - name: pool
-    - name: logger
