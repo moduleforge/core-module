@@ -127,6 +127,7 @@ Each entry in `provides.routes` describes one mountable HTTP route group.
 | `mountFromModule` | string | optional | When a module exposes `NewRouter` that returns a full `chi.Router` (not a registration function), set this to the fully-qualified `NewRouter` call. The compiler emits `r.Mount(prefix, <mountFromModule>(deps))`. Used by core-module, contacts-module, and tags-module. Mutually exclusive with `register`. |
 | `scope` | string | optional | Authentication scope gate applied before this route group. Values: `public` (no auth required), `authenticated` (valid bearer token required), `verified` (authenticated + email verified). Default: `authenticated`. |
 | `middleware` | list of string | optional | Named middleware from `provides.middleware` to apply to this route group, in order. |
+| `innerMount` | bool | optional | When `true`, the module router is emitted inside a `r.Route("<prefix>", ...)` block owned by another module rather than as a standalone top-level `r.Mount` call. Use this when another module already registers the same prefix at the top level so that chi does not panic on duplicate mounts. Default: `false` (top-level `r.Mount`). Only meaningful when `mountFromModule` is also set. |
 
 **`register` vs `mountFromModule`:** Some modules expose routes through a `RegisterRoutes(r chi.Router, handler)` function (audit-module, authz-module). Others expose `NewRouter(deps) chi.Router` that returns a full mountable router (core-module, contacts-module, tags-module). Use `register` for the former and `mountFromModule` for the latter.
 
