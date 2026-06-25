@@ -100,7 +100,10 @@ Each entry in `provides.routes` describes one mountable HTTP route group.
 
 **`register` vs `mountFromModule`:** Some modules expose routes through a `RegisterRoutes(r chi.Router, handler)` function (audit-module, authz-module). Others expose `NewRouter(deps) chi.Router` that returns a full mountable router (core-module, contacts-module, tags-module). Use `register` for the former and `mountFromModule` for the latter.
 
-**`constructor` and `register` together:** When `register:` is present, `constructor:` is still required. The two fields serve distinct roles: `constructor` builds the handler struct (e.g. `audithttpapi.NewAuditHandler`), and `register` is the function that mounts routes from that handler onto a chi router (e.g. `audithttpapi.RegisterRoutes`). The compiler first constructs the handler using `constructor` + `args`, then calls `register(r, handler)` inside a `r.Route(prefix, ...)` block. Omitting `constructor` when `register:` is set is a validation error (V5).
+**`constructor` and `register` — two patterns:** There are two valid patterns for `register:` entries, and whether `constructor:` is required depends on the pattern:
+
+- **Pattern A — pre-built handler struct:** `constructor:` is required. The `constructor` call builds a handler struct (e.g. `audithttpapi.NewAuditHandler`), and `register` is a function that takes that struct as its first argument (e.g. `audithttpapi.RegisterRoutes(r, handler)`). The compiler first constructs the handler using `constructor` + `args`, then calls `register(r, handler)` inside a `r.Route(prefix, ...)` block. audit-module uses this pattern.
+- **Pattern B — service-aggregate registration:** `constructor:` is omitted. The `register` function takes service dependencies directly (e.g. the services aggregate or individual services) and constructs handlers internally. No separate pre-built handler struct is needed. authz-module uses this pattern.
 
 ### `provides.services[]`
 
