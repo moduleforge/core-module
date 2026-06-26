@@ -122,8 +122,9 @@ Each entry in `provides.routes` describes one mountable HTTP route group.
 | `prefix` | string | yes | URL path prefix under which this route group is mounted (e.g. `/v1/audit`) |
 | `handler` | string | yes | Name of the handler variable constructed in the generated code (e.g. `auditHandler`). Omitted when `mountFromModule:` is set (the router is constructed directly from the `mountFromModule` expression without a named handler variable). |
 | `constructor` | string | yes | Constructor call that produces the handler (e.g. `audithttpapi.NewAuditHandler`) |
-| `args` | list of arg-source | yes | Ordered arguments to `constructor`. Each entry is a string in one of the 9 arg-source forms (see [§4](#4-arg-source-vocabulary)). |
+| `args` | list of arg-source | yes | Ordered arguments to `constructor`. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). |
 | `register` | string | optional | If set, the name of the `RegisterRoutes`-style function to call instead of mounting the handler directly. Set when the module exposes a `func(chi.Router, handler)` registration function rather than returning a `chi.Router`. |
+| `register_args` | list of arg-source | optional | Additional arguments to the `register` function, passed after `(r, handler)`. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). Used when the registration function takes extra handler dependencies (e.g. `oidcHandler`, `providersHandler`). |
 | `mountFromModule` | string | optional | When a module exposes `NewRouter` that returns a full `chi.Router` (not a registration function), set this to the fully-qualified `NewRouter` call. The compiler emits `r.Mount(prefix, <mountFromModule>(deps))`. Used by core-module, contacts-module, and tags-module. Mutually exclusive with `register`. |
 | `scope` | string | optional | Authentication scope gate applied before this route group. Values: `public` (no auth required), `authenticated` (valid bearer token required), `verified` (authenticated + email verified). Default: `authenticated`. |
 | `middleware` | list of string | optional | Named middleware from `provides.middleware` to apply to this route group, in order. |
@@ -145,7 +146,7 @@ Each entry in `provides.services` declares a named service value that other modu
 | `name` | string | yes | Logical name for this service (e.g. `auditObserver`). Must be unique across all services provided by all selected modules. Used as the variable name in generated code and as the key for `requires.services` lookups. |
 | `type` | string | yes | The Go type of the provided value as it appears in the generated code (e.g. `*auditservice.Observer`, `authz.Authorizer`). Used for documentation and for verifying the consumer's expected type. |
 | `constructor` | string | yes | Go expression that constructs the service value (e.g. `auditservice.New`, `localAuthz.New`). |
-| `args` | list of arg-source | yes | Ordered arguments passed to `constructor`. Each entry is a string in one of the 9 arg-source forms. |
+| `args` | list of arg-source | yes | Ordered arguments passed to `constructor`. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). |
 
 ### `provides.observers[]`
 
@@ -205,6 +206,13 @@ infra:
     type: <string>         # required
     constructor: <string>  # required
     args: [...]            # required
+closures:
+  <name>:
+    params: <string>       # required
+    returnType: <string>   # required
+    args: [...]            # required
+    body: |                # required
+      <Go function body>
 ```
 
 ### Top-level fields
@@ -261,6 +269,41 @@ A map of named infrastructure singletons. Each entry is constructed once at star
 | `<name>.constructor` | string | yes | Go expression that constructs the value (e.g. `localdb.New`). |
 | `<name>.args` | list of arg-source | yes | Ordered arguments to `constructor`. |
 
+### `closures`
+
+A map of named inline function values defined at the composition root. Each closure is emitted as a named Go variable before any service or route that references it via `closure:<name>`. Closures capture outer-scope variables (infra singletons, services) resolved through the standard arg-source vocabulary.
+
+```yaml
+closures:
+  grantAdminFn:
+    params: "ctx context.Context, userAccountUUID uuid.UUID"
+    returnType: "error"
+    args:
+      - infra:az
+      - infra:pool
+      - service:authzServices
+    body: |
+      if err := az.Authorize(ctx, "manage", nil); err != nil {
+        return err
+      }
+      ua, err := usersdb.New(pool).GetUserAccountByUUID(ctx, userAccountUUID)
+      if err != nil {
+        return coreservice.ErrNotFound
+      }
+      _, err = authzServices.Grant.CreateWildcardGrant(ctx, ua.AccountHolder, "manage")
+      return err
+```
+
+| Field | Type | Required | Purpose |
+|---|---|---|---|
+| `<name>` | object | — | Defines one named closure. The name becomes the Go variable name in the generated composition root. |
+| `<name>.params` | string | yes | Go parameter list for the closure, written verbatim inside `func(...)`. Example: `"ctx context.Context, id uuid.UUID"`. |
+| `<name>.returnType` | string | yes | Go return type of the closure, written verbatim after the parameter list. Example: `"error"`. |
+| `<name>.args` | list of arg-source | yes | Outer-scope variables the closure captures. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). The compiler resolves each arg-source and makes the resolved variable name available inside the closure body. |
+| `<name>.body` | string | yes | Go function body, emitted verbatim inside the closure braces. May reference any variable named by the `args` arg-sources. |
+
+A closure declared here is reachable from any `args:` list in `provides.services`, `provides.routes`, or any other arg-carrying block via `closure:<name>` (see [§4](#4-arg-source-vocabulary)).
+
 ---
 
 ## 4. Arg-source vocabulary
@@ -280,6 +323,7 @@ The compiler resolves each arg-source to a Go expression at code generation time
 | `field:` | `field:<varname>.<Field>` | Struct field access on a named variable | `field:cfg.LocalAuth.JWTSecret` → `cfg.LocalAuth.JWTSecret` |
 | `txQueryFactory:` | `txQueryFactory:<import-alias>` | `func(pgx.Tx)*<package>.Queries` closure | `txQueryFactory:auditdb` → `func(tx pgx.Tx) *auditdb.Queries { return auditdb.New(tx) }` |
 | `context` | `context` | `context.Context` | `context` → `ctx` (the boot context) |
+| `closure:` | `closure:<name>` | The Go function type matching the closure's `params` and `returnType` | `closure:grantAdminFn` → `grantAdminFn` (a `func(context.Context, uuid.UUID) error`) |
 
 ### Arg-source resolution rules
 
@@ -292,6 +336,7 @@ The compiler resolves each arg-source to a Go expression at code generation time
 - **`field:<varname>.<Field>`** — the compiler emits `<varname>.<Field>`. The variable must be assigned earlier in the generated code. The path may contain multiple dots for nested struct access (e.g. `field:cfg.LocalAuth.JWTSecret`). The value after `field:` must be a valid Go qualified identifier (see V7).
 - **`txQueryFactory:<import-alias>`** — the compiler emits an inline closure: `func(tx pgx.Tx) *<import-alias>.Queries { return <import-alias>.New(tx) }`. This is the standard pattern for passing a tx-scoped query factory to observers that must write inside the operation's transaction (e.g. the audit-module observer).
 - **`context`** — the compiler emits `ctx`, the `context.Context` passed to the boot sequence. Used when a constructor needs a context for startup-time I/O (e.g. loading keys, running migrations).
+- **`closure:<name>`** — `name` must match a key declared in the app's `closures:` block (see [§3 `closures`](#closures)). The compiler emits the closure as a named variable at the composition root before any value that depends on it, and passes that variable name at the call site.
 
 ---
 
@@ -421,7 +466,7 @@ The compiler performs a topological sort on the construction dependency graph. I
 
 ### V4 — Unknown arg-source prefix
 
-**Condition:** An arg-source string in any `args:` list uses a prefix that is not one of the 9 defined forms (see [§4](#4-arg-source-vocabulary)).
+**Condition:** An arg-source string in any `args:` list uses a prefix that is not one of the defined forms (see [§4](#4-arg-source-vocabulary)).
 
 **Error:** `unknown arg-source prefix "database:" in module "audit" service "auditObserver" arg 0`
 
@@ -492,7 +537,7 @@ The compiler runs five sequential stages. Each stage must complete successfully 
 **Actions:**
 1. Build the service dependency graph: for each `requires.services` entry, create a directed edge from the requiring module to the providing module.
 2. Collect the infra dependencies: for each `requires.infra` entry, record the dependency on the named infra singleton.
-3. Resolve all arg-sources: for each `args:` entry in every `provides.services`, `provides.routes`, `provides.observers`, `provides.middleware`, and `infra:` block, resolve the arg-source to a concrete Go expression.
+3. Resolve all arg-sources: for each `args:` entry in every `provides.services`, `provides.routes`, `provides.observers`, `provides.middleware`, `infra:`, and `closures:` block, resolve the arg-source to a concrete Go expression.
 4. Validate that all referenced variables (from `infra:`, `service:`, `field:`, `method:`, `symbol:`, `txQueryFactory:`) exist in the resolved dependency graph.
 
 **Output:** A fully resolved dependency graph: each node is a named value (infra singleton, service, handler, observer) annotated with its Go expression and the ordered list of resolved argument expressions.
@@ -918,24 +963,7 @@ The `nil` arg-source and `postConstruct` block are placeholders for the eventual
 
 ### 2. Composition-root inline closures
 
-**What it is.** Some wiring points require a small inline function (closure) that captures one or more already-constructed services and adapts their interface for a consumer. These closures have no module-level identity — they exist only at the composition root — and cannot be expressed as named services or `symbol:` references because they are anonymous function literals.
-
-**Where it appears.** `users-module` requires two such closures: `grantAdminFn` and `revokeAdminFn`, each adapting a method of `authzClient` into a `func(ctx, userID)` signature expected by `userResolver`. Both are flagged `TODO(phase-4/compiler-design): inline closure; not representable as a module service or symbol today`.
-
-**Proposed sketch (not yet valid format).**
-
-```yaml
-# In moduleforge.app.yaml, under a future `closures:` or `adapters:` section:
-closures:
-  grantAdminFn:
-    signature: "func(context.Context, string) error"
-    body: "authzClient.GrantAdmin"   # method reference with automatic ctx/arg threading
-  revokeAdminFn:
-    signature: "func(context.Context, string) error"
-    body: "authzClient.RevokeAdmin"
-```
-
-The final form may be a method-reference shorthand, a lambda expression, or a generated adapter type. This requires a phase-4 compiler-design decision on how much Go expression power the manifest should expose.
+Resolved. See [§3 `closures`](#closures). The `closures:` block is now a fully supported top-level key in `moduleforge.app.yaml`. The compiler emits each closure as a named variable at the composition root before any service or route that depends on it, and `closure:<name>` is a valid arg-source (see [§4](#4-arg-source-vocabulary)). The `grantAdminFn` and `revokeAdminFn` closures in `users-module` / `app-mfdemo` are the reference implementation of this feature.
 
 ### 3. Conditional route mounting (app-level config predicate)
 
