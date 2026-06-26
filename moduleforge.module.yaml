@@ -58,8 +58,14 @@ provides:
       args:
         - service:coreServices
 
-    # coreDeps (corehttpapi.NewDeps) removed: only used by core route mount which is
-    # deferred pending innerMount generator support (see generation-gaps.md G-new).
+    # coreDeps carries the external dependencies for the core httpapi router.
+    # Requires coreServices (entity CRUD) and logger (structured logging).
+    - name: coreDeps
+      type: "corehttpapi.Deps"
+      constructor: corehttpapi.NewDeps
+      args:
+        - service:coreServices   # *coreservice.Services
+        - infra:logger           # *slog.Logger — from app manifest
 
     # noopObserver is a MutationObserver that does nothing.
     - name: noopObserver
@@ -72,14 +78,21 @@ provides:
       service: noopObserver
       policy: swallow
 
-  # routes: core entity endpoints (/v1/*) cannot be declared here via mountFromModule
-  # because chi panics when r.Mount("/v1") and r.Route("/v1") both exist at the same
-  # level. The core router must be mounted at r.Mount("/", coreRouter) INSIDE the
-  # host app's /v1 route group — a generator gap (see generation-gaps.md G-new).
-  # Tracked for future generator work: innerMount support in route entries.
+  routes:
+    # Core entity endpoints (/v1/entities/*) mounted inside the /v1 route group.
+    # innerMount: true causes mfgen to emit:
+    #   r.Route("/v1", func(r chi.Router) { r.Mount("/", corehttpapi.NewRouter(coreDeps)) })
+    # instead of a top-level r.Mount("/v1", ...) which would conflict with the
+    # users-module /v1 route group and cause a chi duplicate-prefix panic (gap G14).
+    - prefix: /v1
+      mountFromModule: corehttpapi.NewRouter
+      innerMount: true
+      args:
+        - service:coreDeps
 
 requires:
   services:
     - name: authorizer
   infra:
     - name: pool
+    - name: logger    # *slog.Logger — from app manifest (for corehttpapi.NewDeps)
