@@ -27,7 +27,7 @@ This spec covers everything needed to write a valid manifest from scratch withou
 9. [Generation pipeline](#9-generation-pipeline)
 10. [Worked examples](#10-worked-examples)
 
-- [Appendix A: core-module special case — `mountFromModule`](#appendix-a-core-module-special-case--mountfrommodule)
+- [Appendix A: mod-core special case — `mountFromModule`](#appendix-a-mod-core-special-case--mountfrommodule)
 - [Appendix B: reserved service names](#appendix-b-reserved-service-names)
 - [Appendix C: generated file header](#appendix-c-generated-file-header)
 
@@ -125,17 +125,17 @@ Each entry in `provides.routes` describes one mountable HTTP route group.
 | `args` | list of arg-source | yes | Ordered arguments to `constructor`. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). |
 | `register` | string | optional | If set, the name of the `RegisterRoutes`-style function to call instead of mounting the handler directly. Set when the module exposes a `func(chi.Router, handler)` registration function rather than returning a `chi.Router`. |
 | `register_args` | list of arg-source | optional | Additional arguments to the `register` function, passed after `(r, handler)`. Each entry is a string in one of the defined arg-source forms (see [§4](#4-arg-source-vocabulary)). Used when the registration function takes extra handler dependencies (e.g. `oidcHandler`, `providersHandler`). |
-| `mountFromModule` | string | optional | When a module exposes `NewRouter` that returns a full `chi.Router` (not a registration function), set this to the fully-qualified `NewRouter` call. The compiler emits `r.Mount(prefix, <mountFromModule>(deps))`. Used by core-module, contacts-module, and tags-module. Mutually exclusive with `register`. |
+| `mountFromModule` | string | optional | When a module exposes `NewRouter` that returns a full `chi.Router` (not a registration function), set this to the fully-qualified `NewRouter` call. The compiler emits `r.Mount(prefix, <mountFromModule>(deps))`. Used by mod-core, mod-contacts, and mod-tags. Mutually exclusive with `register`. |
 | `scope` | string | optional | Authentication scope gate applied before this route group. Values: `public` (no auth required), `authenticated` (valid bearer token required), `verified` (authenticated + email verified). Default: `authenticated`. |
 | `middleware` | list of string | optional | Named middleware from `provides.middleware` to apply to this route group, in order. |
 | `innerMount` | bool | optional | When `true`, the module router is emitted inside a `r.Route("<prefix>", ...)` block owned by another module rather than as a standalone top-level `r.Mount` call. Use this when another module already registers the same prefix at the top level so that chi does not panic on duplicate mounts. Default: `false` (top-level `r.Mount`). Only meaningful when `mountFromModule` is also set. |
 
-**`register` vs `mountFromModule`:** Some modules expose routes through a `RegisterRoutes(r chi.Router, handler)` function (audit-module, authz-module). Others expose `NewRouter(deps) chi.Router` that returns a full mountable router (core-module, contacts-module, tags-module). Use `register` for the former and `mountFromModule` for the latter.
+**`register` vs `mountFromModule`:** Some modules expose routes through a `RegisterRoutes(r chi.Router, handler)` function (mod-audit, mod-authz). Others expose `NewRouter(deps) chi.Router` that returns a full mountable router (mod-core, mod-contacts, mod-tags). Use `register` for the former and `mountFromModule` for the latter.
 
 **`constructor` and `register` — two patterns:** There are two valid patterns for `register:` entries, and whether `constructor:` is required depends on the pattern:
 
-- **Pattern A — pre-built handler struct:** `constructor:` is required. The `constructor` call builds a handler struct (e.g. `audithttpapi.NewAuditHandler`), and `register` is a function that takes that struct as its first argument (e.g. `audithttpapi.RegisterRoutes(r, handler)`). The compiler first constructs the handler using `constructor` + `args`, then calls `register(r, handler)` inside a `r.Route(prefix, ...)` block. audit-module uses this pattern.
-- **Pattern B — service-aggregate registration:** `constructor:` is omitted. The `register` function takes service dependencies directly (e.g. the services aggregate or individual services) and constructs handlers internally. No separate pre-built handler struct is needed. authz-module uses this pattern.
+- **Pattern A — pre-built handler struct:** `constructor:` is required. The `constructor` call builds a handler struct (e.g. `audithttpapi.NewAuditHandler`), and `register` is a function that takes that struct as its first argument (e.g. `audithttpapi.RegisterRoutes(r, handler)`). The compiler first constructs the handler using `constructor` + `args`, then calls `register(r, handler)` inside a `r.Route(prefix, ...)` block. mod-audit uses this pattern.
+- **Pattern B — service-aggregate registration:** `constructor:` is omitted. The `register` function takes service dependencies directly (e.g. the services aggregate or individual services) and constructs handlers internally. No separate pre-built handler struct is needed. mod-authz uses this pattern.
 
 ### `provides.services[]`
 
@@ -236,7 +236,7 @@ modules:
 | Field | Type | Required | Purpose |
 |---|---|---|---|
 | `module` | string | yes | The Go module path of the module's `api` sub-module (e.g. `github.com/moduleforge/core-api`). Must match the `go.api.modulePath` declared in the selected module's `moduleforge.module.yaml`. The compiler uses this as the identity of the module and as the import-path root for its API packages. Must be a valid Go module path (see V8). |
-| `localPath` | string | no | Filesystem path to the module repo root, relative to the directory containing `moduleforge.app.yaml`, used for local development (e.g. `../core-module`). When present and the directory exists on disk, the compiler reads the module manifest from `<localPath>/moduleforge.module.yaml` and emits `replace` directives in the generated `go.mod` pointing at the local source. When absent, the module is treated as a published dependency resolved at a pinned version. |
+| `localPath` | string | no | Filesystem path to the module repo root, relative to the directory containing `moduleforge.app.yaml`, used for local development (e.g. `../mod-core`). When present and the directory exists on disk, the compiler reads the module manifest from `<localPath>/moduleforge.module.yaml` and emits `replace` directives in the generated `go.mod` pointing at the local source. When absent, the module is treated as a published dependency resolved at a pinned version. |
 
 #### Module reference resolution
 
@@ -334,7 +334,7 @@ The compiler resolves each arg-source to a Go expression at code generation time
 - **`symbol:<pkg>.<Func>`** — the compiler emits the bare identifier `<pkg>.<Func>`. No parentheses. Used when a constructor expects a function value (e.g. a hash function or a factory). The value after `symbol:` must be a valid Go qualified identifier (see V7).
 - **`method:<varname>.<Method>`** — the compiler emits `<varname>.<Method>` as a bound method reference. The variable `varname` must have been assigned before this point in the generated `main.go`. The value after `method:` must be a valid Go qualified identifier (see V7).
 - **`field:<varname>.<Field>`** — the compiler emits `<varname>.<Field>`. The variable must be assigned earlier in the generated code. The path may contain multiple dots for nested struct access (e.g. `field:cfg.LocalAuth.JWTSecret`). The value after `field:` must be a valid Go qualified identifier (see V7).
-- **`txQueryFactory:<import-alias>`** — the compiler emits an inline closure: `func(tx pgx.Tx) *<import-alias>.Queries { return <import-alias>.New(tx) }`. This is the standard pattern for passing a tx-scoped query factory to observers that must write inside the operation's transaction (e.g. the audit-module observer).
+- **`txQueryFactory:<import-alias>`** — the compiler emits an inline closure: `func(tx pgx.Tx) *<import-alias>.Queries { return <import-alias>.New(tx) }`. This is the standard pattern for passing a tx-scoped query factory to observers that must write inside the operation's transaction (e.g. the mod-audit observer).
 - **`context`** — the compiler emits `ctx`, the `context.Context` passed to the boot sequence. Used when a constructor needs a context for startup-time I/O (e.g. loading keys, running migrations).
 - **`closure:<name>`** — `name` must match a key declared in the app's `closures:` block (see [§3 `closures`](#closures)). The compiler emits the closure as a named variable at the composition root before any value that depends on it, and passes that variable name at the call site.
 
@@ -352,12 +352,12 @@ Current assignments:
 
 | Module | Range |
 |---|---|
-| core-module | 1–99 |
-| users-module | 100–199 |
-| tags-module | 200–299 |
-| contacts-module | 300–399 |
-| audit-module | 400–499 |
-| authz-module | 500–599 |
+| mod-core | 1–99 |
+| mod-users | 100–199 |
+| mod-tags | 200–299 |
+| mod-contacts | 300–399 |
+| mod-audit | 400–499 |
+| mod-authz | 500–599 |
 
 ### Enforcement rules
 
@@ -436,7 +436,7 @@ The `ObserverGroup` dispatches all in-tx observers in parallel via `errgroup`. N
 
 ### Design rationale
 
-The design rationale for the two-phase observer model (in-tx vs post-commit) and the three policy variants is documented in `core-module/docs/architecture/cross-cutting-design-rationale.md`. That document explains why Pattern A (typed interface, constructor-injected) was chosen over decorator chains, hook buses, repo hooks, and HTTP middleware.
+The design rationale for the two-phase observer model (in-tx vs post-commit) and the three policy variants is documented in `mod-core/docs/architecture/cross-cutting-design-rationale.md`. That document explains why Pattern A (typed interface, constructor-injected) was chosen over decorator chains, hook buses, repo hooks, and HTTP middleware.
 
 ---
 
@@ -474,7 +474,7 @@ The compiler performs a topological sort on the construction dependency graph. I
 
 **Condition:** Any manifest file fails to parse as valid YAML, or fails to unmarshal into the manifest schema (unexpected field types, missing required fields).
 
-**Error:** `failed to parse moduleforge.module.yaml in "audit-module": yaml: line 4: mapping values are not allowed in this context`
+**Error:** `failed to parse moduleforge.module.yaml in "mod-audit": yaml: line 4: mapping values are not allowed in this context`
 
 ### V6 — Non-generated file in outputDir
 
@@ -580,9 +580,9 @@ The compiler runs five sequential stages. Each stage must complete successfully 
 
 ## 10. Worked examples
 
-### 10.1 audit-module — moduleforge.module.yaml
+### 10.1 mod-audit — moduleforge.module.yaml
 
-Audit-module is the simple case: one service, one observer, one route group, no cross-module service dependencies. Its migration range is 400–499.
+mod-audit is the simple case: one service, one observer, one route group, no cross-module service dependencies. Its migration range is 400–499.
 
 ```yaml
 module: audit
@@ -632,7 +632,7 @@ provides:
       policy: propagate
 
   # auditHandler serves GET /v1/audit, /by-actor/{uuid}, /by-entity/{entity_uuid}.
-  # RegisterRoutes is used because audit-module exposes a registration
+  # RegisterRoutes is used because mod-audit exposes a registration
   # function, not a NewRouter that returns a chi.Router.
   routes:
     - prefix: /v1/audit
@@ -645,8 +645,8 @@ provides:
 
 requires:
   services:
-    - name: authorizer       # authz.Authorizer from authz-module
-    - name: coreQuerier      # coredb.Querier from core-module
+    - name: authorizer       # authz.Authorizer from mod-authz
+    - name: coreQuerier      # coredb.Querier from mod-core
   infra:
     - name: pool             # *pgxpool.Pool
 ```
@@ -659,22 +659,22 @@ requires:
 
 ---
 
-### 10.2 users-module — moduleforge.module.yaml
+### 10.2 mod-users — moduleforge.module.yaml
 
-Users-module is the complex case: multiple services, multiple route groups, cross-module dependencies on core, audit, and authz, the `txQueryFactory:` arg-source for the audit observer wiring, and the first-user observer hook.
+mod-users is the complex case: multiple services, multiple route groups, cross-module dependencies on core, audit, and authz, the `txQueryFactory:` arg-source for the audit observer wiring, and the first-user observer hook.
 
-After the phase-3 refactors, users-module exposes route groups via `RegisterRoutes`-style methods. This example reflects the post-refactor shape that the compiler targets.
+After the phase-3 refactors, mod-users exposes route groups via `RegisterRoutes`-style methods. This example reflects the post-refactor shape that the compiler targets.
 
 ```yaml
 module: users
-goModule: github.com/moduleforge/users-module
+goModule: github.com/moduleforge/mod-users
 
 go:
   api:
-    modulePath: github.com/moduleforge/users-module/api
+    modulePath: github.com/moduleforge/mod-users/api
     dir: ./api
   model:
-    modulePath: github.com/moduleforge/users-module/model
+    modulePath: github.com/moduleforge/mod-users/model
     dir: ./model
 
 migrations:
@@ -690,7 +690,7 @@ provides:
       constructor: localAuthz.New
       args:
         - queries:authzdb          # authzdb.New(pool)
-        - service:operationRegistry  # *authzapi.OperationRegistry from authz-module
+        - service:operationRegistry  # *authzapi.OperationRegistry from mod-authz
         - infra:pool               # *pgxpool.Pool (needed for wildcard-grant check)
 
     # The UserAccountService — manages user account CRUD.
@@ -703,7 +703,7 @@ provides:
         - queries:coredb
         - service:authorizer
         - service:observerGroup
-        - service:naturalPersonService   # NaturalPersonServicer from core-module
+        - service:naturalPersonService   # NaturalPersonServicer from mod-core
         - service:typeResolver
         - symbol:auth.HashPassword       # bare function reference
 
@@ -715,10 +715,10 @@ provides:
       constructor: users.NewFirstUserHook
       args:
         - infra:pool
-        - service:grantService           # GrantServicer from authz-module
+        - service:grantService           # GrantServicer from mod-authz
 
     # The oauthOrchestrator manages OIDC provider onboarding flow.
-    # Provided by users-module itself; consumed by the /v1/oidc-config handler.
+    # Provided by mod-users itself; consumed by the /v1/oidc-config handler.
     - name: oauthOrchestrator
       type: "*oauth.Orchestrator"
       constructor: oauth.NewOrchestrator
@@ -787,14 +787,14 @@ provides:
 requires:
   services:
     - name: observerGroup         # *observer.ObserverGroup (assembled by compiler)
-    - name: coreServices          # *coreservice.Services from core-module
-    - name: naturalPersonService  # NaturalPersonServicer from core-module
-    - name: typeResolver          # *types.Resolver from core-module
-    - name: operationRegistry     # *authzapi.OperationRegistry from authz-module
-    - name: grantService          # GrantServicer from authz-module
+    - name: coreServices          # *coreservice.Services from mod-core
+    - name: naturalPersonService  # NaturalPersonServicer from mod-core
+    - name: typeResolver          # *types.Resolver from mod-core
+    - name: operationRegistry     # *authzapi.OperationRegistry from mod-authz
+    - name: grantService          # GrantServicer from mod-authz
     - name: emailSender           # EmailSender — email delivery service (external provider)
-    - name: grantAdminFn          # func(ctx, userID) error — provided by authz-module
-    - name: revokeAdminFn         # func(ctx, userID) error — provided by authz-module
+    - name: grantAdminFn          # func(ctx, userID) error — provided by mod-authz
+    - name: revokeAdminFn         # func(ctx, userID) error — provided by mod-authz
   infra:
     - name: pool
     - name: cfg                   # *config.Config
@@ -805,7 +805,7 @@ requires:
 - `symbol:auth.HashPassword` passes the hash function as a value, not a call. The compiler emits `auth.HashPassword` (no parens). Used where a constructor takes a `func(string) (string, error)`.
 - `field:cfg.LocalAuth.JWTSecret` navigates the config struct: `cfg.LocalAuth.JWTSecret`. The compiler derives the `cfg` variable from `infra:cfg`.
 - `service:observerGroup` references the `ObserverGroup` that the compiler assembles from all modules' `provides.observers`. This service name is reserved and generated automatically by the compiler.
-- `txQueryFactory:auditdb` (seen in audit-module's worked example) generates the closure `func(tx pgx.Tx) *auditdb.Queries { return auditdb.New(tx) }` and passes it to the observer constructor.
+- `txQueryFactory:auditdb` (seen in mod-audit's worked example) generates the closure `func(tx pgx.Tx) *auditdb.Queries { return auditdb.New(tx) }` and passes it to the observer constructor.
 - The `firstUserHook` service is injected into auth handlers so they can bootstrap the first-user wildcard grant after account creation. It is declared as a service with a function type.
 
 ---
@@ -822,17 +822,17 @@ outputDir: cmd/app
 
 modules:
   - module: github.com/moduleforge/core-api
-    localPath: ./core-module
-  - module: github.com/moduleforge/users-module/api
-    localPath: ./users-module
+    localPath: ./mod-core
+  - module: github.com/moduleforge/mod-users/api
+    localPath: ./mod-users
   - module: github.com/moduleforge/audit-api
-    localPath: ./audit-module
+    localPath: ./mod-audit
   - module: github.com/moduleforge/authz-api
-    localPath: ./authz-module
+    localPath: ./mod-authz
   - module: github.com/moduleforge/contacts-api
-    localPath: ./contacts-module
+    localPath: ./mod-contacts
   - module: github.com/moduleforge/tags-api
-    localPath: ./tags-module
+    localPath: ./mod-tags
 
 config:
   auth:
@@ -879,11 +879,11 @@ infra:
 
 ---
 
-## Appendix A: core-module special case — `mountFromModule`
+## Appendix A: mod-core special case — `mountFromModule`
 
-Core-module exposes `NewRouter(deps) chi.Router` rather than a `RegisterRoutes` function. This is because core-module's handler set is large and its dependencies are expressed via a `Deps` struct rather than individual arguments.
+mod-core exposes `NewRouter(deps) chi.Router` rather than a `RegisterRoutes` function. This is because mod-core's handler set is large and its dependencies are expressed via a `Deps` struct rather than individual arguments.
 
-In `moduleforge.module.yaml` for core-module, the route entry uses `mountFromModule:` instead of `register:`:
+In `moduleforge.module.yaml` for mod-core, the route entry uses `mountFromModule:` instead of `register:`:
 
 ```yaml
 provides:
@@ -901,7 +901,7 @@ The compiler emits:
 r.Mount("/v1", corehttpapi.NewRouter(coreDeps))
 ```
 
-This pattern applies to any module that returns a full `chi.Router` from a `New*` constructor. The contacts-module and tags-module use the same pattern. The distinction from `register:` is:
+This pattern applies to any module that returns a full `chi.Router` from a `New*` constructor. mod-contacts and mod-tags use the same pattern. The distinction from `register:` is:
 
 - `mountFromModule:` — the constructor returns a `chi.Router` that is mounted at `prefix`
 - `register:` — the constructor is a `RegisterRoutes(r chi.Router, handler)` function that mounts routes onto an existing router
@@ -940,7 +940,7 @@ The following patterns are not yet representable in the manifest format. Each is
 
 **What it is.** Some services require a two-phase initialization: the object is constructed normally, but one or more collaborators are injected *after construction* by calling a setter method on the already-constructed instance. The current arg-source vocabulary (§4) covers only constructor *inputs*; there is no form for "after constructing X, call X.SetY(z)."
 
-**Where it appears.** `users-module` and `core-module` both carry `TODO(phase-4/compiler-design)` markers on services that need this pattern. The canonical example is `userResolver`: it is constructed with `nil` as its observer argument, then `SetObserverGroup` is called on it after the observer group is assembled. A `firstUserGrant` hook service similarly needs to register itself onto `authHandler` and `userResolver` via setter calls after both are constructed.
+**Where it appears.** `mod-users` and `mod-core` both carry `TODO(phase-4/compiler-design)` markers on services that need this pattern. The canonical example is `userResolver`: it is constructed with `nil` as its observer argument, then `SetObserverGroup` is called on it after the observer group is assembled. A `firstUserGrant` hook service similarly needs to register itself onto `authHandler` and `userResolver` via setter calls after both are constructed.
 
 **Proposed sketch (not yet valid format).**
 
@@ -963,7 +963,7 @@ The `nil` arg-source and `postConstruct` block are placeholders for the eventual
 
 ### 2. Composition-root inline closures
 
-Resolved. See [§3 `closures`](#closures). The `closures:` block is now a fully supported top-level key in `moduleforge.app.yaml`. The compiler emits each closure as a named variable at the composition root before any service or route that depends on it, and `closure:<name>` is a valid arg-source (see [§4](#4-arg-source-vocabulary)). The `grantAdminFn` and `revokeAdminFn` closures in `users-module` / `app-mfdemo` are the reference implementation of this feature.
+Resolved. See [§3 `closures`](#closures). The `closures:` block is now a fully supported top-level key in `moduleforge.app.yaml`. The compiler emits each closure as a named variable at the composition root before any service or route that depends on it, and `closure:<name>` is a valid arg-source (see [§4](#4-arg-source-vocabulary)). The `grantAdminFn` and `revokeAdminFn` closures in `mod-users` / `app-mfdemo` are the reference implementation of this feature.
 
 ### 3. Conditional route mounting (app-level config predicate)
 
@@ -971,7 +971,7 @@ Resolved. See [§3 `closures`](#closures). The `closures:` block is now a fully 
 
 **Why it must be app-level.** A per-module `provides.routes[]` entry cannot express a condition that references app-level config, because the module manifest is authored and resolved before the app config shape is known. The predicate must live in the app manifest, where the full config tree is in scope.
 
-**Where it appears.** The `users-module` example app required conditional mounting of a token-display route: show `GET /v1/self/token` only when `cfg.Onboarding.TokenDisplay != config.TokenDisplayNone`. This condition references an app-level config key that no individual module manifest can observe.
+**Where it appears.** The `mod-users` example app required conditional mounting of a token-display route: show `GET /v1/self/token` only when `cfg.Onboarding.TokenDisplay != config.TokenDisplayNone`. This condition references an app-level config key that no individual module manifest can observe.
 
 **Proposed sketch (not yet valid format).**
 
