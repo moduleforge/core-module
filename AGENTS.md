@@ -1,10 +1,10 @@
-# AGENTS.md — core-module
+# AGENTS.md — mod-core
 
 This file is the canonical reference for contributors and AI agents working on this codebase. It covers purpose, package layout, build and test commands, code-generation workflow, and conventions. Claude Code-specific guidance is in [`.claude/settings.local.json`](./.claude/settings.local.json).
 
 ## Project overview
 
-`core-module` is the foundational domain model for the ModuleForge platform. It defines the `entities` and `legal_entities` tables, owns UUID generation and assignment for every entity in the system, and exposes the service-layer abstractions (Entity interface, entity types, observers, cipher) that peer modules depend on.
+`mod-core` is the foundational domain model for the ModuleForge platform. It defines the `entities` and `legal_entities` tables, owns UUID generation and assignment for every entity in the system, and exposes the service-layer abstractions (Entity interface, entity types, observers, cipher) that peer modules depend on.
 
 The module ships three sub-projects:
 
@@ -12,7 +12,7 @@ The module ships three sub-projects:
 - `api/` — Go HTTP handlers, service layer, and all cross-cutting library packages (`github.com/moduleforge/core-api`)
 - `gui/` — TypeScript/React component library (`@moduleforge/core-gui`), published via yalc for local development
 
-See [docs/manifest-spec.md](./docs/manifest-spec.md) for the authoritative manifest specification that describes how core-module integrates with mfgen and the application composition layer.
+See [docs/manifest-spec.md](./docs/manifest-spec.md) for the authoritative manifest specification that describes how mod-core integrates with mfgen and the application composition layer.
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ make migrate.new NAME=add_foo_column  # create a new numbered migration file
 
 The default `DATABASE_URL` is `postgresql://core:core@localhost:5432/core?sslmode=disable`. Override by setting the environment variable before invoking make.
 
-**Migration range: 1–99.** Core-module owns migration numbers 1 through 99. Other modules start at higher numbers. Do not add core migrations outside this range.
+**Migration range: 1–99.** mod-core owns migration numbers 1 through 99. Other modules start at higher numbers. Do not add core migrations outside this range.
 
 ## Code generation (sqlc)
 
@@ -91,7 +91,7 @@ All packages below live under `api/` (`github.com/moduleforge/core-api`).
 | `observer/` | `MutationObserver` interface and `ObserverGroup` concrete type. `ObserverGroup` fans out to N observers in parallel with configurable error policy (`PolicyPropagate` / `PolicySwallow`). Provides `Observe`, `MustObserve`, `MayObserve` per-call-site policy overrides, and `ObserveAfterCommit` for post-tx hooks. |
 | `fieldcrypto/` | Public façade for the AES-256-GCM field cipher. Reads `CORE_FIELD_KEY_HEX` from the environment. Implementation lives in `internal/fieldcrypto/`; this package re-exports only what callers outside core need. |
 | `service/` | `Services` aggregate wrapping `EntityService`, `NaturalPersonService`, `CorporationService`, and `ServiceAccountService`. Constructed via `service.New(...)` and passed to `httpapi.NewRouter`. |
-| `authz/` | `Authorizer` and `OpResolver` interfaces. Implementations are consumer-supplied (e.g. authz-module); this package defines only the contracts. |
+| `authz/` | `Authorizer` and `OpResolver` interfaces. Implementations are consumer-supplied (e.g. mod-authz); this package defines only the contracts. |
 | `types/` | `Resolver` that maps `fundamental_type_slug` strings to internal type IDs. Populated once at startup from the `types` table; safe to cache for process lifetime. |
 | `display/` | Per-`(typeSlug, fieldName)` renderer registry. Modules register renderers for their own entity kinds; the registry dispatches at render time. |
 | `opctx/` | Typed context accessors for `ActorEntityID`, `SudoActorEntityID`, and `RequestID`. Set by HTTP middleware; consumed by service methods and the `Authorizer`. |
@@ -108,7 +108,7 @@ Model packages (`github.com/moduleforge/core-model`):
 
 ## mountFromModule special case
 
-Core-module's route block in `moduleforge.module.yaml` uses `innerMount: true`:
+mod-core's route block in `moduleforge.module.yaml` uses `innerMount: true`:
 
 ```yaml
 routes:
@@ -133,9 +133,9 @@ instead of the default:
 r.Mount("/v1", corehttpapi.NewRouter(coreDeps))
 ```
 
-This distinction matters because other modules (e.g. users-module) also register routes under `/v1`. A top-level `r.Mount("/v1", ...)` would create a chi prefix group that conflicts with subsequent `r.Route("/v1", ...)` calls in the same router, causing a duplicate-prefix panic. The `innerMount` flag makes the `/v1` group open (additive) rather than terminal (captured), so other modules can nest their own routes inside the same group.
+This distinction matters because other modules (e.g. mod-users) also register routes under `/v1`. A top-level `r.Mount("/v1", ...)` would create a chi prefix group that conflicts with subsequent `r.Route("/v1", ...)` calls in the same router, causing a duplicate-prefix panic. The `innerMount` flag makes the `/v1` group open (additive) rather than terminal (captured), so other modules can nest their own routes inside the same group.
 
-**Core-module's `/v1` route group is the entry point for the outer route group that other modules nest inside.** When wiring the composition root, core-module must be mounted before peer modules that share `/v1`.
+**mod-core's `/v1` route group is the entry point for the outer route group that other modules nest inside.** When wiring the composition root, mod-core must be mounted before peer modules that share `/v1`.
 
 ## Manifest spec
 
@@ -151,5 +151,5 @@ This is the authoritative reference for `provides`, `requires`, `routes`, `obser
 - **Handlers are thin** — parse input, call one service method, shape response. No business logic in handlers.
 - **Authorization is checked first** in every service method, before any data access.
 - **Generated code (`model/db/`) is committed** and must not be edited by hand. Re-run `make gen` after any query change.
-- **Migration numbers 1–99 are reserved** for core-module. Do not add core migrations above 99; other modules start at 100+.
+- **Migration numbers 1–99 are reserved** for mod-core. Do not add core migrations above 99; other modules start at 100+.
 - **Observer policy**: pass `observer.NewObserverGroup()` (no-op) when you don't need observation. Use `MustObserve` when an observer failure should abort the operation; use `MayObserve` when best-effort is acceptable.

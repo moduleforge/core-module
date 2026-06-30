@@ -8,7 +8,7 @@ For why this design (rather than middleware, decorator chains, or a hook bus) wa
 
 ## The `Authorizer` interface
 
-Defined in `core-module/api/authz`:
+Defined in `mod-core/api/authz`:
 
 ```go
 type Authorizer interface {
@@ -47,7 +47,7 @@ The following values travel on `context.Context` through the service layer. They
 | `sudo_actor_entity_id` | `*int64` | auth middleware | Internal entity ID of the user whose identity an admin has assumed. Nil when no assumption is active. |
 | `request_id` | `string` | HTTP middleware | Request correlation ID for logging and tracing. |
 
-`opctx` lives in `core-module/api/opctx`. It is deliberately narrow: only ambient request properties go here. Richer policy data (roles, scopes, tenancy, app context) is the `Authorizer` implementation's concern, not `opctx`'s — the implementation can resolve those from the actor's entity ID via its own DB lookups.
+`opctx` lives in `mod-core/api/opctx`. It is deliberately narrow: only ambient request properties go here. Richer policy data (roles, scopes, tenancy, app context) is the `Authorizer` implementation's concern, not `opctx`'s — the implementation can resolve those from the actor's entity ID via its own DB lookups.
 
 When an admin assumes another user's identity, the authorizer reads the **assumed** actor for policy purposes (the admin is acting *as* that user), and the original admin ID for audit purposes. Both are available on `ctx` simultaneously.
 
@@ -171,7 +171,7 @@ This pushes row-level filtering into Postgres where the planner can index-scan, 
 
 Each peer module ships **stubs** in its migration files (`0099_access_stubs.sql`, `0299_access_stubs.sql`, etc.) that define the function with a placeholder body returning the empty set. This satisfies `sqlc compile` and lets the schema migrate cleanly.
 
-At app startup, after migrations have been applied, the composition root calls `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `core-module/api/authz/setup`. The generator (an `AccessFuncGenerator` implementation supplied by the chosen Authorizer) replaces each stub body via `CREATE OR REPLACE FUNCTION` with the real policy. Different apps may use different generators (admin-or-own, grant-table-based, etc.) without changing the peer-module schemas.
+At app startup, after migrations have been applied, the composition root calls `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `mod-core/api/authz/setup`. The generator (an `AccessFuncGenerator` implementation supplied by the chosen Authorizer) replaces each stub body via `CREATE OR REPLACE FUNCTION` with the real policy. Different apps may use different generators (admin-or-own, grant-table-based, etc.) without changing the peer-module schemas.
 
 For tests, `setup.PermissiveGenerator(tableForSlug)` produces bodies that return all rows for all actors; `setup.DenyingGenerator()` produces bodies that return the empty set.
 
@@ -188,11 +188,11 @@ Single-target operations (`read`, `update`, `delete`) only consult `Authorize` �
 
 ### Production policy — `GrantTableGenerator` (Phase 2, active)
 
-The current production policy replaces `AdminOrOwnGenerator` with a data-driven `GrantTableGenerator` backed by the `authz-module` schema (migration range `0500–0599`). The high-level pieces are:
+The current production policy replaces `AdminOrOwnGenerator` with a data-driven `GrantTableGenerator` backed by the `mod-authz` schema (migration range `0500–0599`). The high-level pieces are:
 
 #### Operation registry and `OpResolver`
 
-`authz-module` owns an `authz_operations` table seeded with 11 operations:
+`mod-authz` owns an `authz_operations` table seeded with 11 operations:
 
 | slug | implies |
 |---|---|
@@ -208,12 +208,12 @@ The current production policy replaces `AdminOrOwnGenerator` with a data-driven 
 | `grant` | — |
 | `revoke` | — |
 
-`OperationRegistry` (in `authz-module/api/authz`) loads these at startup and caches two transitive-closure views:
+`OperationRegistry` (in `mod-authz/api/authz`) loads these at startup and caches two transitive-closure views:
 
 - **Forward implies**: what does this op grant transitively? (For management UI display.)
 - **Reverse / `SatisfiedBy`**: which ops, if granted, satisfy a request for this op? This closure drives every `Authorize` call and every `JOIN ... op_ids` in list queries.
 
-The `OpResolver` interface in `core-module/api/authz` exposes `SatisfiedBy` to peer modules without requiring them to import `authz-api`:
+The `OpResolver` interface in `mod-core/api/authz` exposes `SatisfiedBy` to peer modules without requiring them to import `authz-api`:
 
 ```go
 type OpResolver interface {
@@ -227,12 +227,12 @@ The `SatisfiedByMust` / `SatisfiedBy` distinction: `Must` panics on unknown slug
 
 #### Actor and target groups — schema and cycle prevention
 
-`authz-module` adds two additional entity types:
+`mod-authz` adds two additional entity types:
 
 - `authz_actor_groups` — nestable groups of actors (UserAccounts or other actor groups). CTI under `entities`.
 - `authz_target_groups` — nestable groups of targets (any Entity). CTI under `entities`.
 
-Join tables (`authz_actor_group_members`, `authz_target_group_members`) reference `entities.id`. Cycle prevention is enforced at write time via database triggers; the triggers walk the membership chain and reject an insert that would create a cycle. Member-type rules (actor group members must be user_accounts or actor groups; target group members may be any entity) are likewise enforced by triggers using `core-module`'s `type_is_or_descends_from()` helper function.
+Join tables (`authz_actor_group_members`, `authz_target_group_members`) reference `entities.id`. Cycle prevention is enforced at write time via database triggers; the triggers walk the membership chain and reject an insert that would create a cycle. Member-type rules (actor group members must be user_accounts or actor groups; target group members may be any entity) are likewise enforced by triggers using `mod-core`'s `type_is_or_descends_from()` helper function.
 
 Both group types carry `ON DELETE CASCADE` from `entities`, so archiving the underlying entity removes group membership automatically.
 
@@ -320,7 +320,7 @@ The `Authorizer` implementation checks `is_admin` in Go before issuing any grant
 
 #### Admin API for authz management (Phase 2.4)
 
-`authz-module/api` provides CRUD endpoints for operations, actor groups, target groups, grants, and memberships under `/v1/authz/*`. All endpoints are admin-only via the `is_admin` short-circuit. See the phase-2-design.md §Phase 2.4 for the full endpoint list.
+`mod-authz/api` provides CRUD endpoints for operations, actor groups, target groups, grants, and memberships under `/v1/authz/*`. All endpoints are admin-only via the `is_admin` short-circuit. See the phase-2-design.md §Phase 2.4 for the full endpoint list.
 
 ### Future evolution — Phase 3
 

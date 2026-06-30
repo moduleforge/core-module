@@ -18,7 +18,7 @@ In this package:
 yalc publish
 ```
 
-In the consumer app (e.g. `users-module/gui`):
+In the consumer app (e.g. `mod-users/gui`):
 
 ```bash
 yalc add @moduleforge/core-gui
@@ -28,7 +28,7 @@ npm install
 To push updates after rebuilding:
 
 ```bash
-# in core-module/gui
+# in mod-core/gui
 npm run build && yalc push
 ```
 

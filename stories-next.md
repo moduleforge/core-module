@@ -1,4 +1,4 @@
-# core-module/gui — deferred component workbench follow-ups
+# mod-core/gui — deferred component workbench follow-ups
 
 The initial Ladle setup (`gui/.ladle/`, `make preview`) covers the minimum: every exported component has at least one story, Tailwind + the shadcn theme tokens render correctly, and HMR works. Items below were intentionally left out of the first pass.
 
@@ -42,4 +42,4 @@ If someone wants a single URL covering both core and tags previews, the simplest
 
 ## Composite stories that use core-gui primitives
 
-No tag stories currently compose core-gui; if one does in the future, yalc-link core-gui into `tags-module/gui` (mirror the root `link-core` pattern under a module-level `preview-link` target) so the story can resolve `@moduleforge/core-gui` at dev time.
+No tag stories currently compose core-gui; if one does in the future, yalc-link core-gui into `mod-tags/gui` (mirror the root `link-core` pattern under a module-level `preview-link` target) so the story can resolve `@moduleforge/core-gui` at dev time.

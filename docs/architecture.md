@@ -1,8 +1,8 @@
-# core-module architecture
+# mod-core architecture
 
 ## Purpose and scope
 
-These documents describe the **system design concepts, high-level specifications, and the reasoning behind them** for `core-module` and the modules that build on it. The target audience is architects and engineers who need to understand the system as a whole, the top level concepts and components, and how everything fits together.
+These documents describe the **system design concepts, high-level specifications, and the reasoning behind them** for `mod-core` and the modules that build on it. The target audience is architects and engineers who need to understand the system as a whole, the top level concepts and components, and how everything fits together.
 
 These documents do NOT cover specific APIs, usage, or operations.
 
@@ -16,18 +16,18 @@ The unit of organisation is the **module**. A module is a self-contained code pa
 
 A module need not include all three.
 
-Modules are not applications. Each module is a library that exposes its domain as a coherent surface — schema fragments, service constructors, HTTP route mounters, React components — without prescribing how it gets used. **Applications** are built by *composing* modules: a composition root constructs whatever modules the application needs, wires them with shared dependencies (a database pool, a single authorization policy, a single observer group, a configuration object), and produces a runnable artifact. `users-module` contains a small example used for local debugging.
+Modules are not applications. Each module is a library that exposes its domain as a coherent surface — schema fragments, service constructors, HTTP route mounters, React components — without prescribing how it gets used. **Applications** are built by *composing* modules: a composition root constructs whatever modules the application needs, wires them with shared dependencies (a database pool, a single authorization policy, a single observer group, a configuration object), and produces a runnable artifact. `mod-users` contains a small example used for local debugging.
 
 The composition root has three application-level wiring responsibilities that no individual module owns:
 
-- **Authorization policy.** Construct one `Authorizer` implementation, then call `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `core-module/api/authz/setup` to install the SQL access functions for row-level scoping. Different apps may use different `AccessFuncGenerator` implementations (see [`authorization-design.md`](./architecture/authorization-design.md)).
+- **Authorization policy.** Construct one `Authorizer` implementation, then call `setup.ApplyFuncs(ctx, pool, generator, slugs)` from `mod-core/api/authz/setup` to install the SQL access functions for row-level scoping. Different apps may use different `AccessFuncGenerator` implementations (see [`authorization-design.md`](./architecture/authorization-design.md)).
 - **Cross-module routing.** Routes that span multiple modules — e.g. dependent-data routes like `/natural-persons/{uuid}/contacts` (a contacts list under a parent legal entity) — are registered at the composition root, not by either module. The convention `/{parent-resource}/{uuid}/{dependent-resource}` is documentation, not a framework. Each peer module exposes service methods (e.g. `ContactService.ListByLegalEntity`); the app wires the URL.
 - **Observer composition.** Build one `*observer.ObserverGroup` containing whichever cross-cutting observers the app composes (audit, outbox, cache invalidation, search-index sync); inject into every service.
 
 **Module design rules:**
 
-- **`core-module` defines the shared contracts.** The interfaces and helpers that let modules be composed cleanly — entity identity, authorization, state-change observation, transaction lifecycle, request context — all live in `core-module`. Other modules implement or use these contracts; they do not redefine them.
-- **All other modules are final.** The `core-module` is (almost always) used as the basis for other modules. However, there is no general "inheritance" mechanism like OOP style classes. A module may "build" off other modules internally, but that's all internal to the module.
+- **`mod-core` defines the shared contracts.** The interfaces and helpers that let modules be composed cleanly — entity identity, authorization, state-change observation, transaction lifecycle, request context — all live in `mod-core`. Other modules implement or use these contracts; they do not redefine them.
+- **All other modules are final.** The `mod-core` is (almost always) used as the basis for other modules. However, there is no general "inheritance" mechanism like OOP style classes. A module may "build" off other modules internally, but that's all internal to the module.
 - **Modules primarily model 'domains'.** In theory, you could have module that "sub class" other modules, extending or refining services and semantics. You could have modules that augment other modules by defining additional or more sophisticated GUI components. However, the current design focus is on "modules as domain implementations" which implement large, cohesive application chunks. It's natural for the module implementations to share many details, but those are implementation concerns not addressed here.
 - **The module components may be tightly bound.** The model definition, API implementation, and GUI implementation may have interdependencies at the implementation level. E.g., the API may rely on denormalized view tables or other database implementation details for the sake of efficiency.
 
@@ -47,9 +47,9 @@ The model part is the persistent state for the domain.
 
 **Design rules:**
 
-- **`Entities` represent independent objects/data.** The `entities` table in `core-module/model` is the abstract root for all classes that model indpendent things with their own existence. `Entities` may reference each other, but are never a fundamental/existential "part" or directly dependent on another `Entity` for their existence at the model level.[^bussinesdependencies]
+- **`Entities` represent independent objects/data.** The `entities` table in `mod-core/model` is the abstract root for all classes that model indpendent things with their own existence. `Entities` may reference each other, but are never a fundamental/existential "part" or directly dependent on another `Entity` for their existence at the model level.[^bussinesdependencies]
 - **Tables whose primary ID does not transitively FK to `entities` is considered "dependent" objcets/data.** A dependent object/data is just "part" of an `Entity`'s data. Therefore, a single `Entity` model (such as a `NaturalPerson` or `Company`) may be captured by by multiple tables.
-- **Otherwises dependent object classes may be promoted to `Entity` status if they are involved in authorization resulotion.** The cannonical example here is the `UserAccount` types in `users-module`. A `UserAccount` is logically dependent on a `User`, however it is the `UserAccount` and not the `User` themselves to which authorizations are attached and since the subject and target of an authorization must be an `Entity`, `UserAccount` is effectively promoted.
+- **Otherwises dependent object classes may be promoted to `Entity` status if they are involved in authorization resulotion.** The cannonical example here is the `UserAccount` types in `mod-users`. A `UserAccount` is logically dependent on a `User`, however it is the `UserAccount` and not the `User` themselves to which authorizations are attached and since the subject and target of an authorization must be an `Entity`, `UserAccount` is effectively promoted.
 - **Internal IDs are integers; external IDs are UUIDs.** Internal IDs are used only for joins and FKs and are never sent in HTTP responses.
 - **Tables are named in the plural; columns in `snake_case`.**
 - **Sub-tables inherit primary keys from parent tables (CTI — class-table inheritance).** A `natural_persons` row's `entity_id` is both the primary key and the FK to `entities`.
@@ -93,7 +93,7 @@ For details:
 
 The GUI part is the user-facing surface for the domain — the React components and front-end primitives that an application uses to present the module's data and operations.
 
-**Scope:** A standalone React component library per module (e.g. `tags-module/gui`, `contacts-module/gui`). TypeScript, npm-published. No application code; no module-specific routing or state stores beyond the components themselves.
+**Scope:** A standalone React component library per module (e.g. `mod-tags/gui`, `mod-contacts/gui`). TypeScript, npm-published. No application code; no module-specific routing or state stores beyond the components themselves.
 
 **Technical goals:**
 
@@ -106,10 +106,10 @@ The GUI part is the user-facing surface for the domain — the React components 
 
 - **Authentication and routing are application concerns**, not module concerns. A module's components accept whatever data they need as props; they do not call `/login` or assume a router.[^authbymodule]
 - **A modules GUI components may factor in authorization** in order to determine what options to display or not. Ideally, these kinds of questions should be answered by results from the API. E.g., fetch results could indicate whether the data can be editted or not. However, it is also possible that the GUI component ask "can edit" or "can access" to determine what options to present. In general, impossible options should not be displayed.
-- **Cross-module data flow is the application's responsibility.** A `<TagEditor>` does not reach into `users-module`; the application provides whatever lookups the editor needs.
+- **Cross-module data flow is the application's responsibility.** A `<TagEditor>` does not reach into `mod-users`; the application provides whatever lookups the editor needs.
 - **No module's GUI imports another module's GUI.** Same peer-module independence rule as the model and API parts. However, modules may take parameters which are then displayed. For instance, a "detail" widget may take an `additionalOptions` input which would be an array of labels + widgets like 'Tags' + tag widget, and then display the additional data options as secondary options.
 
-[^authbymodule]: Though authentication is logically an "application level concern", the `users-module` does provide an authentication implementation. The point here is that, in general, modules do not concern themselves with authentication.
+[^authbymodule]: Though authentication is logically an "application level concern", the `mod-users` does provide an authentication implementation. The point here is that, in general, modules do not concern themselves with authentication.
 
 The GUI surface is less mature than the model and API surfaces; current modules use it where there is end-user-visible functionality (tags, contacts, core entity forms), but there is no formal design doc yet.
 

@@ -1,4 +1,4 @@
-# Entity typing in core-module
+# Entity typing in mod-core
 
 ## Motivation
 
@@ -61,7 +61,7 @@ SELECT
 FROM types WHERE slug = 'entity';
 ```
 
-Core-module seeds its five built-in types in migrations `0003–0007`. Downstream modules follow the same pattern in their own migrations — no core file is touched.
+mod-core seeds its five built-in types in migrations `0003–0007`. Downstream modules follow the same pattern in their own migrations — no core file is touched.
 
 The `type_is_or_descends_from(p_type_id BIGINT, p_target_slug TEXT) RETURNS BOOLEAN` helper defined in `0002_types.sql` resolves ancestry via a recursive CTE. Subtype-table triggers use this to assert correct parentage.
 
@@ -91,7 +91,7 @@ Each field is an independent registration. Callers request only the fields they 
 
 `Render` resolves the entity's `fundamental_type_slug` from the DB, then dispatches to the registered renderer. If no renderer is wired, it returns `ErrRendererNotRegistered` — callers may check with `errors.Is`.
 
-Core-module registers default renderers for `natural_person`, `corporation`, and `service_account` via `service.RegisterBuiltins(reg, q)`. Downstream modules register their own renderers in their service init.
+mod-core registers default renderers for `natural_person`, `corporation`, and `service_account` via `service.RegisterBuiltins(reg, q)`. Downstream modules register their own renderers in their service init.
 
 ## Why accidental typing is deferred
 

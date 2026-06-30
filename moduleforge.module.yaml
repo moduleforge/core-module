@@ -83,7 +83,7 @@ provides:
     # innerMount: true causes mfgen to emit:
     #   r.Route("/v1", func(r chi.Router) { r.Mount("/", corehttpapi.NewRouter(coreDeps)) })
     # instead of a top-level r.Mount("/v1", ...) which would conflict with the
-    # users-module /v1 route group and cause a chi duplicate-prefix panic (gap G14).
+    # mod-users /v1 route group and cause a chi duplicate-prefix panic (gap G14).
     - prefix: /v1
       mountFromModule: corehttpapi.NewRouter
       innerMount: true

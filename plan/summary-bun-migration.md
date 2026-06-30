@@ -5,11 +5,11 @@ status: completed
 date_summary: 2026.06.21
 ---
 
-# Plan Session Summary: Migrate core-module/gui from npm to bun
+# Plan Session Summary: Migrate mod-core/gui from npm to bun
 
 ## What was planned and why
 
-**Goal:** Replace npm as the package manager for `core-module/gui` with bun, eliminating `package-lock.json` in favour of `bun.lock`, updating all Makefile delegate commands from `npm` to `bun`, and verifying the build and typecheck pipeline remains green.
+**Goal:** Replace npm as the package manager for `mod-core/gui` with bun, eliminating `package-lock.json` in favour of `bun.lock`, updating all Makefile delegate commands from `npm` to `bun`, and verifying the build and typecheck pipeline remains green.
 
 **Motivation:** Streamline JavaScript dependency management and build tooling by adopting bun as a faster, unified package manager and runtime for the GUI subproject.
 

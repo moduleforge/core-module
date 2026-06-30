@@ -1,6 +1,6 @@
-# core-module
+# mod-core
 
-`core-module` is the foundational domain module for the ModuleForge platform. It owns the canonical entity-identity schema and the Go library packages that every other ModuleForge module builds on.
+`mod-core` is the foundational domain module for the ModuleForge platform. It owns the canonical entity-identity schema and the Go library packages that every other ModuleForge module builds on.
 
 ## What it provides
 

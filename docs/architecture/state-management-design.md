@@ -8,7 +8,7 @@ For the pre-operation gate (authorization), see [`authorization-design.md`](auth
 
 ## The `MutationObserver` interface
 
-Defined in `core-module/api/observer`:
+Defined in `mod-core/api/observer`:
 
 ```go
 type MutationObserver interface {
@@ -43,7 +43,7 @@ An observer that needs only one phase implements the other as `return nil`.
 
 ## The `txhelper.Run` helper
 
-Defined in `core-module/api/txhelper`. Owns transaction lifecycle for service methods.
+Defined in `mod-core/api/txhelper`. Owns transaction lifecycle for service methods.
 
 ```go
 err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
@@ -58,7 +58,7 @@ err := txhelper.Run(ctx, s.db, func(ctx context.Context, tx pgx.Tx) error {
 
 ## The `ObserverGroup` and its three call variants
 
-`core-module/api/observer.ObserverGroup` is a concrete fan-out helper that wraps any number of `MutationObserver` implementations. Service methods take `*ObserverGroup` (not the bare interface) so they can choose between three in-transaction call variants per operation:
+`mod-core/api/observer.ObserverGroup` is a concrete fan-out helper that wraps any number of `MutationObserver` implementations. Service methods take `*ObserverGroup` (not the bare interface) so they can choose between three in-transaction call variants per operation:
 
 | Method | Policy applied |
 |--------|---------------|
@@ -122,7 +122,7 @@ Read methods collapse to a single Authorize call followed by the fetch — no tr
 
 List/search methods authorize against the type ID (resolved via `TypeResolver`) for entity-level lists, or against the parent entity ID for dependent-data lists. Row-level scoping is handled separately by SQL access functions; see [`authorization-design.md` "Row-level scoping"](authorization-design.md#row-level-scoping).
 
-All list/search methods are paged. Each peer module defines a small `Pagination` struct (`Limit`, `Offset` with sane defaults and a hard cap) and threads it through service methods to the underlying sqlc query. The struct is module-local today; promoting to a shared `core-module/api/service` type is a consolidation candidate once the convention has settled.
+All list/search methods are paged. Each peer module defines a small `Pagination` struct (`Limit`, `Offset` with sane defaults and a hard cap) and threads it through service methods to the underlying sqlc query. The struct is module-local today; promoting to a shared `mod-core/api/service` type is a consolidation candidate once the convention has settled.
 
 ## Composing services into larger transactions
 
@@ -201,7 +201,7 @@ The interface covers the common cross-cutting concerns that need to react to mut
 
 | Use case | Phase | Notes |
 |----------|-------|-------|
-| Audit logging | in-tx | A rolled-back operation must not leave an audit row. Implemented today by `audit-module`. |
+| Audit logging | in-tx | A rolled-back operation must not leave an audit row. Implemented today by `mod-audit`. |
 | Outbox / event dispatch | in-tx | Event row must commit with the data so the dispatcher always sees it. |
 | Cache invalidation | post-commit | Invalidating before commit risks readers re-caching stale pre-commit values. |
 | Search-index sync | post-commit | Indexing a rolled-back operation pollutes the index. |

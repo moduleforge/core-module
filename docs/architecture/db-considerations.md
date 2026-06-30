@@ -152,10 +152,10 @@ proprietary Pro features). It worked well but did not earn its complexity:
 - Files use the existing 4-digit sequential prefix convention
   (`0008_entities.sql`, `0300_contacts.sql`, etc.). Each module reserves its
   own range:
-  - `core-module`: `0001–0099` (goose reserves version 0)
-  - `users-module`: `0100–0199`
-  - `tags-module`: `0200–0299`
-  - `contacts-module`: `0300–0399`
+  - `mod-core`: `0001–0099` (goose reserves version 0)
+  - `mod-users`: `0100–0199`
+  - `mod-tags`: `0200–0299`
+  - `mod-contacts`: `0300–0399`
 - Every file begins with `-- +goose Up`. Down sections are not provided —
   migrations are forward-only by convention.
 - Any `CREATE [OR REPLACE] FUNCTION … $$ … $$ LANGUAGE …;` block (PL/pgSQL or
@@ -163,6 +163,6 @@ proprietary Pro features). It worked well but did not earn its complexity:
   `-- +goose StatementBegin` / `-- +goose StatementEnd` markers so goose
   treats it as a single statement.
 - The cross-module composition mechanism (Makefile `compose` target that
-  copies `core-module` migrations + the consumer module's own migrations into
+  copies `mod-core` migrations + the consumer module's own migrations into
   a unified `schema/migrations/` directory) is unchanged conceptually; only
   the tool that operates on the composed directory has changed.

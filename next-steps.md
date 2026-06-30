@@ -1,11 +1,11 @@
-# core-module — next steps
+# mod-core — next steps
 
-This file tracks pending manual verification and deferred work for `core-module`. Architecture decisions made across the cross-cutting framework rounds and the SQL access-function refactor are documented in `docs/architecture/` and indexed by `plan/report.phase-1-sql-access-fn-handoff.md` at the user-components root.
+This file tracks pending manual verification and deferred work for `mod-core`. Architecture decisions made across the cross-cutting framework rounds and the SQL access-function refactor are documented in `docs/architecture/` and indexed by `plan/report.phase-1-sql-access-fn-handoff.md` at the user-components root.
 
 ## Pending manual verification (needs live stack / DB)
 
 - **`make dev.start` end-to-end smoke** — bring up the full stack, log in, edit profile at `/profile`, reload to confirm persistence; create a user via admin; edit an existing user.
-- **`goose status` against a freshly-migrated local DB** — confirm migrations applied in order: core (`0001–0099`, ending at `0099_access_function_stubs.sql`) → audit-module (`0400_audit_log.sql`) → users-module (`0100–0107`) → tags-module (`0200–0299`) → contacts-module (`0300–0399`).
+- **`goose status` against a freshly-migrated local DB** — confirm migrations applied in order: core (`0001–0099`, ending at `0099_access_function_stubs.sql`) → mod-audit (`0400_audit_log.sql`) → mod-users (`0100–0107`) → mod-tags (`0200–0299`) → mod-contacts (`0300–0399`).
 - **Audit log smoke** — after a profile edit, verify `SELECT op, resource, actor_entity_id FROM audit_log ORDER BY at DESC LIMIT 5` shows `op='update'`, `resource='natural_person'`, populated `actor_entity_id`, populated `before`/`after`. (Note: column is `actor_entity_id`, not `actor_user_id` — schema generalized in Phase 3.)
 - **Access function inlining spot-check** — VERIFIED in Phase 2.5 against the Phase 2 schema (authz tables + tags table). EXPLAIN ANALYZE on `accessible_tag_ids_for_actor(1, ARRAY[1,2,3,4,5,6,7]::int[])` showed the CTE body inlined directly (no "Function Scan" node). Retained here for future re-verification after Phase 3 access-table migration.
 - **Tax-id round-trip** — verify `Cipher.Decrypt` on an empty-but-non-NULL bytea cleanly yields `""` against live Postgres. Inspect raw column (`SELECT encode(ssn, 'hex') FROM natural_persons WHERE entity_id = <id>;`) to confirm the plaintext SSN bytes are NOT present.
@@ -14,7 +14,7 @@ This file tracks pending manual verification and deferred work for `core-module`
 
 - `EntityService.GetByID` returns `ErrNotFound` unconditionally — no caller uses it today; sqlc query was never added. Add when needed.
 - `ServiceAccountService.UpdateByEntityUUID` returns `ErrInvalidInput` because no `UpdateServiceAccount` sqlc query exists. Wiring is in place; the sentinel is misleading (should be `ErrNotImplemented` → 501) until the query lands.
-- Entity forms (`<NaturalPersonForm>`, `<CorporationForm>`, `<ServiceAccountForm>`) exist in core-gui but the admin user-edit page in users-module renders its own inline form. Consolidation deferred ("leave admin pages alone — we can consolidate later").
+- Entity forms (`<NaturalPersonForm>`, `<CorporationForm>`, `<ServiceAccountForm>`) exist in core-gui but the admin user-edit page in mod-users renders its own inline form. Consolidation deferred ("leave admin pages alone — we can consolidate later").
 
 ## Tax-id encryption — future hardening
 
@@ -25,7 +25,7 @@ This file tracks pending manual verification and deferred work for `core-module`
 
 These surfaced during the round and are not blocking; capture before context-clear:
 
-- **`GrantTableGenerator` + slug-list maintenance.** `users-module/api/cmd/server/main.go` hardcodes the slug list passed to `setup.ApplyFuncs`; `GrantTableGenerator.GenerateForResource` hardcodes per-slug bodies. Adding a new entity type requires updating both. Acceptable today; defer a registration helper until a real new-entity-type scenario.
+- **`GrantTableGenerator` + slug-list maintenance.** `mod-users/api/cmd/server/main.go` hardcodes the slug list passed to `setup.ApplyFuncs`; `GrantTableGenerator.GenerateForResource` hardcodes per-slug bodies. Adding a new entity type requires updating both. Acceptable today; defer a registration helper until a real new-entity-type scenario.
 - **`EntityResolver.AllowNotFound` is unused.** No resource has opted into 404 transparency. Reasonable default for a privacy-conservative system; flag if a UI starts relying on 404 to distinguish missing vs. forbidden.
 
 ## Phase 3: trigger-maintained access tables

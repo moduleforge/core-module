@@ -1,14 +1,14 @@
 # ---------------------------------------------------------------------------
-# core-module entities API — OpenAPI 3.0.3 fragment
+# mod-core entities API — OpenAPI 3.0.3 fragment
 #
 # This is a FRAGMENT, not a standalone service spec. It is meant to be
 # composed into a consumer's root spec via $ref. For example:
 #
 #   paths:
 #     /self:
-#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1self'
+#       $ref: '../../mod-core/api/openapi.fragment.yaml#/paths/~1self'
 #     /entities/natural-persons:
-#       $ref: '../../core-module/api/openapi.fragment.yaml#/paths/~1entities~1natural-persons'
+#       $ref: '../../mod-core/api/openapi.fragment.yaml#/paths/~1entities~1natural-persons'
 #
 # The fragment intentionally omits `servers:` because the mounting path and
 # host are determined by each consuming service.
@@ -17,11 +17,11 @@
 openapi: "3.0.3"
 
 info:
-  title: core-module entities API
+  title: mod-core entities API
   version: "0.1.0"
   description: |
     Reusable OpenAPI fragment that describes the /entities/* routes owned by
-    core-module. Consuming services (e.g. users-module) compose this fragment
+    mod-core. Consuming services (e.g. mod-users) compose this fragment
     into their own root spec via $ref rather than duplicating the definitions.
 
 # ---------------------------------------------------------------------------
@@ -36,9 +36,9 @@ security:
 # ---------------------------------------------------------------------------
 paths:
 
-  # /self is NOT defined here — core-module has no users/auth concept and
+  # /self is NOT defined here — mod-core has no users/auth concept and
   # cannot compose a meaningful identity response on its own. Consumers
-  # that own a users layer (e.g. users-module) define their own /self and
+  # that own a users layer (e.g. mod-users) define their own /self and
   # use core's EntityService.GetSelf helper for the entity portion.
 
   # --------------------------------------------------------------------------
