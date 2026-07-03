@@ -1,7 +1,6 @@
 package setup_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
@@ -192,12 +191,21 @@ func TestGrantTableGenerator_Tag(t *testing.T) {
 	if !strings.Contains(body, "p_op_ids") {
 		t.Errorf("body missing p_op_ids reference; got:\n%s", body)
 	}
-	// Must reference owner_id and subject_id (tag "own" semantics).
-	if !strings.Contains(body, "owner_id") {
+	// Type-scoped own semantics: the generic own-arm keys on owner_id, scoped to
+	// the tag type. The subject_id access predicate has been dropped (subject_id
+	// remains a data column; it is no longer used for access), and the body no
+	// longer references the downstream tags table.
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'tag')") {
+		t.Errorf("tag body missing type predicate; got:\n%s", body)
+	}
+	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
 		t.Errorf("tag body missing owner_id own-clause; got:\n%s", body)
 	}
-	if !strings.Contains(body, "subject_id") {
-		t.Errorf("tag body missing subject_id own-clause; got:\n%s", body)
+	if strings.Contains(body, "subject_id") {
+		t.Errorf("tag body must not reference subject_id (access predicate dropped); got:\n%s", body)
+	}
+	if strings.Contains(body, "FROM tags") {
+		t.Errorf("tag body must not reference the downstream tags table; got:\n%s", body)
 	}
 }
 
@@ -211,9 +219,12 @@ func TestGrantTableGenerator_NaturalPerson(t *testing.T) {
 	if !strings.Contains(body, "ActorChain") {
 		t.Errorf("body missing ActorChain CTE; got:\n%s", body)
 	}
-	// Own predicate: entity_id = actor.
-	if !strings.Contains(body, "np.entity_id = p_actor_entity_id") {
+	// Own predicate: owner_id = actor (owns-itself convention), scoped to type.
+	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
 		t.Errorf("natural_person body missing self-access clause; got:\n%s", body)
+	}
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'natural_person')") {
+		t.Errorf("natural_person body missing type predicate; got:\n%s", body)
 	}
 }
 
@@ -224,12 +235,15 @@ func TestGrantTableGenerator_Corporation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Corporations: no "own" clause since non-admins are never corporations.
-	// The body should NOT contain an actor-equality own-predicate.
-	if strings.Contains(body, "c.entity_id = p_actor_entity_id") {
-		t.Errorf("corporation body must not include self-access clause; got:\n%s", body)
+	// Under the shared generic template the corporation body DOES contain the
+	// own-arm text (e.owner_id = p_actor_entity_id). The "corporations have no
+	// self-access" invariant now lives in the ownership data model — corporation
+	// entities keep a NULL owner_id, so the own-arm matches nothing — and is
+	// verified by DB/integration tests, not by SQL-text inspection here.
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'corporation')") {
+		t.Errorf("corporation body missing type predicate; got:\n%s", body)
 	}
-	// But must still include the grants CTE path.
+	// Must still include the grants CTE path.
 	if !strings.Contains(body, "TargetChain") {
 		t.Errorf("corporation body missing TargetChain CTE; got:\n%s", body)
 	}
@@ -242,12 +256,15 @@ func TestGrantTableGenerator_LegalEntity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Must compose via the concrete sub-type functions (as before).
-	if !strings.Contains(body, "accessible_natural_person_ids_for_actor") {
-		t.Errorf("legal_entity body missing natural_person delegation; got:\n%s", body)
+	// Post-refactor legal_entity routes through the same generic body: the type
+	// predicate matches both natural_person and corporation (they descend from
+	// legal_entity), so the old delegation to the concrete sub-type functions is
+	// gone.
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'legal_entity')") {
+		t.Errorf("legal_entity body missing type predicate; got:\n%s", body)
 	}
-	if !strings.Contains(body, "accessible_corporation_ids_for_actor") {
-		t.Errorf("legal_entity body missing corporation delegation; got:\n%s", body)
+	if strings.Contains(body, "accessible_natural_person_ids_for_actor") {
+		t.Errorf("legal_entity body must not delegate to sub-type functions; got:\n%s", body)
 	}
 }
 
@@ -258,21 +275,32 @@ func TestGrantTableGenerator_ServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(body, "sa.entity_id = p_actor_entity_id") {
+	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
 		t.Errorf("service_account body missing self-access clause; got:\n%s", body)
+	}
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'service_account')") {
+		t.Errorf("service_account body missing type predicate; got:\n%s", body)
 	}
 }
 
-func TestGrantTableGenerator_UnknownSlug(t *testing.T) {
+func TestGrantTableGenerator_InvalidSlugFormat(t *testing.T) {
 	t.Parallel()
 	gen := setup.NewGrantTableGenerator()
-	_, err := gen.GenerateForResource("unknown_resource")
-	if err == nil {
-		t.Fatal("expected error for unknown slug; got nil")
+	// The error path now signals a malformed slug (SQL-injection guard on the
+	// interpolated slug), not an unknown slug.
+	for _, bad := range []string{"bad slug; DROP", "Tag'"} {
+		if _, err := gen.GenerateForResource(bad); err == nil {
+			t.Errorf("expected error for malformed slug %q; got nil", bad)
+		}
 	}
-	// Confirm it's not a wrapped sentinel — just a plain error.
-	if errors.Is(err, errors.New("dummy")) {
-		t.Error("unexpected sentinel error type")
+	// A well-formed but previously-unknown slug still generates a body: mod-core
+	// has no allow-list, so a resource type it has never heard of works.
+	body, err := gen.GenerateForResource("widget")
+	if err != nil {
+		t.Fatalf("well-formed slug %q: unexpected error: %v", "widget", err)
+	}
+	if body == "" {
+		t.Errorf("well-formed slug %q: expected non-empty body", "widget")
 	}
 }
 
