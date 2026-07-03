@@ -274,6 +274,30 @@ func (m *mockQuerier) CreateEntity(_ context.Context, fundamentalTypeID int64) (
 	}, nil
 }
 
+func (m *mockQuerier) CreateEntityWithOwner(_ context.Context, arg coredb.CreateEntityWithOwnerParams) (coredb.Entity, error) {
+	id := m.nextSeq()
+	slug := m.slugForTypeID(arg.FundamentalTypeID)
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	row := coredb.GetEntityByUUIDRow{
+		ID:                  id,
+		Uuid:                uuid.New(),
+		FundamentalTypeID:   arg.FundamentalTypeID,
+		FundamentalTypeSlug: slug,
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	m.entities[row.Uuid] = row
+	m.entitiesByID[id] = row
+	return coredb.Entity{
+		ID:                id,
+		Uuid:              row.Uuid,
+		FundamentalTypeID: arg.FundamentalTypeID,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		OwnerID:           arg.OwnerID,
+	}, nil
+}
+
 func (m *mockQuerier) CreateLegalEntity(_ context.Context, entityID int64) (int64, error) {
 	m.legalEntities[entityID] = entityID
 	return entityID, nil

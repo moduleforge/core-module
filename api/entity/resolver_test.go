@@ -33,6 +33,9 @@ func (s *resolverStubQuerier) CreateCorporation(_ context.Context, _ coredb.Crea
 func (s *resolverStubQuerier) CreateEntity(_ context.Context, _ int64) (coredb.Entity, error) {
 	return coredb.Entity{}, nil
 }
+func (s *resolverStubQuerier) CreateEntityWithOwner(_ context.Context, _ coredb.CreateEntityWithOwnerParams) (coredb.Entity, error) {
+	return coredb.Entity{}, nil
+}
 func (s *resolverStubQuerier) CreateLegalEntity(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }

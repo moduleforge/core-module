@@ -35,6 +35,9 @@ func (s *stubQuerier) CreateCorporation(_ context.Context, _ coredb.CreateCorpor
 func (s *stubQuerier) CreateEntity(_ context.Context, _ int64) (coredb.Entity, error) {
 	return coredb.Entity{}, nil
 }
+func (s *stubQuerier) CreateEntityWithOwner(_ context.Context, _ coredb.CreateEntityWithOwnerParams) (coredb.Entity, error) {
+	return coredb.Entity{}, nil
+}
 func (s *stubQuerier) CreateLegalEntity(_ context.Context, _ int64) (int64, error) { return 0, nil }
 func (s *stubQuerier) CreateNaturalPerson(_ context.Context, _ coredb.CreateNaturalPersonParams) (coredb.CreateNaturalPersonRow, error) {
 	return coredb.CreateNaturalPersonRow{}, nil
