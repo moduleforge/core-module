@@ -20,9 +20,10 @@ import (
 //     (only for non-wildcard, targeted grants where target_id IS NOT NULL).
 //   - TargetChain: all members reachable downward from GrantedTarget.
 //
-// Each per-resource body then adds a UNION of:
+// Each generated body then adds a UNION of:
 //  1. The WildcardAdmin arm: returns all rows when WildcardAdmin is non-empty.
-//  2. The per-resource "own" predicate (actor owns the row directly).
+//  2. The generic "own" predicate (actor owns the row directly, scoped to the
+//     requested type).
 //  3. A join against TargetChain to include grant-reachable rows.
 const sharedCTEPrefix = `WITH RECURSIVE
     ActorChain AS (
