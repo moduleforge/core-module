@@ -28,6 +28,7 @@ type Entity struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	ArchivedAt        *time.Time         `json:"archived_at"`
+	OwnerID           pgtype.Int8        `json:"owner_id"`
 }
 
 type LegalEntity struct {

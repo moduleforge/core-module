@@ -1,7 +1,7 @@
 -- name: CreateEntity :one
 INSERT INTO entities (fundamental_type_id)
 VALUES ($1)
-RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at;
+RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at, owner_id;
 
 -- name: GetEntityByUUID :one
 SELECT
