@@ -3,6 +3,11 @@ INSERT INTO entities (fundamental_type_id)
 VALUES ($1)
 RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at, owner_id;
 
+-- name: CreateEntityWithOwner :one
+INSERT INTO entities (fundamental_type_id, owner_id)
+VALUES ($1, $2)
+RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at, owner_id;
+
 -- name: GetEntityByUUID :one
 SELECT
   e.id, e.uuid, e.fundamental_type_id,
