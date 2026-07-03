@@ -209,6 +209,45 @@ func TestGrantTableGenerator_Tag(t *testing.T) {
 	}
 }
 
+func TestGrantTableGenerator_Task(t *testing.T) {
+	t.Parallel()
+	gen := setup.NewGrantTableGenerator()
+	// "task" has no case in GrantTableGenerator (mod-core has never heard of it),
+	// yet the generic body generates correctly for it — the zero-mod-core-code
+	// proof that a new resource type gets row-scoping for free.
+	body, err := gen.GenerateForResource("task")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Must contain the CTE skeleton.
+	if !strings.Contains(body, "ActorChain") {
+		t.Errorf("body missing ActorChain CTE; got:\n%s", body)
+	}
+	if !strings.Contains(body, "TargetChain") {
+		t.Errorf("body missing TargetChain CTE; got:\n%s", body)
+	}
+	if !strings.Contains(body, "p_op_ids") {
+		t.Errorf("body missing p_op_ids reference; got:\n%s", body)
+	}
+	// Type-scoped own semantics, identical shape to every other slug: the type
+	// predicate scopes the own-arm so an actor's rows of other types cannot leak
+	// into the task access function.
+	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'task')") {
+		t.Errorf("task body missing type predicate; got:\n%s", body)
+	}
+	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
+		t.Errorf("task body missing owner_id own-clause; got:\n%s", body)
+	}
+	if !strings.Contains(body, "JOIN TargetChain") {
+		t.Errorf("task body missing granted-target TargetChain join; got:\n%s", body)
+	}
+	// mod-core has no compile-time knowledge of the downstream tasks table; the
+	// body is generated purely from entities + the type hierarchy.
+	if strings.Contains(body, "FROM tasks") {
+		t.Errorf("task body must not reference the downstream tasks table; got:\n%s", body)
+	}
+}
+
 func TestGrantTableGenerator_NaturalPerson(t *testing.T) {
 	t.Parallel()
 	gen := setup.NewGrantTableGenerator()
