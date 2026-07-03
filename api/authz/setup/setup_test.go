@@ -295,12 +295,13 @@ func TestGrantTableGenerator_InvalidSlugFormat(t *testing.T) {
 	}
 	// A well-formed but previously-unknown slug still generates a body: mod-core
 	// has no allow-list, so a resource type it has never heard of works.
-	body, err := gen.GenerateForResource("widget")
+	const wellFormedSlug = "widget"
+	body, err := gen.GenerateForResource(wellFormedSlug)
 	if err != nil {
-		t.Fatalf("well-formed slug %q: unexpected error: %v", "widget", err)
+		t.Fatalf("well-formed slug %q: unexpected error: %v", wellFormedSlug, err)
 	}
 	if body == "" {
-		t.Errorf("well-formed slug %q: expected non-empty body", "widget")
+		t.Errorf("well-formed slug %q: expected non-empty body", wellFormedSlug)
 	}
 }
 

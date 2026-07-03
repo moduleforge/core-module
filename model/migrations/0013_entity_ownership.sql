@@ -1,6 +1,6 @@
 -- +goose Up
 
--- 1. Nullable, self-referential ownership column (matches overview.md).
+-- 1. Nullable, self-referential ownership column.
 --    No ON DELETE clause (default NO ACTION); entities are soft-deleted via
 --    archived_at, so there is no hard-DELETE path for the RI action to guard.
 ALTER TABLE entities
@@ -26,11 +26,11 @@ END;
 $$ LANGUAGE plpgsql;
 -- +goose StatementEnd
 
--- Trigger NAME is chosen deliberately: 'entities_owner_default_self' sorts
+-- Trigger NAME is chosen deliberately: 'entities_owner_self_default' sorts
 -- alphabetically AFTER the existing 'entities_fundamental_type_concrete_check'
 -- ('...f...' < '...o...'), and Postgres fires same-event row triggers in
 -- alphabetical name order, so fundamental_type_id is validated first.
-CREATE TRIGGER entities_owner_default_self
+CREATE TRIGGER entities_owner_self_default
   BEFORE INSERT ON entities
   FOR EACH ROW EXECUTE FUNCTION entities_owner_default_self();
 
@@ -67,7 +67,7 @@ CREATE TRIGGER entities_owner_immutable
 -- Reverse order: drop the two triggers, then the two functions, then the
 -- index, then the column.
 DROP TRIGGER IF EXISTS entities_owner_immutable ON entities;
-DROP TRIGGER IF EXISTS entities_owner_default_self ON entities;
+DROP TRIGGER IF EXISTS entities_owner_self_default ON entities;
 DROP FUNCTION IF EXISTS entities_immutable_owner();
 DROP FUNCTION IF EXISTS entities_owner_default_self();
 DROP INDEX IF EXISTS entities_owner_id_idx;
