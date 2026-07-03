@@ -27,7 +27,7 @@ func (q *Queries) ArchiveEntity(ctx context.Context, argUuid uuid.UUID) error {
 const createEntity = `-- name: CreateEntity :one
 INSERT INTO entities (fundamental_type_id)
 VALUES ($1)
-RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at
+RETURNING id, uuid, fundamental_type_id, created_at, updated_at, archived_at, owner_id
 `
 
 func (q *Queries) CreateEntity(ctx context.Context, fundamentalTypeID int64) (Entity, error) {
@@ -40,6 +40,7 @@ func (q *Queries) CreateEntity(ctx context.Context, fundamentalTypeID int64) (En
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
