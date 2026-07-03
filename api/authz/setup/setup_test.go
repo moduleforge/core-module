@@ -344,6 +344,93 @@ func TestGrantTableGenerator_InvalidSlugFormat(t *testing.T) {
 	}
 }
 
+// --- NoDownstreamTableRefs ---
+
+// downstreamTableRefPatterns is the literal "no per-downstream-resource
+// knowledge" list: substrings that would indicate GrantTableGenerator has
+// compiled-in awareness of a specific downstream resource's table or access
+// function, rather than staying generic over the entities table plus the
+// type hierarchy.
+var downstreamTableRefPatterns = []string{
+	"FROM tags",
+	"FROM tasks",
+	"FROM authz_actor_groups",
+	"FROM authz_target_groups",
+	"accessible_natural_person_ids_for_actor",
+	"accessible_corporation_ids_for_actor",
+}
+
+// TestGrantTableGenerator_NoDownstreamTableRefs is the machine-checkable
+// statement of the plan's architectural goal: GrantTableGenerator emits the
+// same generic, slug-parameterized body for every registered resource type,
+// with zero per-downstream-resource knowledge baked into mod-core. A new
+// resource type gets row-scoping with zero mod-core change.
+func TestGrantTableGenerator_NoDownstreamTableRefs(t *testing.T) {
+	t.Parallel()
+	slugs := []string{
+		"natural_person",
+		"corporation",
+		"service_account",
+		"legal_entity",
+		"tag",
+		"task",
+		"authz_actor_group",
+		"authz_target_group",
+	}
+
+	gen := setup.NewGrantTableGenerator()
+	bodies := make(map[string]string, len(slugs))
+
+	for _, slug := range slugs {
+		t.Run(slug, func(t *testing.T) {
+			t.Parallel()
+			body, err := gen.GenerateForResource(slug)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(body, "ActorChain") {
+				t.Errorf("body missing ActorChain CTE; got:\n%s", body)
+			}
+			if !strings.Contains(body, "TargetChain") {
+				t.Errorf("body missing TargetChain CTE; got:\n%s", body)
+			}
+			if !strings.Contains(body, "p_op_ids") {
+				t.Errorf("body missing p_op_ids reference; got:\n%s", body)
+			}
+			wantTypePredicate := "type_is_or_descends_from(e.fundamental_type_id, '" + slug + "')"
+			if !strings.Contains(body, wantTypePredicate) {
+				t.Errorf("body missing type predicate %q; got:\n%s", wantTypePredicate, body)
+			}
+			if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
+				t.Errorf("body missing owner_id own-clause; got:\n%s", body)
+			}
+		})
+	}
+
+	// Second pass: re-generate (bodies map is independent of t.Run's parallel
+	// subtests above) and assert none of the eight bodies contains any
+	// per-downstream-resource reference. legal_entity is included here too —
+	// post-refactor it no longer delegates to the natural_person/corporation
+	// sub-type functions, so the same zero-knowledge invariant holds across
+	// all eight slugs.
+	for _, slug := range slugs {
+		body, err := gen.GenerateForResource(slug)
+		if err != nil {
+			t.Fatalf("slug %q: unexpected error: %v", slug, err)
+		}
+		bodies[slug] = body
+	}
+
+	for _, slug := range slugs {
+		body := bodies[slug]
+		for _, pattern := range downstreamTableRefPatterns {
+			if strings.Contains(body, pattern) {
+				t.Errorf("slug %q: body must not contain downstream reference %q; got:\n%s", slug, pattern, body)
+			}
+		}
+	}
+}
+
 // --- InterfaceCompliance ---
 
 func TestInterfaceCompliance(t *testing.T) {
