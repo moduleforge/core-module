@@ -27,6 +27,19 @@ This means no migration or application code can retroactively reclassify an enti
 
 [^possiblenamechanges]: While not currently allowed, type name changes may be supported in the future. The type ID would remain immutable in any case, however.
 
+## Entity ownership
+
+Every entity may have an owner: a nullable, self-referential `entities.owner_id BIGINT REFERENCES entities(id)` column, backed by the partial index `entities_owner_id_idx ON entities(owner_id) WHERE owner_id IS NOT NULL`. `owner_id` is the authoritative record of "who owns this entity" for [row-level authorization scoping](authorization-design.md#row-level-scoping) — the [generic access-function body's](authorization-design.md#access-function-shape-phase-2) own-arm reads it directly (`e.owner_id = p_actor_entity_id`), scoped by the requested type.
+
+Two triggers govern `owner_id`, mirroring the rigid-designator pattern above:
+
+- **Owns-itself default** (function `entities_owner_default_self`, trigger `entities_owner_self_default`): fires `BEFORE INSERT`. When `owner_id IS NULL` and the entity's fundamental type descends from `natural_person` or `service_account`, the trigger defaults `owner_id := NEW.id` — a person or service account owns itself unless the caller supplies an explicit `owner_id`. `corporation` and the `authz_actor_group`/`authz_target_group` types are never matched and keep `owner_id = NULL`. The trigger name is chosen to sort alphabetically after `entities_fundamental_type_concrete_check`, so type validation runs first on the same INSERT.
+- **Immutability** (function `entities_immutable_owner`, trigger `entities_owner_immutable`): fires `BEFORE UPDATE OF owner_id`, rejecting any change once a value has been written (`IS DISTINCT FROM`, mirroring `entities_fundamental_type_immutable`). This includes the *first* NULL → non-NULL write made via `UPDATE` — the trigger does not distinguish "setting for the first time" from "changing an existing value." Consequently, any entity that is not self-owning (e.g. a `tag` or a `task`, whose owner is a different actor) must have `owner_id` set at INSERT time, not by a follow-up `UPDATE`. The model layer provides `CreateEntityWithOwner` alongside the unchanged `CreateEntity` for exactly this case (`INSERT INTO entities (fundamental_type_id, owner_id) VALUES (...)`); owning modules (`mod-tags`, `mod-tasks`) call it directly instead of `CreateEntity` followed by an owner `UPDATE`.
+
+Migration `0013_entity_ownership.sql` adds the column and index, backfills existing `natural_person`/`service_account` rows to self-ownership, and creates both triggers — in that order: the backfill runs *before* `entities_owner_immutable` is created, because backfilling afterward would trip the very trigger being added (a NULL → id transition is a `distinct` change even though nothing meaningful changed).
+
+**Local, denormalized owner columns.** Some owning modules retain their own `owner_id` column permanently in addition to `entities.owner_id` — e.g. `mod-tags`' `tags.owner_id` and `mod-tasks`' `tasks.owner_id`. `entities.owner_id` is authoritative for authorization; the local columns remain authoritative for constraints and query shapes `entities.owner_id` cannot support directly (a cross-table `UNIQUE` index is not expressible in Postgres, and a join-based rewrite would reintroduce a sort that a single-table composite index was built to eliminate). Both local columns are immutable after insert and are set from the same value, in the same transaction, as `entities.owner_id`, so the two copies cannot diverge. Downstream modules document their own specific rationale.
+
 ## Append-only registry
 
 The `types` table is append-only per row. New type slugs may be INSERTed; existing rows may not be UPDATEd (except to set/unset `deprecated_at`) and may never be DELETEd. Two triggers enforce this:
