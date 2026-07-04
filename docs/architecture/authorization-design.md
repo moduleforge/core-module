@@ -287,7 +287,11 @@ WITH RECURSIVE
     )
 ```
 
-This is prepended to each per-resource UNION of (a) the "own" predicate (actor owns the row directly) and (b) a JOIN against `TargetChain` to include grant-reachable rows.
+This is prepended to a single **generic** three-arm `UNION`, shared verbatim across every resource slug and parameterized only by the requested resource's type slug: a wildcard-grant arm (visible when the actor holds a wildcard grant), the "own" arm (the [entity ownership](entity-typing.md#entity-ownership) predicate, `e.owner_id = p_actor_entity_id`), and a JOIN against `TargetChain` to include grant-reachable rows. Every arm — including the own arm — carries the same `type_is_or_descends_from(e.fundamental_type_id, '<slug>')` predicate. This is load-bearing, not cosmetic: because ownership is now recorded centrally on `entities.owner_id` rather than being implicit in a per-resource table scan, a single actor may own entities of different types (a tag and a task, say), and the type predicate on the own arm is what keeps one type's rows from leaking into another type's access function.
+
+`corporation` and the two `authz_*_group` types never [receive an owner](entity-typing.md#entity-ownership) — their creation paths never set one — so their generated own-arm text is present but structurally matches nothing. "No self-access" for these types is therefore a data-level invariant (`owner_id IS NULL`), not an omitted SQL clause — verified by DB/integration tests rather than by inspecting the generated SQL text.
+
+`GenerateForResource`'s error return no longer signals an unrecognized resource slug — there is no allow-list of known resources, and `mod-core` has no compile-time knowledge of any downstream resource table (`tags`, `tasks`, `authz_*_group`); a brand-new resource type is served by the same generic body with zero `mod-core` code changes. The error now signals only a malformed slug *format*: an interpolated slug must match `^[a-z][a-z0-9_]*$`, a guard against SQL injection through the slug parameter.
 
 List/search sqlc queries pass `SatisfiedBy("read")` (or the appropriate op slug) as `op_ids`:
 
@@ -312,7 +316,7 @@ For `Authorize(ctx, "update", &target)`:
 2. Short-circuit if actor has `is_admin = true` (current simplification; see below).
 3. Otherwise: recursive-CTE query that walks UP from the actor (via `ActorChain`) and UP from the target (via `TargetChain`), returning `EXISTS(SELECT 1 FROM grants WHERE actor_id IN ActorChain AND target_id IN TargetChain AND operation_id = ANY(op_ids))`.
 
-"Own" semantics for single-row reads are expressed per-resource either as a separate predicate or folded into the access-function body; the impl chooses the cleaner approach per resource.
+With ownership centralized on `entities.owner_id`, "own" semantics for single-row reads no longer require per-resource logic: an implementation can express "does the actor own the target" generically — `EXISTS(SELECT 1 FROM entities WHERE id = p_target_entity_id AND owner_id = p_actor_entity_id)` — or fold the same generic access-function body used for list scoping (see [Access function shape (Phase 2)](#access-function-shape-phase-2)) into the single-row check as an `EXISTS` predicate.
 
 #### `is_admin` short-circuit (current simplification)
 
