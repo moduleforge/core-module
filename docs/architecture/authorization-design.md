@@ -243,14 +243,14 @@ CREATE TABLE grants (
     id           BIGINT PRIMARY KEY,
     actor_id     BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
     operation_id INT    NOT NULL REFERENCES authz_operations(id),
-    target_id    BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    target_id    BIGINT REFERENCES entities(id) ON DELETE CASCADE,
     granted_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     granted_by   BIGINT NOT NULL REFERENCES entities(id),
     UNIQUE (actor_id, operation_id, target_id)
 );
 ```
 
-Both `actor_id` and `target_id` cascade on entity delete. Revoking a grant is a hard delete (not an archive); the unique constraint prevents duplicate grants.
+`target_id` is nullable: `NULL` denotes a wildcard grant, where the actor holds the operation over every entity (the mechanism behind the `WildcardAdmin` arm below). Both `actor_id` and `target_id` cascade on entity delete. Revoking a grant is a hard delete (not an archive); the unique constraint prevents duplicate grants.
 
 #### Access function shape (Phase 2)
 
@@ -272,11 +272,20 @@ WITH RECURSIVE
         FROM authz_actor_group_members agm
         JOIN ActorChain ac ON agm.member_id = ac.aid
     ),
+    WildcardAdmin AS (
+        SELECT 1 AS is_wildcard
+        FROM grants g
+        JOIN ActorChain ac ON g.actor_id = ac.aid
+        WHERE g.operation_id = ANY(p_op_ids)
+          AND g.target_id IS NULL
+        LIMIT 1
+    ),
     GrantedTarget AS (
         SELECT g.target_id AS tid
         FROM grants g
         JOIN ActorChain ac ON g.actor_id = ac.aid
         WHERE g.operation_id = ANY(p_op_ids)
+          AND g.target_id IS NOT NULL
     ),
     TargetChain AS (
         SELECT tid FROM GrantedTarget
