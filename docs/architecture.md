@@ -98,6 +98,7 @@ The GUI part is the user-facing surface for the domain — the React components 
 **Technical goals:**
 
 - **Library-first.** Each module's GUI is a set of reusable components an application composes; it is not a self-contained UI.
+- **Built with a library toolchain, not an app framework.** Each GUI package builds its `dist/` (ESM + CJS + `.d.ts`) with `tsup`; Ladle, the component workbench, runs on Vite. The applications that consume these libraries use a full app framework (Next.js, in this ecosystem — see the aggregate's `docs/apps-architecture.md`), because they solve a different problem: a library must produce an importable package reusable across every consuming app, while an app framework produces one deployable, routable artifact for a single running application. A module GUI built with an app framework instead of a library toolchain cannot be cleanly exported for reuse by a second app — this is why `mod-users`'s GUI was rewritten from Next.js to tsup.
 - **Components stand alone.** A tag editor or a contact form should be droppable into any application without dragging in module-specific app shell, navigation, or auth flows.
 - **TypeScript with public type contracts.** Component props are the API surface; consumers should not need to read implementation files.
 - **Component workbench for component-level development and review.** The workbench renders components in isolation with mocked-or-real data. Ladle is the standard, though individual implementations are free to use Storybook or other frameworks for this purpose.
