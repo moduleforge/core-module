@@ -12,7 +12,7 @@ The module ships three sub-projects:
 - `api/` — Go HTTP handlers, service layer, and all cross-cutting library packages (`github.com/moduleforge/core-api`)
 - `gui/` — TypeScript/React component library (`@moduleforge/core-gui`), published via yalc for local development
 
-See [docs/manifest-spec.md](./docs/mf-standards/manifest-spec.md) for the authoritative manifest specification that describes how mod-core integrates with mfgen and the application composition layer.
+See [docs/mf-standards/manifest-spec.md](./docs/mf-standards/manifest-spec.md) for the authoritative manifest specification that describes how mod-core integrates with mfgen and the application composition layer.
 
 ## Prerequisites
 
@@ -141,7 +141,7 @@ This distinction matters because other modules (e.g. mod-users) also register ro
 
 The manifest specification — which defines the structure of `moduleforge.module.yaml` and the mfgen composition contract — lives at:
 
-[`docs/manifest-spec.md`](./docs/mf-standards/manifest-spec.md)
+[`docs/mf-standards/manifest-spec.md`](./docs/mf-standards/manifest-spec.md)
 
 This is the authoritative reference for `provides`, `requires`, `routes`, `observers`, and `migrations.range` fields.
 
