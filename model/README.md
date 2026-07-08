@@ -7,7 +7,7 @@ base entity hierarchy: `entities`, `legal_entities`, `natural_persons`,
 that any downstream module can depend on a stable, shared identity schema
 without pulling in mod-users application logic.
 
-See [../docs/architecture/db-considerations.md](../docs/architecture/db-considerations.md)
+See [../docs/mf-standards/architecture/db-considerations.md](../docs/mf-standards/architecture/db-considerations.md)
 for the rationale behind the Postgres + goose choices.
 
 ## Layout
