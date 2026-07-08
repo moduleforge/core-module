@@ -1,6 +1,6 @@
 # mod-core — next steps
 
-This file tracks pending manual verification and deferred work for `mod-core`. Architecture decisions made across the cross-cutting framework rounds and the SQL access-function refactor are documented in `docs/architecture/` and indexed by `plan/report.phase-1-sql-access-fn-handoff.md` at the user-components root.
+This file tracks pending manual verification and deferred work for `mod-core`. Architecture decisions made across the cross-cutting framework rounds and the SQL access-function refactor are documented in `docs/mf-standards/architecture/` and indexed by `plan/report.phase-1-sql-access-fn-handoff.md` at the user-components root.
 
 ## Pending manual verification (needs live stack / DB)
 

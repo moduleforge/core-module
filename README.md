@@ -27,4 +27,4 @@ make build
 make test
 ```
 
-See [AGENTS.md](./AGENTS.md) for full environment setup, build commands, sqlc codegen workflow, and package descriptions. See [docs/manifest-spec.md](./docs/manifest-spec.md) for the module manifest specification.
+See [AGENTS.md](./AGENTS.md) for full environment setup, build commands, sqlc codegen workflow, and package descriptions. See [docs/manifest-spec.md](./docs/mf-standards/manifest-spec.md) for the module manifest specification.
