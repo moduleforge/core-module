@@ -13,7 +13,7 @@
 -- explicitly dropped before the 2-arg form is created so Postgres overloading
 -- does not leave a stale 1-arg variant in the schema.
 --
--- See core-module/docs/architecture/authorization-design.md "Row-level scoping".
+-- See docs/mf-standards/architecture/authorization-design.md "Row-level scoping".
 
 -- +goose StatementBegin
 DROP FUNCTION IF EXISTS accessible_natural_person_ids_for_actor(BIGINT);
