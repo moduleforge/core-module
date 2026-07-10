@@ -67,7 +67,7 @@ make migrate.new NAME=add_foo_column  # create a new numbered migration file
 
 The default `DATABASE_URL` is `postgresql://core:core@localhost:5432/core?sslmode=disable`. Override by setting the environment variable before invoking make.
 
-**Migration range: 1–99.** mod-core owns migration numbers 1 through 99. Other modules start at higher numbers. Do not add core migrations outside this range.
+**No cross-module range coordination.** Each module — including mod-core — numbers its own migrations independently starting from 1, tracked in its own dedicated `goose_db_version_<module>` table (mod-core's is `goose_db_version_core`), so no two modules can collide regardless of numbering. Cross-module ordering, where required, is declared via the module manifest's `migrations.after` edge; mod-core is the star-topology root and needs no `after:` edge. Migrations are applied automatically at host-application startup via `model/migrations.Migrate`. See [`docs/mf-standards/manifest-spec.md`](./docs/mf-standards/manifest-spec.md) §5 for the full convention.
 
 ## Code generation (sqlc)
 
@@ -151,5 +151,5 @@ This is the authoritative reference for `provides`, `requires`, `routes`, `obser
 - **Handlers are thin** — parse input, call one service method, shape response. No business logic in handlers.
 - **Authorization is checked first** in every service method, before any data access.
 - **Generated code (`model/db/`) is committed** and must not be edited by hand. Re-run `make gen` after any query change.
-- **Migration numbers 1–99 are reserved** for mod-core. Do not add core migrations above 99; other modules start at 100+.
+- **Migration numbers are module-local.** mod-core's `model/migrations/` numbers independently starting from 1, isolated in the `goose_db_version_core` tracking table; there is no cross-module range to collide with (see [Database migrations](#database-migrations) above).
 - **Observer policy**: pass `observer.NewObserverGroup()` (no-op) when you don't need observation. Use `MustObserve` when an observer failure should abort the operation; use `MayObserve` when best-effort is acceptable.
