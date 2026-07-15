@@ -18,7 +18,7 @@ phases:
             branch: phase-01-task-01-create-apiresp-package
             commit:
                 - ba740fd
-            merge: null
+            merge: 359e35be54a90cf688c9baeae3489bb4d188b429
         - number: 2
           slug: dogfood-migrate-mod-core
           title: Dogfood Migrate Mod-Core
