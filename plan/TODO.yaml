@@ -71,7 +71,7 @@ phases:
             branch: phase-02-task-03-error-widgets
             commit:
                 - 6d187a6
-            merge: null
+            merge: 77b69ae457a6619f23aa324f103bef632720cdc5
         - number: 4
           slug: use-api-error-hook
           title: useApiError Hook
