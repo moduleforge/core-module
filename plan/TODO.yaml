@@ -26,3 +26,7 @@ phases:
             branch: null
             commit: []
             merge: null
+    - number: 2
+      slug: gui-error-widgets
+      title: GUI Error Widgets
+      tasks: []
