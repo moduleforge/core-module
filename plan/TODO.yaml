@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: dogfood-migrate-mod-core
+          title: Dogfood Migrate Mod-Core
+          path: phase-01-apiresp-go/002-dogfood-migrate-mod-core.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
