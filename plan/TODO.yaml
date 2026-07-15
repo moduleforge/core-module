@@ -27,7 +27,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-01-task-02-dogfood-migrate-mod-core
-            commit: []
+            commit:
+                - 9d531ff
             merge: null
     - number: 2
       slug: gui-error-widgets
