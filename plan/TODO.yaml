@@ -64,7 +64,7 @@ phases:
           slug: error-widgets
           title: Error Widgets
           path: phase-02-gui-error-widgets/003-error-widgets.md
-          done: false
+          done: true
           tier: sonnet-med
           digest: Implemented <FieldError> and <ErrorBanner> as presentational-only widgets per the surface-classification table. FieldError binds one task-001 FieldError to an input with role=alert and optional id for aria-describedby, rendering nothing for undefined/null. ErrorBanner wraps the existing Alert/AlertTitle/AlertDescription (variant=destructive) as the mod-core/gui promotion of mod-users' ErrorMessage, accepting a string, message-bearing object, or title/description pair via ErrorBannerData. Both exported from gui/src/index.ts. No new dependency; typecheck and build pass.
           git:
