@@ -44,7 +44,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-02-task-01-client-foundation
-            commit: []
+            commit:
+                - cd00c60
             merge: null
         - number: 2
           slug: toast-provider
