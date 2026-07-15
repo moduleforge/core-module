@@ -90,13 +90,14 @@ All packages below live under `api/` (`github.com/moduleforge/core-api`).
 | `entity/` | `Entity` interface + concrete service-layer types (`LegalEntity`, `NaturalPerson`, `Corporation`, `ServiceAccount`). These are not DB row structs; they carry the resource slug, internal entity ID, and public UUID. |
 | `observer/` | `MutationObserver` interface and `ObserverGroup` concrete type. `ObserverGroup` fans out to N observers in parallel with configurable error policy (`PolicyPropagate` / `PolicySwallow`). Provides `Observe`, `MustObserve`, `MayObserve` per-call-site policy overrides, and `ObserveAfterCommit` for post-tx hooks. |
 | `fieldcrypto/` | Public façade for the AES-256-GCM field cipher. Reads `CORE_FIELD_KEY_HEX` from the environment. Implementation lives in `internal/fieldcrypto/`; this package re-exports only what callers outside core need. |
-| `service/` | `Services` aggregate wrapping `EntityService`, `NaturalPersonService`, `CorporationService`, and `ServiceAccountService`. Constructed via `service.New(...)` and passed to `httpapi.NewRouter`. |
+| `service/` | `Services` aggregate wrapping `EntityService`, `NaturalPersonService`, `CorporationService`, and `ServiceAccountService`. Constructed via `service.New(...)` and passed to `httpapi.NewRouter`. Its sentinel errors (`ErrNotFound`, `ErrForbidden`, `ErrInvalidInput`, `ErrConflict`) alias the canonical `apiresp` sentinels below. |
 | `authz/` | `Authorizer` and `OpResolver` interfaces. Implementations are consumer-supplied (e.g. mod-authz); this package defines only the contracts. |
 | `types/` | `Resolver` that maps `fundamental_type_slug` strings to internal type IDs. Populated once at startup from the `types` table; safe to cache for process lifetime. |
 | `display/` | Per-`(typeSlug, fieldName)` renderer registry. Modules register renderers for their own entity kinds; the registry dispatches at render time. |
 | `opctx/` | Typed context accessors for `ActorEntityID`, `SudoActorEntityID`, and `RequestID`. Set by HTTP middleware; consumed by service methods and the `Authorizer`. |
 | `txhelper/` | Thin transaction-helper utilities used by service methods to open and commit pgx transactions. |
-| `httpapi/` | Chi router wiring and HTTP handlers for `/entities/*` routes. `httpapi.NewRouter(deps)` returns a mountable `chi.Router`. |
+| `apiresp/` | Canonical shared response/error contract: the sentinel set (`ErrUnauthenticated`, `ErrForbidden`, `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`), `WriteJSON` (bare success encoder), `WriteError` (sentinel→status/code mapper and nested `{error:{code,message,details?}}` envelope encoder; logs 5xx via `slog` with request context and never leaks raw error text in the response body), and `InvalidInput(...)` (field-error builder producing the `FieldError`-carrying error `WriteError` surfaces as `details`). Every ModuleForge module is expected to import this in place of a copy-pasted response trio; mod-core's own `httpapi` package dogfoods it. |
+| `httpapi/` | Chi router wiring and HTTP handlers for `/entities/*` routes. `httpapi.NewRouter(deps)` returns a mountable `chi.Router`. Success and error responses are written via `apiresp.WriteJSON`/`apiresp.WriteError`. |
 
 Model packages (`github.com/moduleforge/core-model`):
 
@@ -105,6 +106,17 @@ Model packages (`github.com/moduleforge/core-model`):
 | `model/db/` | sqlc-generated Go query code. Do not edit by hand; regenerate with `make gen`. |
 | `model/migrations/` | goose migration files for the full entity hierarchy (`entities`, `legal_entities`, `natural_persons`, `corporations`, `service_accounts`). |
 | `model/queries/` | SQL query files consumed by sqlc, one file per entity kind. |
+
+### gui/ error and toast toolkit
+
+`@moduleforge/core-gui` (`gui/`) also ships a shared error/toast toolkit consumed by other modules' GUI packages:
+
+- **`gui/src/lib/api-client.ts`** — wire types (`FieldError`, `ApiError`, `ApiErrorResponse`), the `ApiRequestError` class (`code`/`status`/`details`), and a shared typed `request()` fetch wrapper. `request()` synthesizes `network_error`/status 0 on transport failure, redirects on `401` (`unauthenticated`) unless `skipAuthRedirect` is set, and never redirects on `403` (`forbidden`). Token storage and the redirect action are injectable via `configureApiClient({ getToken, onUnauthenticated })`, with an SSR-safe browser default.
+- **`<FieldError>`** (`gui/src/FieldError.tsx`) and **`<ErrorBanner>`** (`gui/src/ErrorBanner.tsx`) — presentational widgets binding a `FieldError`/`ApiError` to inline field-level and banner-level rendering; `<ErrorBanner>` wraps the existing `Alert` `destructive` variant.
+- **`ToastProvider`/`useToast`** (`gui/src/lib/toast-context.tsx`, primitives in `gui/src/ui/toast.tsx`) — the transient/global toast surface, built on the existing `radix-ui` Toast primitive (no new dependency).
+- **`useApiError(error, { fields? })`** (`gui/src/lib/use-api-error.ts`) — the single place the field/banner/toast routing rule lives: field-bound `details[]` entries go to `fieldErrors`; top-level `forbidden`/`not_found`/`conflict`/`invalid_input` (and unmatched `details[]` entries) go to `bannerError`; `network_error`/`internal_error`/rollback errors are dispatched to the toast provider; `unauthenticated` is never surfaced inline.
+
+All of the above are exported from `gui/src/index.ts`.
 
 ## mountFromModule special case
 
