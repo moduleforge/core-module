@@ -25,3 +25,8 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Phase-02 security review (security-001, suggestion/medium-confidence): request() (gui/src/lib/api-client.ts ~106-119) attaches the bearer token to whatever URL the caller passes, with no same-origin/allow-listed-host check. Not exploitable from anything in this diff (no consumer wired yet) - risk depends entirely on how a future consumer calls request(). Consider an optional allowedOrigins/base-URL guard in configureApiClient or request(), or document the implicit same-origin assumption in the doc comment.'
+    - title: Default token storage uses localStorage
+      id: pBoG
+      date: "2026-07-15"
+      tag: phase-02-gui-error-widgets
+      text: 'Phase-02 security review (security-002, suggestion/low-confidence): default ApiClientAuthHandler (gui/src/lib/api-client.ts ~50-60) stores/reads the bearer token via window.localStorage, readable by any script on the page (XSS-exfiltrable). Intentionally mirrors existing mod-users behavior per code comment, not a new regression; configureApiClient seam already lets consumers substitute a safer strategy. No action needed now - revisit if/when the project moves toward httpOnly-cookie or in-memory-token storage.'
