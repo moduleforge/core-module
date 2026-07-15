@@ -29,4 +29,14 @@ phases:
     - number: 2
       slug: gui-error-widgets
       title: GUI Error Widgets
-      tasks: []
+      tasks:
+        - number: 1
+          slug: client-foundation
+          title: Client Foundation
+          path: phase-02-gui-error-widgets/001-client-foundation.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
