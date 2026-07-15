@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 )
@@ -21,13 +22,13 @@ type createCorporationRequest struct {
 // createCorporation handles POST /entities/corporations (admin only).
 func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	var req createCorporationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
@@ -40,7 +41,7 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 	// The service manages its own transaction internally via txhelper.Run.
 	corp, entityUUID, err := h.d.Services.Corporation.Create(r.Context(), h.d.Services.Querier(), in)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
@@ -55,29 +56,29 @@ func (h *handlers) createCorporation(w http.ResponseWriter, r *http.Request) {
 		resp["tax_id"] = req.EIN
 		resp["tax_id_type"] = "EIN"
 	}
-	jsonOK(w, http.StatusCreated, resp)
+	apiresp.WriteJSON(w, http.StatusCreated, resp)
 }
 
 // getCorporation handles GET /entities/corporations/{uuid}.
 func (h *handlers) getCorporation(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	profile, err := h.d.Services.Corporation.GetByEntityUUID(r.Context(), h.d.Services.Querier(), entityUUID)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	apiresp.WriteJSON(w, http.StatusOK, profileResponse(profile))
 }
 
 // updateCorporationRequest is the body for PUT /entities/corporations/{uuid}.
@@ -92,19 +93,19 @@ type updateCorporationRequest struct {
 // updateCorporation handles PUT /entities/corporations/{uuid} (admin only).
 func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	var req updateCorporationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
@@ -120,15 +121,15 @@ func (h *handlers) updateCorporation(w http.ResponseWriter, r *http.Request) {
 		entityUUID,
 		in,
 	); err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
 	profile, err := h.d.Services.Corporation.GetByEntityUUID(r.Context(), h.d.Services.Querier(), entityUUID)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	apiresp.WriteJSON(w, http.StatusOK, profileResponse(profile))
 }

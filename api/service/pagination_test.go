@@ -8,10 +8,10 @@ import (
 
 func TestPagination_Normalize(t *testing.T) {
 	tests := []struct {
-		name        string
-		p           service.Pagination
-		wantLimit   int32
-		wantOffset  int32
+		name       string
+		p          service.Pagination
+		wantLimit  int32
+		wantOffset int32
 	}{
 		{
 			name:       "zero values yield defaults",

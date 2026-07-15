@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/opctx"
 )
 
@@ -13,41 +14,41 @@ import (
 // profile, picking the appropriate subtype automatically.
 func (h *handlers) getEntity(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	profile, err := h.d.Services.Entity.ResolveProfile(r.Context(), h.d.Services.Querier(), entityUUID)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	apiresp.WriteJSON(w, http.StatusOK, profileResponse(profile))
 }
 
 // archiveEntity handles DELETE /entities/{uuid} (admin only) — soft-deletes
 // an entity by setting archived_at.
 func (h *handlers) archiveEntity(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	if err := h.d.Services.Entity.Archive(r.Context(), h.d.Services.Querier(), entityUUID); err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 

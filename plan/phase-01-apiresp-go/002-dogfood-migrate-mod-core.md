@@ -118,3 +118,59 @@ architectural_impact: true
 - After `api/httpapi/response.go` is reduced to `profileResponse` and delegates to `apiresp`.
 - After migrating each handler file's call-sites.
 - After updating the tests to the nested envelope and adding `ErrConflict` coverage; full suite green.
+
+## Status
+
+**Outcome:** validation failed (single check; all Requirements implemented and functionally verified
+green — see below). **Date:** 2026-07-15.
+
+All five `## Requirements` are implemented:
+
+1. `api/service/errors.go` now aliases `apiresp.ErrNotFound` / `ErrForbidden` / `ErrInvalidInput`, and
+   adds `ErrConflict = apiresp.ErrConflict`.
+2. `api/httpapi/response.go` no longer defines `jsonOK`/`jsonErr`/`writeServiceErr`; only
+   `profileResponse` remains.
+3. All four handler files (`entities.go`, `corporations.go`, `natural_persons.go`,
+   `service_accounts.go`) route success through `apiresp.WriteJSON` and errors through
+   `apiresp.WriteError(w, r, err)`. The 401 missing-actor path now returns `apiresp.ErrUnauthenticated`
+   (code `unauthenticated`, status 401 unchanged); the 400 bad-JSON/bad-UUID paths now return
+   `apiresp.ErrInvalidInput` (code `invalid_input`, status 400 unchanged).
+4. `handlers_test.go`'s `TestWriteServiceErr_MapsCorrectly` was retargeted to
+   `TestServiceErr_MapsCorrectly`, calling `apiresp.WriteError` directly and decoding the nested
+   `{"error":{"code":...}}` shape. No other test in `api/httpapi` decoded an error body, so no other
+   test needed updating (confirmed by `grep -rn '"error"' api/httpapi/*_test.go` pre-change).
+5. `TestServiceErr_MapsCorrectly` adds a `service.ErrConflict` → 409 `conflict` case, satisfying the
+   `ErrConflict` coverage requirement at the mod-core level (`apiresp`'s own suite already covers
+   `apiresp.ErrConflict` directly).
+
+**Validation results:**
+
+- `grep -rn "jsonOK\|jsonErr\|writeServiceErr" api/httpapi/` — passed. Only remaining match is inside a
+  doc comment in the new `TestServiceErr_MapsCorrectly` (explaining what the test replaces), which the
+  check's "outside comments/history" carve-out permits.
+- `api/httpapi/response.go` no longer defines the trio — passed (confirmed by inspection and by the
+  grep above).
+- `api/service/errors.go` aliases the apiresp sentinels and defines `ErrConflict` — passed.
+- `cd api && go build ./...` — passed, exit 0, no output.
+- `cd api && make test` — passed, all packages `ok`, including `httpapi` and the updated tests.
+- `cd api && make lint` — **failed**. `go vet ./...` is clean. `gofmt` reports 7 files needing
+  formatting: `display/registry_test.go`, `entity/entity_test.go`, `entity/resolver_test.go`,
+  `internal/fieldcrypto/fieldcrypto.go`, `opctx/opctx.go`, `service/pagination_test.go`,
+  `service/tax_id_test.go`. **None of these files are touched by this task's diff** (confirmed via
+  `git diff --stat` against the task's commits) and the same gofmt debt is present unchanged at the
+  branch's base commit (`b8e2a5b`, the point this worktree was cut from, which already carries task
+  001) — i.e. this is pre-existing repository debt, last touched by commit `54a2512` well before this
+  plan began, unrelated to `apiresp`/`service.errors`/`httpapi` response-writing work. `gofmt -l` on
+  every file this task actually created or modified reports no issues.
+- Manual spot check (nested envelope + no raw-text leak on 5xx) — passed: verified via an ad hoc test
+  invoking `apiresp.WriteError` with a raw error containing a fake credential string; response body
+  was `{"error":{"code":"internal_error","message":"an internal error occurred"}}` — the raw text
+  appeared only in the server-side `slog` line, never in the HTTP response body.
+
+**Assumptions applied:** both `## Assumptions` bullets held — task 001's `api/apiresp` package was
+present as expected, and no existing test asserted the literal `unauthorized`/`bad_request` code
+strings (confirmed by re-grep before editing).
+
+**Files touched:** `api/service/errors.go`, `api/httpapi/response.go`, `api/httpapi/entities.go`,
+`api/httpapi/corporations.go`, `api/httpapi/natural_persons.go`, `api/httpapi/service_accounts.go`,
+`api/httpapi/handlers_test.go`.
