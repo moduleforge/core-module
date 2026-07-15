@@ -76,7 +76,7 @@ phases:
           slug: use-api-error-hook
           title: useApiError Hook
           path: phase-02-gui-error-widgets/004-use-api-error-hook.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: 'Implemented useApiError in gui/src/lib/use-api-error.ts as the single place the design doc''s surface-classification rule lives: unauthenticated/null errors surface nothing; forbidden/not_found/conflict/invalid_input split details[] into field-bound (fieldErrors) vs banner-bound (bannerError); everything else (network_error, internal_error, unrecognized/rollback) toast-dispatched via useEffect keyed on the error instance. Whole-package typecheck and build pass; no new dependency; full Phase-02 export surface (useApiError, ToastProvider, useToast, FieldError, ErrorBanner, ApiRequestError, request) confirmed reachable from package root. Closes out Phase 02.'
           git:
