@@ -91,3 +91,50 @@ architectural_impact: true
 - After `useApiError`'s classification returns correct `fieldErrors`/`bannerError`.
 - After toast dispatch is wired via `useEffect` + `useToast`.
 - After finalizing `gui/src/index.ts` and a clean whole-package typecheck + build.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- **Summary:** Implemented `useApiError(error, { fields? })` in `gui/src/lib/use-api-error.ts`.
+  Routing exactly per the design doc's Surface classification table:
+  - `error.code === 'unauthenticated'` (or `null`/`undefined` error) → `{ fieldErrors: {}, bannerError:
+    null }`, no toast — guarded explicitly in case it ever reaches the hook despite `request()`'s
+    redirect.
+  - `forbidden` / `not_found` / `conflict` / `invalid_input` → inline: each `details[]` entry whose
+    `field` is in the caller-supplied `options.fields` iterable is routed to `fieldErrors` (keyed by
+    field name); every unbound entry, and the top-level `{code, message}` when nothing matched at all,
+    is routed to `bannerError` (shaped as `{code, message}`, directly assignable to
+    `<ErrorBanner error={bannerError} />`'s `Pick<ApiError, 'message'>` branch).
+  - Every other code (`network_error`, `internal_error`, any unrecognized/other code — covering a
+    caller-synthesized optimistic-rollback error too) → toast-worthy: dispatched via `useToast` inside a
+    `useEffect` keyed on `[error, toast]` (the `error` *instance*, not a derived value), so a re-render
+    with the same error object does not enqueue a duplicate toast, and a new `ApiRequestError` instance
+    (the next failed request) toasts again.
+  - Field/banner classification is computed directly during render (no `useMemo`) per the React
+    standard's "do not memoize by default"; only the toast side-effect needs the effect.
+- **Barrel finalization:** added `export * from './use-api-error';` to `gui/src/lib/index.ts`. No edit
+  to `gui/src/index.ts` itself was needed — it already re-exports everything through `export * from
+  './lib'`, `export * from './lib/toast-context'`, and the explicit `FieldError`/`ErrorBanner` exports
+  landed by tasks 002/003, so the new hook's exports (`useApiError`, `UseApiErrorOptions`,
+  `UseApiErrorResult`, `FieldErrors`, `BannerError`) flow through automatically with no new name
+  collisions (checked against `ui/index.ts` and `lib/toast-context.tsx`'s export names before landing).
+  The pre-existing `FieldError` component-vs-wire-type collision from task 003 (resolved there via
+  explicit named re-exports) was left untouched, per the dispatch note.
+- **Toolchain note:** `gui/node_modules` was not present in this fresh worktree even though
+  `dependencies_installed` was passed as `none`; ran `bun install --frozen-lockfile` inside `gui/` to
+  obtain `tsc`/`tsup`, matching the pattern noted by the phase-02 sibling tasks. It resolved exactly
+  against the committed `gui/bun.lock` with no diff.
+- **Validation:** `cd gui && bun run typecheck` (tsc --noEmit) passes clean; `cd gui && bun run build`
+  (tsup, cjs+esm+dts) succeeds; `gui/dist/index.d.ts`'s final `export { ... }` line confirms
+  `useApiError`, `ToastProvider`, `useToast`, `FieldError`, `ErrorBanner`, `ApiRequestError`, and
+  `request` are all reachable from the package root; `git diff gui/package.json` and `git diff
+  gui/bun.lock` are both empty (no new dependency).
+- **Assumptions applied:** tasks 001/002/003 had already landed on the plan branch this worktree was
+  cut from, exactly as the task doc's `## Assumptions` states — confirmed by reading
+  `gui/src/lib/api-client.ts`, `gui/src/lib/toast-context.tsx`, `gui/src/FieldError.tsx`, and
+  `gui/src/ErrorBanner.tsx` before writing the hook.
+- No component-test runner exists in `gui/` (no `vitest`/`jest` dependency or `test` script); consistent
+  with tasks 002/003, and this task's own `## Validation` section does not require tests, so none were
+  added.
+- **Affected source files:** `gui/src/lib/use-api-error.ts` (new), `gui/src/lib/index.ts`.
