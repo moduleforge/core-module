@@ -54,6 +54,7 @@ phases:
           path: phase-02-gui-error-widgets/002-toast-provider.md
           done: false
           tier: sonnet-high
+          digest: 'Added Toast provider surface to mod-core/gui: gui/src/ui/toast.tsx wraps radix Toast primitives with cva/cn styling (default + destructive variants matching Alert); gui/src/lib/toast-context.tsx provides ToastProvider (owns toast queue, mounts radix provider+viewport) and useToast (imperative toast()/dismiss() API, throws outside provider). Barrel-exported. No new dependency; typecheck and build pass.'
           git:
             branch: phase-02-task-02-toast-provider
             commit:
