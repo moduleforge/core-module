@@ -75,3 +75,30 @@ architectural_impact: true
 - After the radix Toast primitives render and typecheck.
 - After `ToastProvider` + context state.
 - After `useToast` + barrel export and a clean typecheck.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- **Summary:** Implemented `gui/src/ui/toast.tsx` (presentational primitives wrapping
+  `import { Toast } from 'radix-ui'`: `ToastProviderPrimitive`, `ToastViewport`, `ToastRoot`
+  with `default`/`destructive` `cva` variants matching `Alert`, `ToastTitle`, `ToastDescription`,
+  `ToastClose`) and `gui/src/lib/toast-context.tsx` (`ToastProvider` component owning the toast
+  queue state, `useToast` hook, and the `ToastOptions`/`ToastVariant`/`ToastContextValue` types).
+  Wired both into `gui/src/ui/index.ts` and `gui/src/index.ts` barrels. `useToast` throws
+  `"useToast must be used within a ToastProvider"` when called outside the provider (verified by
+  code inspection of `React.useContext` returning `null` there). No new dependency was added —
+  `radix-ui`'s existing `Toast` namespace export (`@radix-ui/react-toast` in the lockfile) is the
+  only import source; `git diff gui/package.json` and `gui/bun.lock` are unchanged.
+- **Validation:** all checks passed — see `validation_results` in the structured report returned
+  to the dispatcher.
+- **Assumptions applied:** none beyond the task doc's own text (no `## Assumptions` section was
+  present).
+- **Note for the manager:** `gui/`'s `node_modules` were not present in this worktree
+  (`dependencies_installed` was passed as `none`), so `bun install --frozen-lockfile` was run
+  inside `gui/` to obtain `tsc`/`tsup` for the required validation commands. It resolved
+  exactly against the committed `gui/bun.lock` (no lockfile diff) and installed nothing outside
+  `gui/node_modules` (gitignored). Flagging in case `none` was expected to mean "nothing to
+  install" for this package rather than "not yet installed."
+- **Affected source files:** `gui/src/ui/toast.tsx`, `gui/src/lib/toast-context.tsx`,
+  `gui/src/ui/index.ts`, `gui/src/index.ts`.
