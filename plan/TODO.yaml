@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-masked-miss-httpapi-test
+          title: Add Masked-Miss Httpapi Integration Test
+          path: phase-01-masked-lookup-fix/002-add-masked-miss-httpapi-test.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
