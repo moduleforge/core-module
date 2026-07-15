@@ -83,7 +83,7 @@ phases:
             branch: phase-02-task-04-use-api-error-hook
             commit:
                 - dc7a67f
-            merge: null
+            merge: 39839e0a90586bb930cea8b43c08e42fd9b8ecdb
     - number: 3
       slug: doc-updates
       title: Documentation Updates
