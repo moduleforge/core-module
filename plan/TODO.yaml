@@ -30,7 +30,7 @@ phases:
             branch: phase-01-task-02-dogfood-migrate-mod-core
             commit:
                 - 9d531ff
-            merge: null
+            merge: 9c9f1a92af6f662124f3a11c68611edfb256234e
     - number: 2
       slug: gui-error-widgets
       title: GUI Error Widgets
