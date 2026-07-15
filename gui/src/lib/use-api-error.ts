@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { FieldError } from './api-types';
+import type { FieldErrorData } from './api-types';
 import type { ApiRequestError } from './api-client';
 import { useToast } from './toast-context';
 
@@ -30,7 +30,7 @@ export interface UseApiErrorOptions {
 }
 
 /** Field-bound details, keyed by the field name they bind to. */
-export type FieldErrors = Record<string, FieldError>;
+export type FieldErrors = Record<string, FieldErrorData>;
 
 /**
  * The banner-level error `useApiError` classifies, or `null` for "no banner
@@ -57,7 +57,7 @@ function classifyInline(
 ): { fieldErrors: FieldErrors; bannerError: BannerError | null } {
   const known = fields ? new Set(fields) : undefined;
   const fieldErrors: FieldErrors = {};
-  const unbound: FieldError[] = [];
+  const unbound: FieldErrorData[] = [];
 
   for (const detail of error.details ?? []) {
     if (known?.has(detail.field)) {
@@ -82,7 +82,7 @@ function classifyInline(
     // detail too.
     return {
       fieldErrors,
-      bannerError: { code: error.code, message: unbound.map((d) => d.message).join(' ') },
+      bannerError: { code: error.code, message: unbound.map((d) => d.message).join('; ') },
     };
   }
   return { fieldErrors, bannerError: null };

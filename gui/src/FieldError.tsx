@@ -1,10 +1,10 @@
-import type { FieldError as FieldErrorData } from './lib/api-types';
+import type { FieldErrorData } from './lib/api-types';
 import { cn } from './lib/utils';
 
 export interface FieldErrorProps {
   /**
    * The field-scoped error to render, or `undefined`/`null` for "no error"
-   * (renders nothing). Matches the task-001 `FieldError` wire type — no
+   * (renders nothing). Matches the task-001 `FieldErrorData` wire type — no
    * local redefinition here.
    */
   error?: FieldErrorData | null;
