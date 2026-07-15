@@ -34,6 +34,7 @@ phases:
     - number: 2
       slug: gui-error-widgets
       title: GUI Error Widgets
+      diff_base: d8ff270a1f3c91596497e18b90ef8c72bd6bb77e
       tasks:
         - number: 1
           slug: client-foundation
