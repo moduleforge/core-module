@@ -179,3 +179,29 @@ All seven tasks across all three phases are marked `done: true`; none are outsta
   behavior per code comment, not a new regression; the `configureApiClient` seam already lets consumers
   substitute a safer strategy. No action needed now — revisit if/when the project moves toward
   httpOnly-cookie or in-memory-token storage.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — Apiresp Go Package
+
+- [x] [001-create-apiresp-package.md](./phase-01-apiresp-go/001-create-apiresp-package.md) — tier `sonnet-high` · branch `phase-01-task-01-create-apiresp-package` · commit `ba740fd` · merge `359e35be54a90cf688c9baeae3489bb4d188b429`
+- [x] [002-dogfood-migrate-mod-core.md](./phase-01-apiresp-go/002-dogfood-migrate-mod-core.md) — tier `sonnet-high` · branch `phase-01-task-02-dogfood-migrate-mod-core` · commit `9d531ff` · merge `9c9f1a92af6f662124f3a11c68611edfb256234e`
+
+### Phase 02 — GUI Error Widgets
+
+- [x] [001-client-foundation.md](./phase-02-gui-error-widgets/001-client-foundation.md) — tier `sonnet-high` · branch `phase-02-task-01-client-foundation` · commit `cd00c60` · merge `ca9680ed85a7b197483e9f99759216bee77707c1`
+- [x] [002-toast-provider.md](./phase-02-gui-error-widgets/002-toast-provider.md) — tier `sonnet-high` · branch `phase-02-task-02-toast-provider` · commit `a89512f` · merge `3052492afcde7daec34a780b04581ceb473c9632`
+- [x] [003-error-widgets.md](./phase-02-gui-error-widgets/003-error-widgets.md) — tier `sonnet-med` · branch `phase-02-task-03-error-widgets` · commit `6d187a6` · merge `77b69ae457a6619f23aa324f103bef632720cdc5`
+- [x] [004-use-api-error-hook.md](./phase-02-gui-error-widgets/004-use-api-error-hook.md) — tier `sonnet-high` · branch `phase-02-task-04-use-api-error-hook` · commit `dc7a67f` · merge `39839e0a90586bb930cea8b43c08e42fd9b8ecdb`
+
+### Phase 03 — Documentation Updates
+
+- [x] [001-update-architecture-docs.md](./phase-03-doc-updates/001-update-architecture-docs.md) — tier `sonnet-high` · branch `phase-03-task-01-update-architecture-docs` · commit `fabe6ad` · merge `2404591e6096d3c881f692f20485c9868c07c050`
