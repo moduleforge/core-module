@@ -80,7 +80,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-02-task-04-use-api-error-hook
-            commit: []
+            commit:
+                - dc7a67f
             merge: null
     - number: 3
       slug: doc-updates
