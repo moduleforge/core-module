@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	envKeyName  = "CORE_FIELD_KEY_HEX"
-	keySize     = 32 // AES-256
-	hexKeySize  = keySize * 2
+	envKeyName = "CORE_FIELD_KEY_HEX"
+	keySize    = 32 // AES-256
+	hexKeySize = keySize * 2
 )
 
 // Cipher encrypts and decrypts small field values with AES-256-GCM.

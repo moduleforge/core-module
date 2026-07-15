@@ -83,8 +83,8 @@ var _ coredb.Querier = (*resolverStubQuerier)(nil)
 
 func makeEntityRow(id int64) coredb.GetEntityByUUIDRow {
 	return coredb.GetEntityByUUIDRow{
-		ID:   id,
-		Uuid: uuid.New(),
+		ID:        id,
+		Uuid:      uuid.New(),
 		CreatedAt: pgtype.Timestamptz{Valid: true},
 		UpdatedAt: pgtype.Timestamptz{Valid: true},
 	}
