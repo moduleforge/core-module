@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 )
@@ -21,13 +22,13 @@ type createNaturalPersonRequest struct {
 // createNaturalPerson handles POST /entities/natural-persons (admin only).
 func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	var req createNaturalPersonRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
@@ -40,7 +41,7 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	// The service manages its own transaction internally via txhelper.Run.
 	np, entityUUID, err := h.d.Services.NaturalPerson.Create(r.Context(), h.d.Services.Querier(), in)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
@@ -55,29 +56,29 @@ func (h *handlers) createNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		resp["tax_id"] = req.SSN
 		resp["tax_id_type"] = "SSN"
 	}
-	jsonOK(w, http.StatusCreated, resp)
+	apiresp.WriteJSON(w, http.StatusCreated, resp)
 }
 
 // getNaturalPerson handles GET /entities/natural-persons/{uuid}.
 func (h *handlers) getNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	profile, err := h.d.Services.NaturalPerson.GetByEntityUUID(r.Context(), h.d.Services.Querier(), entityUUID)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	apiresp.WriteJSON(w, http.StatusOK, profileResponse(profile))
 }
 
 // updateNaturalPersonRequest is the body for PUT /entities/natural-persons/{uuid}.
@@ -92,19 +93,19 @@ type updateNaturalPersonRequest struct {
 // updateNaturalPerson handles PUT /entities/natural-persons/{uuid}.
 func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 	if _, ok := opctx.ActorEntityID(r.Context()); !ok {
-		jsonErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)
 		return
 	}
 
 	entityUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
 	if err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid uuid")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
 	var req updateNaturalPersonRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
 		return
 	}
 
@@ -120,15 +121,15 @@ func (h *handlers) updateNaturalPerson(w http.ResponseWriter, r *http.Request) {
 		entityUUID,
 		in,
 	); err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
 	profile, err := h.d.Services.NaturalPerson.GetByEntityUUID(r.Context(), h.d.Services.Querier(), entityUUID)
 	if err != nil {
-		writeServiceErr(w, err)
+		apiresp.WriteError(w, r, err)
 		return
 	}
 
-	jsonOK(w, http.StatusOK, profileResponse(profile))
+	apiresp.WriteJSON(w, http.StatusOK, profileResponse(profile))
 }
