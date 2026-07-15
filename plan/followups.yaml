@@ -10,11 +10,6 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Pre-existing gap (not introduced by this plan): gui/ has no vitest/jest dependency or test script, though the React Developer role doc calls for component tests as a core responsibility. Sibling tasks 002/003 shipped without tests since neither task doc''s Validation section required them. Decide whether/when to add a test runner to gui/.'
-    - title: FieldError name collision (component/type)
-      id: dsYv
-      date: "2026-07-15"
-      tag: phase-02-gui-error-widgets
-      text: gui/src/index.ts exports both a FieldError component (task 003) and a FieldError wire-type interface (task 001, gui/src/lib/api-types.ts) under the same name, resolved via explicit re-export (value vs `import type` resolve to different things by usage position) rather than a rename. Works but is a wart in the public API surface. Consider renaming the wire type (e.g. FieldErrorData) in a follow-up task — not done here to avoid destabilizing task 001's already-landed contract mid-plan.
     - title: Banner drops detail text when all-unbound
       id: XKQ2
       date: "2026-07-15"
