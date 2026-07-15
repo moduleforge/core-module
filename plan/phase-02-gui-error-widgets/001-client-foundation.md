@@ -101,3 +101,36 @@ architectural_impact: true
 - After the wire types + `ApiRequestError` typecheck.
 - After the `request()` wrapper with `network_error` synthesis and the 401/403 split.
 - After wiring the barrel export and a clean typecheck.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- **Implementation:** Split the module per the task's suggested layout —
+  `gui/src/lib/api-types.ts` (wire types: `FieldError`, `ApiError`, `ApiErrorResponse`) and
+  `gui/src/lib/api-client.ts` (`ApiRequestError`, the `ApiClientAuthHandler` seam +
+  `configureApiClient()`, `RequestOptions`, `request<T>()`), barreled through a new
+  `gui/src/lib/index.ts` and re-exported from `gui/src/index.ts` via `export * from './lib';`.
+  `request()` parses the non-2xx envelope once, throws `ApiRequestError` with the real
+  `code`/`message`/`status`/`details` (falling back to a generic code/message if the body is
+  missing/unparseable), and only routes 401 through the auth handler's `onUnauthenticated()`
+  (skippable via `skipAuthRedirect`); 403 and all other non-2xx statuses fall through the same
+  generic throw with no redirect. A transport failure (`fetch` reject) short-circuits to
+  `ApiRequestError("network_error", <message>, 0)` before any envelope parsing.
+- **Auth seam:** `configureApiClient({ getToken, onUnauthenticated })` overrides a
+  browser-default (`localStorage` `auth_token` key, hard redirect to `/auth/login`) that is
+  SSR-safe (`typeof window === 'undefined'` guarded no-op). Documented inline in
+  `api-client.ts` above the seam.
+- **Dependencies:** the dispatch's `dependencies_installed` was `none`, but `gui/` has a real
+  `bun.lock`/`package.json` with no `node_modules` present. Ran `bun install` from `gui/`
+  (matches the existing lockfile exactly — `git diff gui/bun.lock` is empty, no dependency was
+  added or changed) so `bun run typecheck` / `bun run build` could execute; see
+  `flagged_for_manager` in the structured report for the mismatch note.
+- **Validation:** `bun run typecheck` (tsc --noEmit) — clean, no output. `bun run build`
+  (tsup) — succeeds, emits `dist/index.d.ts`/`dist/index.d.mts` with all required symbols.
+  Manual code review of `request()` confirms all four special cases. Grep check for
+  `network_error|skipAuthRedirect|ApiRequestError|class ApiRequestError` in
+  `gui/src/lib/*.ts` — matches present.
+- **Files:** `gui/src/lib/api-types.ts`, `gui/src/lib/api-client.ts`, `gui/src/lib/index.ts`,
+  `gui/src/index.ts` (added `export * from './lib';`).
+- **No new dependency added; `mod-users` not touched.**
