@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: apiresp-go
       title: Apiresp Go Package
-      tasks: []
+      tasks:
+        - number: 1
+          slug: create-apiresp-package
+          title: Create Apiresp Package
+          path: phase-01-apiresp-go/001-create-apiresp-package.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
