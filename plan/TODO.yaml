@@ -11,7 +11,7 @@ phases:
           slug: create-apiresp-package
           title: Create Apiresp Package
           path: phase-01-apiresp-go/001-create-apiresp-package.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Created api/apiresp package (sentinels, Envelope/ErrorBody/FieldError types with omitempty Details, WriteJSON, WriteError with errors.Is classification + 5xx slog logging incl. opctx.RequestID, InvalidInput builder). Full unit test suite passes; go build/go test/make test pass with no regressions. make lint fails only on 7 pre-existing gofmt violations outside this task's scope (confirmed pre-existing).
           git:
