@@ -135,3 +135,59 @@ architectural_impact: true
 - After `WriteJSON` + `WriteError` (with `classify`/`publicMessage`/5xx logging).
 - After `InvalidInput` + `fieldErrors` accessor.
 - After the unit-test suite passes.
+
+## Status
+
+- **Outcome:** succeeded (with one pre-existing, out-of-scope validation caveat — see below).
+- **Date:** 2026-07-15
+- **Implementation:** Created `api/apiresp/` (package `apiresp`) with:
+  - `errors.go` — package doc comment + the five sentinels (`ErrUnauthenticated`, `ErrForbidden`,
+    `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`).
+  - `types.go` — `FieldError`, `ErrorBody` (`Details []FieldError` with `omitempty`), `Envelope`.
+  - `writer.go` — `WriteJSON`, `WriteError`, plus unexported `classify`/`publicMessage`/
+    `logServerError` helpers. `WriteError` logs 5xx via `slog.ErrorContext(r.Context(), ...)`,
+    including `opctx.RequestID` when present on the request context (intra-module import,
+    `api/opctx` -> no import cycle since `opctx` does not depend on `apiresp`).
+  - `invalidinput.go` — unexported `invalidInputError` (wraps `ErrInvalidInput` via `Unwrap`),
+    `InvalidInput(details ...FieldError) error`, and unexported `fieldErrors(err) ([]FieldError, bool)`
+    accessor consumed by `WriteError`.
+  - `apiresp_test.go` (package `apiresp_test`) — table-driven sentinel-mapping test, unmapped-error
+    500 test (asserts raw error text absent from body), wrapped-sentinel test, `InvalidInput`
+    with/without details tests (asserts `details` key is absent, not `null`/`[]`, when empty),
+    `WriteJSON` bare-body test, and a 5xx test with a real `*http.Request` context to exercise the
+    `slog` call path without panicking.
+- **Validation summary:**
+  - `go build ./...` — passed.
+  - `go test ./apiresp/...` — passed (all 7 top-level tests, incl. subtests).
+  - `make test` — passed, no regressions in any other `api/` package.
+  - `make lint` — **failed**, but not due to this task's changes: `gofmt -l` reports pre-existing
+    formatting issues in `display/registry_test.go`, `entity/entity_test.go`,
+    `entity/resolver_test.go`, `internal/fieldcrypto/fieldcrypto.go`, `opctx/opctx.go`,
+    `service/pagination_test.go`, `service/tax_id_test.go` — none of which this task touched or is
+    permitted to touch (task doc: "Do not edit any file outside `api/apiresp/`"). Verified pre-existing
+    by checking `gofmt -l api/` against the pre-task base commit (`a41cc33`, before any `apiresp/`
+    files existed) in a disposable clone: the same seven files were already non-gofmt-clean there.
+    `gofmt -l api/apiresp/` and `go vet ./apiresp/...` are both clean on their own. `go vet ./...`
+    (whole module) reported no issues.
+  - Sentinel/function grep check — all five sentinels and four exported symbols present (see report).
+  - `details` `omitempty` — confirmed by source and by `TestInvalidInput_NoDetails` (asserts the
+    `details` key is absent, and separately asserts the raw body does not contain the substring
+    `"details"` at all).
+  - No 5xx path returns raw `err.Error()` text — confirmed by `TestWriteError_UnmappedError`.
+- **Assumptions applied:** None beyond the task doc's own text; no `## Assumptions` section was
+  present on this task doc.
+- **Decisions made:**
+  - Split the package into `errors.go` (sentinels + package doc), `types.go` (wire types),
+    `writer.go` (`WriteJSON`/`WriteError`/classification/logging), `invalidinput.go`
+    (`InvalidInput`/`fieldErrors`) rather than one large file — mirrors the flat-file, one-concern
+    style already used elsewhere in `api/` (e.g. `opctx/`, `observer/`).
+  - `publicMessage` uses a small per-code switch with a safe default summary per mapped sentinel
+    (rather than a single generic 4xx message) since the design doc allows "a per-code default" and
+    it gives 4xx responses slightly more useful text without echoing internal detail.
+  - `logServerError` looks up `opctx.RequestID` and includes it as a `request_id` slog attribute only
+    when non-empty, falling back to logging without it — matches the task doc's "use it if reachable
+    ... otherwise log without it" instruction; left a `// TODO` note in `writer.go` about revisiting
+    if `opctx` ever needs `apiresp` (it doesn't today, so no cycle exists).
+- **Files touched:** `api/apiresp/errors.go`, `api/apiresp/types.go`, `api/apiresp/writer.go`,
+  `api/apiresp/invalidinput.go`, `api/apiresp/apiresp_test.go`,
+  `plan/phase-01-apiresp-go/001-create-apiresp-package.md` (this file).
