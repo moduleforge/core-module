@@ -27,9 +27,9 @@ import "context"
 type contextKey struct{ name string }
 
 var (
-	actorEntityIDKey        = contextKey{"actorEntityID"}
+	actorEntityIDKey     = contextKey{"actorEntityID"}
 	sudoActorEntityIDKey = contextKey{"sudoActorEntityID"}
-	requestIDKey            = contextKey{"requestID"}
+	requestIDKey         = contextKey{"requestID"}
 )
 
 // WithActor returns a new context carrying the given actor entity ID.
