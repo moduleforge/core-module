@@ -50,3 +50,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: error-widgets
+          title: Error Widgets
+          path: phase-02-gui-error-widgets/003-error-widgets.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
