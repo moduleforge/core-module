@@ -97,5 +97,6 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-03-task-01-update-architecture-docs
-            commit: []
+            commit:
+                - fabe6ad
             merge: null
