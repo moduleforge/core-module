@@ -68,7 +68,8 @@ phases:
           tier: sonnet-med
           git:
             branch: phase-02-task-03-error-widgets
-            commit: []
+            commit:
+                - 6d187a6
             merge: null
         - number: 4
           slug: use-api-error-hook
