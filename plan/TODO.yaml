@@ -79,7 +79,7 @@ phases:
           done: false
           tier: sonnet-high
           git:
-            branch: null
+            branch: phase-02-task-04-use-api-error-hook
             commit: []
             merge: null
     - number: 3
