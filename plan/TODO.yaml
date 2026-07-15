@@ -87,6 +87,7 @@ phases:
     - number: 3
       slug: doc-updates
       title: Documentation Updates
+      diff_base: 70e4b89fe03f54629e59fa3cbf434e6d7c8e4cca
       tasks:
         - number: 1
           slug: update-architecture-docs
