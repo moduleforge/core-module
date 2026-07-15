@@ -1,4 +1,4 @@
-import type { ApiErrorResponse, FieldError } from './api-types';
+import type { ApiErrorResponse, FieldErrorData } from './api-types';
 
 // ─── Client error ───────────────────────────────────────────────────────────
 
@@ -16,9 +16,9 @@ import type { ApiErrorResponse, FieldError } from './api-types';
 export class ApiRequestError extends Error {
   code: string;
   status: number;
-  details?: FieldError[];
+  details?: FieldErrorData[];
 
-  constructor(code: string, message: string, status: number, details?: FieldError[]) {
+  constructor(code: string, message: string, status: number, details?: FieldErrorData[]) {
     super(message);
     this.name = 'ApiRequestError';
     this.code = code;
@@ -125,7 +125,7 @@ export async function request<T>(input: string | URL, options: RequestOptions = 
   if (!response.ok) {
     let code = 'unknown_error';
     let message = `Request failed with status ${response.status}`;
-    let details: FieldError[] | undefined;
+    let details: FieldErrorData[] | undefined;
     try {
       const body = (await response.json()) as Partial<ApiErrorResponse> | undefined;
       if (body?.error) {

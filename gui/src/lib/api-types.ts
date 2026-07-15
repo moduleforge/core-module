@@ -10,7 +10,7 @@
 // working unchanged against this one.
 
 /** One field-scoped validation/detail error, keyed to a form input by `field`. */
-export interface FieldError {
+export interface FieldErrorData {
   /** The input this error binds to (matches a form field name). */
   field: string;
   /** Namespaced detail code, e.g. "users.email_taken". */
@@ -25,7 +25,7 @@ export interface ApiError {
   code: string;
   message: string;
   /** Present only when there is per-field detail. */
-  details?: FieldError[];
+  details?: FieldErrorData[];
 }
 
 /** The full nested envelope a non-2xx JSON response body carries. */

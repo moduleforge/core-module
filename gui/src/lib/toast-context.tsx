@@ -14,6 +14,9 @@ export type ToastVariant = 'default' | 'destructive';
 /** The default auto-dismiss duration (ms) applied when a toast omits one. */
 const DEFAULT_TOAST_DURATION = 5000;
 
+/** Upper bound on simultaneously queued toasts; oldest entries are dropped past this. */
+const MAX_TOASTS = 5;
+
 /** Options accepted by `useToast().toast(...)`. */
 export interface ToastOptions {
   /** Optional short heading. */
@@ -67,7 +70,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
 
   const toast = React.useCallback((options: ToastOptions) => {
     const id = createToastId();
-    setToasts((current) => [...current, { id, ...options }]);
+    setToasts((current) => [...current, { id, ...options }].slice(-MAX_TOASTS));
     return id;
   }, []);
 
