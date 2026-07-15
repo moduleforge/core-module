@@ -56,7 +56,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-02-task-02-toast-provider
-            commit: []
+            commit:
+                - a89512f
             merge: null
         - number: 3
           slug: error-widgets
