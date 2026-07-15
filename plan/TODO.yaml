@@ -100,4 +100,4 @@ phases:
             branch: phase-03-task-01-update-architecture-docs
             commit:
                 - fabe6ad
-            merge: null
+            merge: 2404591e6096d3c881f692f20485c9868c07c050
