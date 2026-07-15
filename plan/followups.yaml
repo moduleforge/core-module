@@ -1,0 +1,7 @@
+version: 1
+items:
+    - title: Service validation-reason text lost on 400s
+      id: womX
+      date: "2026-07-15"
+      tag: phase-01-apiresp-go
+      text: 'Phase-01 correctness review (correctness-001, minor/medium-confidence): adopting apiresp.WriteError drops the specific validation-reason text (e.g. "legal_name is required") that existing service-layer fmt.Errorf("%w: ...", ErrInvalidInput) errors used to surface via err.Error() under the old writeServiceErr. publicMessage always substitutes a generic string for invalid_input, and these errors aren''t built via apiresp.InvalidInput so they carry no structured details[]. Consistent with the design doc''s general allowance for generic 4xx messages, but not explicitly scoped by either task doc. Decide: accept as a documented tradeoff, or follow up to route api/service/{corporation,natural_person,service_account}.go''s validation errors through apiresp.InvalidInput(FieldError{...}) so the reason survives in details[]. See api/apiresp/writer.go, api/httpapi/response.go.'
