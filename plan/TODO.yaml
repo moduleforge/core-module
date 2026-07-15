@@ -25,6 +25,7 @@ phases:
           path: phase-01-apiresp-go/002-dogfood-migrate-mod-core.md
           done: false
           tier: sonnet-high
+          digest: Migrated mod-core's own HTTP surface off the local jsonOK/jsonErr/writeServiceErr trio and local sentinel set onto api/apiresp. api/service/errors.go aliases apiresp.ErrNotFound/ErrForbidden/ErrInvalidInput and adds ErrConflict. api/httpapi/response.go reduced to profileResponse only. All four handler files route success through apiresp.WriteJSON and errors through apiresp.WriteError(w, r, err), with 401/400 jsonErr call-sites brought into design-doc vocabulary conformance (unauthenticated/invalid_input) at unchanged HTTP status. Tests updated to the nested envelope; ErrConflict->409/conflict coverage added. go build, make test, make lint all green after the manager cherry-picked the separately-landed gofmt fix onto this branch.
           git:
             branch: phase-01-task-02-dogfood-migrate-mod-core
             commit:
