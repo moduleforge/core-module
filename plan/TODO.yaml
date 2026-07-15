@@ -42,6 +42,7 @@ phases:
           path: phase-02-gui-error-widgets/001-client-foundation.md
           done: false
           tier: sonnet-high
+          digest: 'Implemented mod-core/gui client foundation: gui/src/lib/api-types.ts (FieldError/ApiError/ApiErrorResponse) and gui/src/lib/api-client.ts (ApiRequestError, configureApiClient/ApiClientAuthHandler injectable auth seam, request<T>() typed fetch wrapper with network_error/status-0 synthesis and 401-redirect/403-never-redirect split). Barreled through gui/src/lib/index.ts and gui/src/index.ts. Typecheck and build pass; no new dependency; mod-users untouched.'
           git:
             branch: phase-02-task-01-client-foundation
             commit:
