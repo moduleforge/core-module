@@ -60,3 +60,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 4
+          slug: use-api-error-hook
+          title: useApiError Hook
+          path: phase-02-gui-error-widgets/004-use-api-error-hook.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
