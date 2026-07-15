@@ -15,7 +15,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-01-task-01-create-apiresp-package
-            commit: []
+            commit:
+                - ba740fd
             merge: null
         - number: 2
           slug: dogfood-migrate-mod-core
