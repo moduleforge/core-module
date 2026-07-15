@@ -40,3 +40,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: toast-provider
+          title: Toast Provider
+          path: phase-02-gui-error-widgets/002-toast-provider.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
