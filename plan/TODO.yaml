@@ -95,6 +95,7 @@ phases:
           path: phase-03-doc-updates/001-update-architecture-docs.md
           done: false
           tier: sonnet-high
+          digest: Updated AGENTS.md (apiresp/ row, service/ and httpapi/ row updates, new gui error/toast toolkit subsection) and README.md (brief mentions of apiresp and the gui error/toast toolkit) to reflect phases 01-02's new subsystems. docs/mf-standards/ left untouched (submodule-owned, out of scope, confirmed via git status). No repo-owned docs/architecture.md exists. Closes out the plan's final phase.
           git:
             branch: phase-03-task-01-update-architecture-docs
             commit:
