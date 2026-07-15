@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: masked-lookup-fix
       title: Masked Lookup 403 Fix
-      tasks: []
+      tasks:
+        - number: 1
+          slug: alias-entity-resolver-sentinels
+          title: Alias Entity Resolver Errors To Apiresp Sentinels
+          path: phase-01-masked-lookup-fix/001-alias-entity-resolver-sentinels.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
