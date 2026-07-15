@@ -73,3 +73,32 @@ architectural_impact: true
 - After `<FieldError>` typechecks.
 - After `<ErrorBanner>` wraps `Alert` and typechecks.
 - After barrel exports and a clean typecheck.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- Implemented `gui/src/FieldError.tsx` (binds one task-001 `FieldError` to an input, `role="alert"`,
+  accepts an `id` for `aria-describedby` wiring, renders `null` for `undefined`/`null`) and
+  `gui/src/ErrorBanner.tsx` (wraps the shared `Alert`/`AlertTitle`/`AlertDescription` with
+  `variant="destructive"`, accepting a plain `string`, an `ApiError`-shaped `{message}`, or an explicit
+  `{title?, description}` pair via the new exported `ErrorBannerData` union). Both exported from
+  `gui/src/index.ts`.
+- **Naming-collision note:** the component `FieldError` and the wire-type `FieldError` (from
+  `gui/src/lib/api-types.ts`, re-exported via `export * from './lib'`) share a name. `tsc` rejects two
+  ambiguous `export *` star-exports of the same identifier even though one is a type and the other a
+  value (`TS2308`). Resolved with an explicit `export { FieldError } from './FieldError'` /
+  `export type { FieldErrorProps } from './FieldError'` pair in `gui/src/index.ts` instead of
+  `export * from './FieldError'`; both names remain independently importable
+  (`import { FieldError } from '@moduleforge/core-gui'` for the component,
+  `import type { FieldError } from '@moduleforge/core-gui'` for the wire type — TypeScript resolves
+  each by its usage position). No rename was needed on either side.
+- No new dependency added (`gui/package.json` / `gui/bun.lock` unchanged).
+- Validation: `cd gui && bun run typecheck` and `cd gui && bun run build` both pass; grep checks
+  confirm `<ErrorBanner>` imports `Alert` from `./ui/alert` (not re-implemented) and `<FieldError>`
+  imports the task-001 `FieldError` type from `./lib/api-types` (no local redefinition).
+- No component-test runner exists in `gui/` (no `vitest`/`jest` dependency or `test` script; confirmed
+  by inspecting `gui/package.json` and the prior phase-02 tasks' committed state) — the task's own
+  `## Validation` section does not require tests, so none were added, consistent with the toast-provider
+  task (002) that landed ahead of this one.
+- Affected source files: `gui/src/FieldError.tsx`, `gui/src/ErrorBanner.tsx`, `gui/src/index.ts`.
