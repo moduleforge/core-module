@@ -20,3 +20,8 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Phase-02 correctness review (correctness-002, minor/medium-confidence): in useApiError''s classifyInline (gui/src/lib/use-api-error.ts ~561-567), when details[] is non-empty but none match a rendered field, bannerError falls back to the generic top-level {code,message} rather than surfacing the specific unbound detail messages - even though the adjacent "some bound, some unbound" branch does surface them. Design-doc''s Surface classification table supports the current literal reading, but the asymmetry may be a product surprise. Decide: is generic-message-on-all-unbound intentional, or should it join unbound detail messages like the partial-match branch does?'
+    - title: request() has no origin check for token
+      id: 7VD3
+      date: "2026-07-15"
+      tag: phase-02-gui-error-widgets
+      text: 'Phase-02 security review (security-001, suggestion/medium-confidence): request() (gui/src/lib/api-client.ts ~106-119) attaches the bearer token to whatever URL the caller passes, with no same-origin/allow-listed-host check. Not exploitable from anything in this diff (no consumer wired yet) - risk depends entirely on how a future consumer calls request(). Consider an optional allowedOrigins/base-URL guard in configureApiClient or request(), or document the implicit same-origin assumption in the doc comment.'
