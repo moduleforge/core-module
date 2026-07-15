@@ -59,7 +59,7 @@ phases:
             branch: phase-02-task-02-toast-provider
             commit:
                 - a89512f
-            merge: null
+            merge: 3052492afcde7daec34a780b04581ceb473c9632
         - number: 3
           slug: error-widgets
           title: Error Widgets
