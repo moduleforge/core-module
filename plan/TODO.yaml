@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: apiresp-go
       title: Apiresp Go Package
+      diff_base: d9a6d15bd7230a8f45526104a2b04272dde912a0
       tasks:
         - number: 1
           slug: create-apiresp-package
