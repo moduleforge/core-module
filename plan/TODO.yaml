@@ -47,7 +47,7 @@ phases:
             branch: phase-02-task-01-client-foundation
             commit:
                 - cd00c60
-            merge: null
+            merge: ca9680ed85a7b197483e9f99759216bee77707c1
         - number: 2
           slug: toast-provider
           title: Toast Provider
