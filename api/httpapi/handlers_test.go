@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/service"
 	coredb "github.com/moduleforge/core-model/db"
@@ -149,7 +150,12 @@ func TestGetEntity_200_HappyPath(t *testing.T) {
 
 // --- Response helpers ---
 
-func TestWriteServiceErr_MapsCorrectly(t *testing.T) {
+// TestServiceErr_MapsCorrectly verifies the service sentinel error set maps
+// to the expected status/code pairs when routed through apiresp.WriteError
+// — the same mapping writeServiceErr used to perform locally before mod-core
+// migrated onto the shared apiresp package. The response envelope is now the
+// nested {"error":{"code":...}} shape.
+func TestServiceErr_MapsCorrectly(t *testing.T) {
 	cases := []struct {
 		err        error
 		wantStatus int
@@ -158,23 +164,29 @@ func TestWriteServiceErr_MapsCorrectly(t *testing.T) {
 		{service.ErrNotFound, http.StatusNotFound, "not_found"},
 		{service.ErrForbidden, http.StatusForbidden, "forbidden"},
 		{service.ErrInvalidInput, http.StatusBadRequest, "invalid_input"},
+		{service.ErrConflict, http.StatusConflict, "conflict"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.wantCode, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			writeServiceErr(rec, tc.err)
+			req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
+			apiresp.WriteError(rec, req, tc.err)
 
 			if rec.Code != tc.wantStatus {
 				t.Errorf("status: got %d, want %d", rec.Code, tc.wantStatus)
 			}
 
-			var body map[string]string
+			var body struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
 			if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			if body["error"] != tc.wantCode {
-				t.Errorf("error code: got %q, want %q", body["error"], tc.wantCode)
+			if body.Error.Code != tc.wantCode {
+				t.Errorf("error code: got %q, want %q", body.Error.Code, tc.wantCode)
 			}
 		})
 	}

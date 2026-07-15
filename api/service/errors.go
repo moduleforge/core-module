@@ -1,12 +1,16 @@
 package service
 
-import "errors"
+import "github.com/moduleforge/core-api/apiresp"
 
 // ErrNotFound is returned when a requested resource does not exist.
-var ErrNotFound = errors.New("not found")
+var ErrNotFound = apiresp.ErrNotFound
 
 // ErrForbidden is returned when the caller lacks permission for the operation.
-var ErrForbidden = errors.New("forbidden")
+var ErrForbidden = apiresp.ErrForbidden
 
 // ErrInvalidInput is returned when the caller supplies invalid or missing input.
-var ErrInvalidInput = errors.New("invalid input")
+var ErrInvalidInput = apiresp.ErrInvalidInput
+
+// ErrConflict is returned when the request conflicts with the current state
+// (e.g. a uniqueness violation or optimistic-concurrency clash).
+var ErrConflict = apiresp.ErrConflict
