@@ -28,7 +28,7 @@ func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntit
 // stubQuerier implements all other Querier methods as no-ops to satisfy the
 // interface. Only GetEntityByID is exercised by the display registry.
 
-func (s *stubQuerier) ArchiveEntity(_ context.Context, _ uuid.UUID) error                        { return nil }
+func (s *stubQuerier) ArchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
 func (s *stubQuerier) CreateCorporation(_ context.Context, _ coredb.CreateCorporationParams) (coredb.CreateCorporationRow, error) {
 	return coredb.CreateCorporationRow{}, nil
 }

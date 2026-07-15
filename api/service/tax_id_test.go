@@ -25,7 +25,7 @@ func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-		in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith", SSN: "123-45-6789"}
+	in := CreateNaturalPersonInput{GivenName: "Alice", FamilyName: "Smith", SSN: "123-45-6789"}
 	np, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
@@ -66,7 +66,7 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-		in := CreateNaturalPersonInput{GivenName: "Bob", FamilyName: "Jones", SSN: ""}
+	in := CreateNaturalPersonInput{GivenName: "Bob", FamilyName: "Jones", SSN: ""}
 	np, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
@@ -96,7 +96,7 @@ func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-		in := CreateNaturalPersonInput{GivenName: "Carol", FamilyName: "White", SSN: "987-65-4321"}
+	in := CreateNaturalPersonInput{GivenName: "Carol", FamilyName: "White", SSN: "987-65-4321"}
 	_, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -154,7 +154,7 @@ func TestNaturalPersonService_Update_SetSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-		entityUUID := q.seedNaturalPerson("Eve", "Foster")
+	entityUUID := q.seedNaturalPerson("Eve", "Foster")
 
 	ssn := "111-22-3333"
 	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &ssn})
@@ -184,7 +184,7 @@ func TestNaturalPersonService_Update_ClearSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-		entityUUID := q.seedNaturalPerson("Frank", "Green")
+	entityUUID := q.seedNaturalPerson("Frank", "Green")
 
 	empty := ""
 	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{SSN: &empty})
@@ -210,7 +210,7 @@ func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 		cipher:     testCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
-		entityUUID := q.seedNaturalPerson("Grace", "Hall")
+	entityUUID := q.seedNaturalPerson("Grace", "Hall")
 	gn := "Grace"
 	err := svc.UpdateByEntityUUID(context.Background(), q, entityUUID, UpdateNaturalPersonInput{GivenName: &gn})
 	if err != nil {
@@ -237,7 +237,7 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-		in := CreateCorporationInput{LegalName: "Acme Inc", EIN: "12-3456789"}
+	in := CreateCorporationInput{LegalName: "Acme Inc", EIN: "12-3456789"}
 	corp, _, err := svc.Create(context.Background(), q, in)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
@@ -384,7 +384,7 @@ func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 		typeResolver:   testTypeResolver(q),
 	}
 	leSvc := &LegalEntityService{cipher: cipher}
-		_, entityUUID, err := saSvc.Create(context.Background(), q, CreateServiceAccountInput{Label: "svc"})
+	_, entityUUID, err := saSvc.Create(context.Background(), q, CreateServiceAccountInput{Label: "svc"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -460,7 +460,7 @@ func TestAuditRedaction_NoPlaintext(t *testing.T) {
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
 	}
-		const plainSSN = "999-88-7777"
+	const plainSSN = "999-88-7777"
 
 	in := CreateNaturalPersonInput{GivenName: "Karl", FamilyName: "Lang", SSN: plainSSN}
 	_, _, err := svc.Create(context.Background(), q, in)

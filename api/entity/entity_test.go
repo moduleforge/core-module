@@ -121,8 +121,8 @@ func TestEntity_PublicUUID(t *testing.T) {
 	const want = "11111111-2222-3333-4444-555555555555"
 
 	cases := []struct {
-		name    string
-		empty   entity.Entity
+		name      string
+		empty     entity.Entity
 		populated entity.Entity
 	}{
 		{"LegalEntity", entity.LegalEntity{}, entity.LegalEntity{UUID: want}},
