@@ -5,9 +5,9 @@
 ## What it provides
 
 - **Entity schema** — Postgres tables for `entities`, `legal_entities`, `natural_persons`, `corporations`, and `service_accounts`, plus the `types` registry that drives the entity-typing system. UUID ownership and assignment live here.
-- **Go API library** (`github.com/moduleforge/core-api`) — service layer (entity CRUD), HTTP handlers, observer/fan-out pattern, AES-256-GCM field cipher, authorization and operation-context contracts, and display-renderer registry.
+- **Go API library** (`github.com/moduleforge/core-api`) — service layer (entity CRUD), HTTP handlers, observer/fan-out pattern, AES-256-GCM field cipher, authorization and operation-context contracts, display-renderer registry, and the shared `apiresp` response/error contract (canonical sentinels, JSON envelope, and error mapping) other ModuleForge modules import.
 - **Go model library** (`github.com/moduleforge/core-model`) — sqlc-generated query code for the entity schema, consumed by core-api and by peer modules that need direct DB access.
-- **GUI component library** (`@moduleforge/core-gui`) — shared TypeScript/React components published via yalc for local development.
+- **GUI component library** (`@moduleforge/core-gui`) — shared TypeScript/React components published via yalc for local development, including an error/toast widget toolkit (`<FieldError>`, `<ErrorBanner>`, `ToastProvider`, `useApiError`) that renders the same response/error contract `apiresp` implements on the Go side.
 
 ## Sub-projects
 
