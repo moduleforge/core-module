@@ -67,7 +67,7 @@ phases:
           done: false
           tier: sonnet-med
           git:
-            branch: null
+            branch: phase-02-task-03-error-widgets
             commit: []
             merge: null
         - number: 4
