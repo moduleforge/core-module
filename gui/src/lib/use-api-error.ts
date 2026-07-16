@@ -69,21 +69,20 @@ function classifyInline(
 
   const hasFieldMatch = Object.keys(fieldErrors).length > 0;
 
-  if (!hasFieldMatch) {
-    // Table row 1: top-level forbidden/not_found/conflict/invalid_input with
-    // no field-bound details is banner-level in full (this also covers the
-    // case where `details` exist but none matched a rendered field — the
-    // top-level message already summarizes them).
-    return { fieldErrors, bannerError: { code: error.code, message: error.message } };
-  }
   if (unbound.length > 0) {
-    // Table row 1, second clause: some details matched fields, but the rest
-    // still need a surface even though the overall response has field-level
-    // detail too.
+    // Table row 1, second clause: any detail that didn't bind to a rendered
+    // field needs a surface — whether some details matched fields and the
+    // rest didn't, or none of them did. Either way the unbound messages
+    // themselves are more specific than the generic top-level message.
     return {
       fieldErrors,
       bannerError: { code: error.code, message: unbound.map((d) => d.message).join('; ') },
     };
+  }
+  if (!hasFieldMatch) {
+    // Table row 1: top-level forbidden/not_found/conflict/invalid_input with
+    // no details at all is banner-level via the top-level message.
+    return { fieldErrors, bannerError: { code: error.code, message: error.message } };
   }
   return { fieldErrors, bannerError: null };
 }
