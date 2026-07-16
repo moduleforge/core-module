@@ -15,7 +15,8 @@ phases:
           tier: sonnet-med
           git:
             branch: phase-01-task-01-alias-entity-resolver-errors-t
-            commit: []
+            commit:
+                - 2af5ce5
             merge: null
         - number: 2
           slug: add-masked-miss-httpapi-test
