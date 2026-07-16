@@ -25,6 +25,7 @@ phases:
           path: phase-01-masked-lookup-fix/002-add-masked-miss-httpapi-test.md
           done: false
           tier: sonnet-med
+          digest: Added api/httpapi/masked_lookup_test.go with TestGetEntity_MaskedMiss_Returns403Forbidden, an httpapi-layer test that wires the real service.EntityService (via service.New with entity.NewResolver()) into NewRouter instead of the package's usual fake*Service mocks, so a GET /entities/{random-uuid} against a stub Querier returning pgx.ErrNoRows exercises the actual resolver -> service -> apiresp.WriteError chain and asserts the response is 403/forbidden rather than the pre-fix 500. Added a package-local stubQuerier (18-method coredb.Querier stub mirroring api/entity/resolver_test.go's resolverStubQuerier) and a trivial stubAuthorizer that always allows. All four validation checks pass; the pre-fix regression check was done by reading the task-1 commit diff and apiresp's classify() logic rather than actually reverting, per the task doc's stated alternative. No scope expansion was needed.
           git:
             branch: phase-01-task-02-add-masked-miss-httpapi-test
             commit:
