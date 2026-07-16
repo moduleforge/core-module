@@ -19,14 +19,6 @@
         "scored_at": "2026-07-15T21:15:00Z",
         "metrics_generated_at": null
       },
-      "XKQ2": {
-        "sig": "a2a8c06c61907fa010c9462dc693ca6d",
-        "effort_bucket": "low",
-        "utility_bucket": "medium",
-        "rationale": "Single-function fix in use-api-error.ts mirroring the already-existing partial-match branch pattern; small, quick, improves real observable UX once useApiError is wired up.",
-        "scored_at": "2026-07-15T21:15:00Z",
-        "metrics_generated_at": null
-      },
       "7VD3": {
         "sig": "68cdf9d7b1255c2ef16b77b8718d306f",
         "effort_bucket": "low",
