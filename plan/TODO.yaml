@@ -13,6 +13,7 @@ phases:
           path: phase-01-masked-lookup-fix/001-alias-entity-resolver-sentinels.md
           done: false
           tier: sonnet-med
+          digest: 'Aliased api/entity/resolver.go''s ErrForbidden/ErrNotFound sentinels directly onto apiresp.ErrForbidden/apiresp.ErrNotFound (matching api/service/errors.go''s precedent and the design doc''s prescribed shape), so apiresp.WriteError''s errors.Is-based classify() now correctly maps a masked entity-lookup miss to 403/404 instead of falling through to 500 at all five entityResolver.Resolve(...) call sites. Updated doc comments, confirmed no import cycle, left api/service/*.go and api/httpapi/*.go non-test files untouched. Strengthened test coverage: alias assertions in resolver_test.go, second ErrForbidden assertion in GetByUUID_NotFound, new TestEntityService_ResolveProfile_NotFound, and strengthened bare err==nil checks in corporation/natural_person/extra tests to errors.Is(err, ErrForbidden). make lint/go build/make test all pass.'
           git:
             branch: phase-01-task-01-alias-entity-resolver-errors-t
             commit:
