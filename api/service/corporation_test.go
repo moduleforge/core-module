@@ -92,8 +92,8 @@ func TestCorporationService_GetByEntityUUID_NotFound(t *testing.T) {
 	svc := newCorpService(t, q)
 
 	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(nil))
-	if err == nil {
-		t.Error("expected error for missing entity")
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("expected ErrForbidden for missing entity, got %v", err)
 	}
 }
 

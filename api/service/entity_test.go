@@ -97,6 +97,19 @@ func TestEntityService_GetByUUID_NotFound(t *testing.T) {
 	if !errors.Is(err, entity.ErrForbidden) {
 		t.Errorf("expected entity.ErrForbidden for missing UUID, got %v", err)
 	}
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("expected err to satisfy service.ErrForbidden (apiresp-classifiable), got %v", err)
+	}
+}
+
+func TestEntityService_ResolveProfile_NotFound(t *testing.T) {
+	q := newMockQuerier()
+	svc := newEntityService(q)
+
+	_, err := svc.ResolveProfile(context.Background(), q, randomUUID(t))
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("expected ErrForbidden for missing UUID, got %v", err)
+	}
 }
 
 func TestEntityService_GetByUUID_Found(t *testing.T) {

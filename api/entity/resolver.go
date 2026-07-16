@@ -8,18 +8,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/moduleforge/core-api/apiresp"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
 // ErrForbidden is returned by Resolver.Resolve when a UUID is not found and
 // the resource has not opted into 404 behaviour. Returning a 403 instead of
 // a 404 masks existence: a caller cannot distinguish "no such entity" from
-// "entity exists but you lack access".
-var ErrForbidden = errors.New("entity: forbidden")
+// "entity exists but you lack access". It is an alias of the canonical
+// apiresp.ErrForbidden sentinel, so callers can classify it via
+// apiresp.WriteError with no further translation.
+var ErrForbidden = apiresp.ErrForbidden
 
 // ErrNotFound is returned by Resolver.Resolve when a UUID is not found and
-// the resource has explicitly opted into 404 behaviour via AllowNotFound.
-var ErrNotFound = errors.New("entity: not found")
+// the resource has explicitly opted into 404 behaviour via AllowNotFound. It
+// is an alias of the canonical apiresp.ErrNotFound sentinel, so callers can
+// classify it via apiresp.WriteError with no further translation.
+var ErrNotFound = apiresp.ErrNotFound
 
 // Resolver maps an entity UUID to its internal int64 ID while applying a
 // per-resource not-found policy.
