@@ -42,14 +42,6 @@
         "rationale": "Item explicitly states no action needed now; revisit only if/when token-storage strategy changes project-wide.",
         "scored_at": "2026-07-15T21:15:00Z",
         "metrics_generated_at": null
-      },
-      "mJ5k": {
-        "sig": "1e9200c66d08739113768e5ac5068aa7",
-        "effort_bucket": "medium",
-        "utility_bucket": "high",
-        "rationale": "Possible real production bug just merged: masked entity-lookup miss may return 500 instead of the documented 403, undermining the masking policy the whole plan implements. Needs tracing + likely a small sentinel-translation fix.",
-        "scored_at": "2026-07-15T21:15:00Z",
-        "metrics_generated_at": null
       }
     },
     "roadmap": {}
