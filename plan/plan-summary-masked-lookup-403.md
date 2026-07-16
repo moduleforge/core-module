@@ -107,3 +107,18 @@ earlier phases/plans):
 
 As noted above, followup `mJ5k` (the source finding for this plan) should be considered resolved
 and is flagged for manager removal from `plan/followups.yaml`.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — Masked Lookup 403 Fix
+
+- [x] [001-alias-entity-resolver-sentinels.md](./phase-01-masked-lookup-fix/001-alias-entity-resolver-sentinels.md) — tier `sonnet-med` · branch `phase-01-task-01-alias-entity-resolver-errors-t` · commit `2af5ce5` · merge `3fc99efc8025f6668b8b22d68e386d61b736c5c9`
+- [x] [002-add-masked-miss-httpapi-test.md](./phase-01-masked-lookup-fix/002-add-masked-miss-httpapi-test.md) — tier `sonnet-med` · branch `phase-01-task-02-add-masked-miss-httpapi-test` · commit `ca630a5` · merge `20dc33d01db5001b7412f052017089e7288a1825`
