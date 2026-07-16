@@ -99,6 +99,34 @@ conventions (see References).
   `api/service/entity.go`'s `GetByUUID`/`ResolveProfile` bodies and `api/service/service.go`'s
   `New` to confirm neither is dereferenced on this path) and flag in your report if it does not.
 
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- **Validation summary:** `go build ./...` clean; `go test ./httpapi/... -run TestGetEntity_MaskedMiss -v` passes
+  (`TestGetEntity_MaskedMiss_Returns403Forbidden`); `make test` passes for the full `api` module with
+  no regressions; `make lint` (`go vet ./...` + `gofmt -l .`) passes clean.
+- **Affected files:** `api/httpapi/masked_lookup_test.go` (new).
+- **Assumptions applied:** confirmed by reading `api/service/entity.go` and `api/service/service.go`
+  that `service.New`'s `db`, `cipher`, and `typeResolver` parameters are never dereferenced on the
+  masked-miss path through `EntityService.GetByUUID`/`ResolveProfile` (the resolver returns
+  `apiresp.ErrForbidden` before authz or any subtype lookup runs) — the test passes `nil` for all
+  three without panicking, confirming the assumption held.
+- **Scope note:** `EntityService`'s path fully exercised the fix as anticipated; no expansion beyond
+  the single required test was needed. The optional second (success-path sanity) test was not added,
+  per the task doc's guidance not to pad the file with redundant cases — the single 403/`forbidden`
+  assertion already fully proves the fix.
+- **Pre-fix regression check:** performed via code-reading rather than an actual `git stash` (per the
+  task doc's "or reason through it without actually reverting" option). `git show 2af5ce5 --
+  entity/resolver.go` shows the pre-task-1 sentinels were distinct local values
+  (`errors.New("entity: forbidden")` / `errors.New("entity: not found")`), not aliased to
+  `apiresp.ErrForbidden`/`apiresp.ErrNotFound`. `apiresp.classify` (in `apiresp/writer.go`) dispatches
+  purely via `errors.Is` against the `apiresp` sentinels, defaulting to `("internal_error", 500)` for
+  any error that doesn't match. Against the pre-fix sentinel, `errors.Is(err, apiresp.ErrForbidden)`
+  would be false, so `WriteError` would have fallen through to the default case and returned `500`
+  instead of `403` — confirming this test's `rec.Code == http.StatusForbidden` assertion would have
+  failed red against the pre-task-1 code.
+
 ## References
 
 - `api/httpapi/entities.go` — `getEntity` handler (`GET /entities/{uuid}`), the entry point this
