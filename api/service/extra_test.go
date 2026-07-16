@@ -49,8 +49,8 @@ func TestServiceAccountService_GetByEntityUUID_NotFound(t *testing.T) {
 	svc := newSAService(q)
 
 	_, err := svc.GetByEntityUUID(context.Background(), q, randomUUID(t))
-	if err == nil {
-		t.Error("expected error for missing entity")
+	if !errors.Is(err, ErrForbidden) {
+		t.Errorf("expected ErrForbidden for missing entity, got %v", err)
 	}
 }
 

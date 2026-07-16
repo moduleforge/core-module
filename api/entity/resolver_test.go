@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/entity"
 	coredb "github.com/moduleforge/core-model/db"
 )
@@ -120,6 +121,9 @@ func TestResolver_Resolve_NotFound_DefaultForbidden(t *testing.T) {
 	if !errors.Is(err, entity.ErrForbidden) {
 		t.Errorf("expected ErrForbidden; got %v", err)
 	}
+	if !errors.Is(err, apiresp.ErrForbidden) {
+		t.Errorf("expected err to alias apiresp.ErrForbidden; got %v", err)
+	}
 }
 
 func TestResolver_Resolve_NotFound_OptedIn404(t *testing.T) {
@@ -133,6 +137,9 @@ func TestResolver_Resolve_NotFound_OptedIn404(t *testing.T) {
 	}
 	if !errors.Is(err, entity.ErrNotFound) {
 		t.Errorf("expected ErrNotFound; got %v", err)
+	}
+	if !errors.Is(err, apiresp.ErrNotFound) {
+		t.Errorf("expected err to alias apiresp.ErrNotFound; got %v", err)
 	}
 }
 
