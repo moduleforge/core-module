@@ -27,5 +27,6 @@ phases:
           tier: sonnet-med
           git:
             branch: phase-01-task-02-add-masked-miss-httpapi-test
-            commit: []
+            commit:
+                - ca630a5
             merge: null
