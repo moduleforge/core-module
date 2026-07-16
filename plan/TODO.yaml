@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: masked-lookup-fix
       title: Masked Lookup 403 Fix
+      diff_base: bc6e17c6a4f281206b33f0d37258ea170a3b3fb7
       tasks:
         - number: 1
           slug: alias-entity-resolver-sentinels
