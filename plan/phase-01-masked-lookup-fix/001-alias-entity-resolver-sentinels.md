@@ -112,6 +112,25 @@ the repo's existing conventions (see References) rather than inventing new patte
   production wiring (a future consumer module opting a resource in via `AllowNotFound` will now
   get the correctly-mapped `404 not_found` for free).
 
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-15
+- **Validation:** `cd api && make lint` (go vet + gofmt) passed with no findings; `cd api &&
+  go build ./...` compiled cleanly (no import cycle); `cd api && make test` (`go test ./...`)
+  passed across all packages, including the new/strengthened assertions in
+  `api/entity/resolver_test.go` and `api/service/{entity,corporation,natural_person,extra}_test.go`.
+  Both manual grep checks (old error-text literals gone; `entity.ErrForbidden`/`entity.ErrNotFound`
+  referenced only from test files) confirmed as expected. `go.mod`/`go.sum` unchanged.
+- **Affected source files:** `api/entity/resolver.go`, `api/entity/resolver_test.go`,
+  `api/service/entity_test.go`, `api/service/corporation_test.go`,
+  `api/service/natural_person_test.go`, `api/service/extra_test.go`.
+- **Assumptions relied on:** both `## Assumptions` entries applied as written — `api/apiresp`
+  importing into `api/entity` is architecturally acceptable per existing `api/service/errors.go`
+  precedent and the design doc's explicit prescription; no production resource currently calls
+  `AllowNotFound`, so the `ErrNotFound` alias remains exercised only by
+  `api/entity/resolver_test.go`'s `OptedIn404` test today.
+
 ## References
 
 - `api/entity/resolver.go` — the fix target.
