@@ -18,4 +18,4 @@ phases:
             branch: phase-01-task-01-implement-origin-guard
             commit:
                 - 36c3c5d
-            merge: null
+            merge: e8b944e974ffd8c0a636fca829adb322ca37a6d0
