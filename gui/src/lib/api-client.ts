@@ -61,14 +61,73 @@ const defaultAuthHandler: ApiClientAuthHandler = {
 
 let authHandler: ApiClientAuthHandler = defaultAuthHandler;
 
+// ─── Origin guard ───────────────────────────────────────────────────────────
+//
+// Opt-in allow-list guard: when a consuming app configures `allowedOrigins`,
+// `request()` rejects any call whose resolved target origin is not on the
+// list, before attaching the bearer token or touching the network. Left
+// unconfigured (the default), this is a complete no-op — identical to
+// pre-guard behavior — so every existing/dogfooded caller is unaffected.
+
+export interface ApiClientOriginGuardConfig {
+  /**
+   * Allow-list of request origins (scheme + host + optional port, e.g.
+   * "https://api.example.com" — no path, no trailing slash) permitted to
+   * receive the bearer token. When unset (the default), request() performs
+   * no origin check at all — identical to pre-guard behavior. When set,
+   * request() throws ApiRequestError("origin_not_allowed", ...) before
+   * issuing any request whose resolved target origin is not in this list
+   * (including when the target origin cannot be resolved at all).
+   */
+  allowedOrigins?: string[];
+}
+
+let originGuardConfig: ApiClientOriginGuardConfig = {};
+
 /**
- * Overrides the token retrieval / unauthenticated handling `request()` uses.
- * Consuming apps call this once at startup (e.g. in an app-level provider)
- * to supply their own token storage and redirect behavior; any field omitted
- * keeps its current (default, browser-based) implementation.
+ * Overrides the token retrieval / unauthenticated handling `request()` uses,
+ * and/or configures the opt-in origin guard `request()` enforces. Consuming
+ * apps call this once at startup (e.g. in an app-level provider) to supply
+ * their own token storage and redirect behavior, and/or an `allowedOrigins`
+ * allow-list; any field omitted keeps its current value — an auth-handler-only
+ * call never resets a previously configured guard, and vice versa. Omitting
+ * `allowedOrigins` entirely (the default) never changes `request()`'s
+ * behavior; passing `allowedOrigins: []` is a deliberate "block everything"
+ * configuration, not "guard disabled".
  */
-export function configureApiClient(handler: Partial<ApiClientAuthHandler>): void {
-  authHandler = { ...authHandler, ...handler };
+export function configureApiClient(
+  config: Partial<ApiClientAuthHandler> & Partial<ApiClientOriginGuardConfig>
+): void {
+  const { allowedOrigins, ...handlerFields } = config;
+  authHandler = { ...authHandler, ...handlerFields };
+  if (allowedOrigins !== undefined) {
+    originGuardConfig = { allowedOrigins };
+  }
+}
+
+/**
+ * Resolves the origin `request()` will check against `allowedOrigins`.
+ *
+ * - `URL` instances and absolute URL strings ("https://...") resolve
+ *   directly.
+ * - Relative strings (e.g. "/api/widgets") only resolve when a browser
+ *   `window.location` is available to serve as the base; outside a browser
+ *   (SSR) a relative input's origin cannot be determined and resolution
+ *   intentionally fails (returns `null`).
+ * - Any parse failure returns `null` rather than throwing — the caller
+ *   (`request()`) treats `null` as "not verified as allowed" and fails
+ *   closed.
+ */
+function resolveRequestOrigin(input: string | URL): string | null {
+  try {
+    if (input instanceof URL) return input.origin;
+    if (typeof window !== 'undefined' && window.location) {
+      return new URL(input, window.location.origin).origin;
+    }
+    return new URL(input).origin;
+  } catch {
+    return null;
+  }
 }
 
 // ─── request() ──────────────────────────────────────────────────────────────
@@ -102,8 +161,26 @@ export interface RequestOptions extends RequestInit {
  *   other non-2xx error for inline handling.
  * - On success, the JSON body is parsed and returned typed via `T`; a `204`
  *   or otherwise empty body resolves to `undefined`.
+ * - When `configureApiClient({ allowedOrigins })` is set, a request whose
+ *   resolved target origin is not in the list (or cannot be resolved) is
+ *   rejected before any network call as `ApiRequestError('origin_not_allowed',
+ *   ..., 0)` — the bearer token is never attached and `fetch` is never
+ *   invoked.
  */
 export async function request<T>(input: string | URL, options: RequestOptions = {}): Promise<T> {
+  if (originGuardConfig.allowedOrigins) {
+    const origin = resolveRequestOrigin(input);
+    if (!origin || !originGuardConfig.allowedOrigins.includes(origin)) {
+      throw new ApiRequestError(
+        'origin_not_allowed',
+        origin
+          ? `Request origin "${origin}" is not in the configured allowedOrigins list.`
+          : 'Request origin could not be determined and no allowedOrigins match was possible.',
+        0
+      );
+    }
+  }
+
   const { skipAuthRedirect = false, ...fetchOptions } = options;
   const token = authHandler.getToken();
   const headers: HeadersInit = {
