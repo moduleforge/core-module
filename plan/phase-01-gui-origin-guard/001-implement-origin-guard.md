@@ -162,3 +162,30 @@ Edit the "### gui/ error and toast toolkit" section's `api-types.ts` bullet (aro
 ## Metadata
 
 architectural_impact: false
+
+## Status
+
+**Outcome:** succeeded (2026-07-17)
+
+**Validation summary:**
+1. Typecheck — `cd gui && bun run typecheck` (`tsc --noEmit`) passed with zero errors, after running `bun install` in `gui/` (no `node_modules` was present at worktree provisioning).
+2. Backward-compatibility trace-through — confirmed by code inspection:
+   - `originGuardConfig` is initialized to `{}` (`allowedOrigins` absent/`undefined`) at module load and is only ever reassigned inside `configureApiClient` when its caller explicitly passes `allowedOrigins !== undefined`. With `configureApiClient()` never called, or called without `allowedOrigins`, `originGuardConfig.allowedOrigins` stays `undefined`, so the `if (originGuardConfig.allowedOrigins)` guard at the top of `request()` is falsy and every statement after it runs exactly as before this change — byte-for-byte identical control flow for every existing/dogfooded caller.
+   - `configureApiClient({ getToken: ... })` destructures `allowedOrigins` out of `config` (it is `undefined` when the caller only passes auth-handler fields) and the `if (allowedOrigins !== undefined)` guard skips reassigning `originGuardConfig` in that case — an auth-handler-only call never resets a previously configured guard, and never spuriously enables one.
+3. Manual trace-through of guard branches (by code inspection of the single guard block inserted as the first statement in `request()`, before the `fetchOptions` destructure and before `authHandler.getToken()`):
+   - Absolute-URL string, origin present in `allowedOrigins` → when `window.location` is available, `new URL(input, window.location.origin).origin` resolves an absolute `input` to its own origin (the `base` argument is ignored by the WHATWG URL parser when `input` is already absolute); when no `window` is available, the fallback `new URL(input).origin` branch resolves it the same way. Either path yields the request's actual origin; `.includes` is true; the guard's `if` is false; execution falls through to the unchanged request body.
+   - Absolute-URL string, origin not in `allowedOrigins` → `resolveRequestOrigin` returns a non-null origin; `.includes` is false; `ApiRequestError('origin_not_allowed', ..., 0)` is thrown synchronously, before the `try { fetch(...) }` block — `fetch` is never invoked and `authHandler.getToken()` is never called for this request.
+   - `URL` object input, matching and non-matching — `resolveRequestOrigin`'s `input instanceof URL` branch returns `input.origin` directly; same match/reject logic as above applies.
+   - Relative string input (e.g. `"/v1/widgets"`) in a browser context — `typeof window !== 'undefined' && window.location` is true, so `new URL(input, window.location.origin).origin` resolves the relative path against the current page origin; matches or rejects accordingly.
+   - Relative string input with no `window` (SSR) and a guard configured — the `window` branch is skipped, falls to `new URL(input).origin`, which throws for a bare relative path (no base) — caught by the `try/catch`, returns `null`; back in `request()`, `!origin` is true so the request is rejected regardless of `allowedOrigins` contents (fail-closed per Requirement 4's "including when the target origin cannot be resolved at all" clause).
+   - `allowedOrigins: []` configured explicitly — `originGuardConfig.allowedOrigins` is `[]`, which is truthy as an array reference, so the outer `if` still runs; `[].includes(origin)` is always `false` for any resolved origin, so every request is rejected. Confirmed by reading `configureApiClient`: `allowedOrigins` is stored as given (`{ allowedOrigins }`) with no `.length` check or other special-casing of the empty-array case anywhere in the module.
+4. Grep sweep — `grep -n "allowedOrigins" gui/src/lib/api-client.ts` shows the interface field, module state (`originGuardConfig`), the `configureApiClient` destructure/reassignment, the `resolveRequestOrigin` JSDoc reference, and the `request()` guard check, with no stray/duplicate declarations. `grep -n "origin_not_allowed" gui/src/lib/api-client.ts` shows the one throw site plus its two JSDoc mentions (on the `allowedOrigins` field doc comment and on `request()`'s doc comment) — no duplicate throw sites.
+5. AGENTS.md check — the "### gui/ error and toast toolkit" section's `api-types.ts` bullet (line 114) now mentions the `allowedOrigins` guard, its throw-before-fetch behavior, and its no-op-when-unconfigured default; `git diff AGENTS.md` confirms no other line in the file changed.
+6. Public API surface check — `ApiClientOriginGuardConfig` is declared `export interface` at module top level, consistent with `ApiClientAuthHandler`/`RequestOptions`. `gui/src/lib/index.ts` and `gui/src/index.ts` both re-export via `export * from './api-client'` (and `export * from './lib'` respectively) rather than naming individual symbols, so the new interface is re-exported automatically with no additional re-export line needed — matches the file's existing re-export style.
+
+**Affected source files:**
+- `gui/src/lib/api-client.ts`
+- `AGENTS.md`
+- `plan/phase-01-gui-origin-guard/001-implement-origin-guard.md` (this file)
+
+**Assumptions relied on (from `## Assumptions`):** all three — exact-string origin comparison (no wildcard matching), `URL.origin` normalization is sufficient with no extra step, and no current in-repo consumer calls `request()` (re-confirmed via `grep -rn "configureApiClient\|api-client" gui/src` during implementation — only the pre-existing `ApiRequestError` type import in `use-api-error.ts`).
