@@ -15,5 +15,6 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-01-task-01-implement-origin-guard
-            commit: []
+            commit:
+                - 36c3c5d
             merge: null
