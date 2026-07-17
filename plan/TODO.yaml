@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: gui-origin-guard
       title: GUI API Client Origin Guard
+      diff_base: 3225c4bd92c12cf5b122dd905ee4b20e3cfc51c3
       tasks:
         - number: 1
           slug: implement-origin-guard
