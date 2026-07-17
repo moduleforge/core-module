@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
@@ -154,10 +155,18 @@ func (s *NaturalPersonService) CreateInTx(
 	in.GivenName = strings.TrimSpace(in.GivenName)
 	in.FamilyName = strings.TrimSpace(in.FamilyName)
 	if in.GivenName == "" {
-		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("%w: given_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "given_name",
+			Code:    "natural_persons.given_name_required",
+			Message: "given_name is required",
+		})
 	}
 	if in.FamilyName == "" {
-		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "family_name",
+			Code:    "natural_persons.family_name_required",
+			Message: "family_name is required",
+		})
 	}
 	return s.createNaturalPersonInTx(ctx, tx, in)
 }
@@ -180,10 +189,18 @@ func (s *NaturalPersonService) Create(
 	in.GivenName = strings.TrimSpace(in.GivenName)
 	in.FamilyName = strings.TrimSpace(in.FamilyName)
 	if in.GivenName == "" {
-		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, fmt.Errorf("%w: given_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "given_name",
+			Code:    "natural_persons.given_name_required",
+			Message: "given_name is required",
+		})
 	}
 	if in.FamilyName == "" {
-		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, fmt.Errorf("%w: family_name is required", ErrInvalidInput)
+		return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "family_name",
+			Code:    "natural_persons.family_name_required",
+			Message: "family_name is required",
+		})
 	}
 
 	// 2. Mutate inside a transaction; observers participate in the same tx.

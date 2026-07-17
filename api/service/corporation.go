@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
@@ -82,7 +83,11 @@ func (s *CorporationService) Create(
 
 	in.LegalName = strings.TrimSpace(in.LegalName)
 	if in.LegalName == "" {
-		return coredb.CreateCorporationRow{}, uuid.UUID{}, fmt.Errorf("%w: legal_name is required", ErrInvalidInput)
+		return coredb.CreateCorporationRow{}, uuid.UUID{}, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "legal_name",
+			Code:    "corporations.legal_name_required",
+			Message: "legal_name is required",
+		})
 	}
 
 	// 2. Mutate inside a transaction; observers participate in the same tx.

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
@@ -74,7 +75,11 @@ func (s *ServiceAccountService) Create(
 
 	in.Label = strings.TrimSpace(in.Label)
 	if in.Label == "" {
-		return coredb.ServiceAccount{}, uuid.UUID{}, fmt.Errorf("%w: label is required", ErrInvalidInput)
+		return coredb.ServiceAccount{}, uuid.UUID{}, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "label",
+			Code:    "service_accounts.label_required",
+			Message: "label is required",
+		})
 	}
 
 	// 2. Mutate inside a transaction; observers participate in the same tx.
