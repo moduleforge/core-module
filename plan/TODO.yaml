@@ -13,6 +13,7 @@ phases:
           path: phase-01-gui-origin-guard/001-implement-origin-guard.md
           done: false
           tier: sonnet-high
+          digest: 'Added an opt-in allowedOrigins: string[] allow-list guard to gui/src/lib/api-client.ts, resolving followup 7VD3. configureApiClient() now accepts both auth-handler fields and allowedOrigins, merging each independently. New private resolveRequestOrigin() helper resolves target origin from string|URL input (browser-relative-safe, SSR-safe, never throws). request() enforces the guard as its first statement, throwing ApiRequestError(''origin_not_allowed'', ..., 0) before any network call when the origin is disallowed or unresolvable. Unconfigured default is a complete no-op, verified byte-for-byte against pre-change control flow. AGENTS.md''s api-types.ts bullet updated accordingly. tsc --noEmit passes with zero errors; no automated test runner exists in gui/ (followup vr20, out of scope).'
           git:
             branch: phase-01-task-01-implement-origin-guard
             commit:
