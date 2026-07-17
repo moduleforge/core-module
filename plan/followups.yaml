@@ -10,11 +10,6 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Pre-existing gap (not introduced by this plan): gui/ has no vitest/jest dependency or test script, though the React Developer role doc calls for component tests as a core responsibility. Sibling tasks 002/003 shipped without tests since neither task doc''s Validation section required them. Decide whether/when to add a test runner to gui/.'
-    - title: request() has no origin check for token
-      id: 7VD3
-      date: "2026-07-15"
-      tag: phase-02-gui-error-widgets
-      text: 'Phase-02 security review (security-001, suggestion/medium-confidence): request() (gui/src/lib/api-client.ts ~106-119) attaches the bearer token to whatever URL the caller passes, with no same-origin/allow-listed-host check. Not exploitable from anything in this diff (no consumer wired yet) - risk depends entirely on how a future consumer calls request(). Consider an optional allowedOrigins/base-URL guard in configureApiClient or request(), or document the implicit same-origin assumption in the doc comment.'
     - title: Default token storage uses localStorage
       id: pBoG
       date: "2026-07-15"
