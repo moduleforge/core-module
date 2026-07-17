@@ -44,3 +44,17 @@ Carried forward in `plan/followups.yaml` (followup `7VD3`, this plan's own subje
 - **`vr20` — `gui/` package has no test runner configured.** Pre-existing gap, not introduced by this plan. The React Developer role doc calls for component tests as a core responsibility, but sibling tasks (and this plan's task) have shipped without them since no task doc's Validation section required them. Decide whether/when to add a test runner to `gui/`.
 - **`pBoG` — Default token storage uses `localStorage`.** Low-confidence/suggestion-level finding from an earlier security review: the default `ApiClientAuthHandler` (`gui/src/lib/api-client.ts`) stores/reads the bearer token via `window.localStorage`, which is XSS-exfiltrable. Intentionally mirrors existing `mod-users` behavior, not a new regression; `configureApiClient` already lets consumers substitute a safer strategy. No action needed now — revisit if/when the project moves toward httpOnly-cookie or in-memory-token storage.
 - **`womX` — Service validation-reason text lost on 400s.** Unrelated to this plan (tagged `phase-01-apiresp-go`, a Go API-layer finding); listed here only because it remains open in the shared `plan/followups.yaml`. Adopting `apiresp.WriteError` drops specific validation-reason text that older `writeServiceErr`-based errors used to surface. Decide: accept as a documented tradeoff, or route the relevant service-layer validation errors through `apiresp.InvalidInput(FieldError{...})` so the reason survives in `details[]`.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — GUI API Client Origin Guard
+
+- [x] [001-implement-origin-guard.md](./phase-01-gui-origin-guard/001-implement-origin-guard.md) — tier `sonnet-high` · branch `phase-01-task-01-implement-origin-guard` · commit `36c3c5d` · merge `e8b944e974ffd8c0a636fca829adb322ca37a6d0`
