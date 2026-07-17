@@ -3,27 +3,11 @@
   "entries": {
     "todo": {},
     "followup": {
-      "womX": {
-        "sig": "a408bd5addd6d738c2ef91fd7562101b",
-        "effort_bucket": "medium",
-        "utility_bucket": "medium",
-        "rationale": "Routes 3 service files' validation errors through apiresp.InvalidInput(FieldError) so client-visible detail text survives; contained but touches 3 files + tests.",
-        "scored_at": "2026-07-15T21:15:00Z",
-        "metrics_generated_at": null
-      },
       "vr20": {
         "sig": "b86864aff423af60718152e23e16d95d",
         "effort_bucket": "high",
         "utility_bucket": "medium",
         "rationale": "Adding a test runner to gui/ is a real infra investment (deps, config, CI wiring, initial coverage) with no urgent driver; valuable long-term.",
-        "scored_at": "2026-07-15T21:15:00Z",
-        "metrics_generated_at": null
-      },
-      "7VD3": {
-        "sig": "68cdf9d7b1255c2ef16b77b8718d306f",
-        "effort_bucket": "low",
-        "utility_bucket": "medium",
-        "rationale": "Doc-comment fix is trivial; a real origin-check guard is still small. Utility currently theoretical since no consumer calls request() yet.",
         "scored_at": "2026-07-15T21:15:00Z",
         "metrics_generated_at": null
       },
