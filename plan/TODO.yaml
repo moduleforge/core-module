@@ -1,0 +1,8 @@
+slug: api-client-origin-guard
+version: 1
+title: ""
+phases:
+    - number: 1
+      slug: gui-origin-guard
+      title: GUI API Client Origin Guard
+      tasks: []
