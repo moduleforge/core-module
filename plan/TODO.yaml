@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: gui-origin-guard
       title: GUI API Client Origin Guard
-      tasks: []
+      tasks:
+        - number: 1
+          slug: implement-origin-guard
+          title: Implement Origin Guard
+          path: phase-01-gui-origin-guard/001-implement-origin-guard.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
