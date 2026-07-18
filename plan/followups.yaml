@@ -1,10 +1,5 @@
 version: 1
 items:
-    - title: gui/ package has no test runner configured
-      id: vr20
-      date: "2026-07-15"
-      tag: phase-02-gui-error-widgets
-      text: 'Pre-existing gap (not introduced by this plan): gui/ has no vitest/jest dependency or test script, though the React Developer role doc calls for component tests as a core responsibility. Sibling tasks 002/003 shipped without tests since neither task doc''s Validation section required them. Decide whether/when to add a test runner to gui/.'
     - title: 'Task worktree''s node_modules was not present '
       id: 0xGl
       date: "2026-07-18"
