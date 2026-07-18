@@ -18,7 +18,7 @@ phases:
             branch: phase-01-task-01-add-test-runner-dependencies-a
             commit:
                 - 13e38df
-            merge: null
+            merge: 700b1d0
         - number: 2
           slug: add-initial-component-and-lib-tests
           title: Add Initial Component And Lib Tests
