@@ -39,4 +39,12 @@ describe('ErrorBanner', () => {
     render(<ErrorBanner error="Something went wrong." />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  test('renders an AlertCircle icon as the first child of the alert', () => {
+    render(<ErrorBanner error="Something went wrong." />);
+    const alert = screen.getByRole('alert');
+    const icon = alert.querySelector('svg');
+    expect(icon).toBeInTheDocument();
+    expect(alert.firstElementChild).toBe(icon);
+  });
 });
