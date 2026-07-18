@@ -40,4 +40,4 @@ phases:
             branch: phase-01-task-03-wire-gui-tests-into-root-test
             commit:
                 - 9e64281
-            merge: null
+            merge: e4b0980
