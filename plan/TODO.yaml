@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: gui-test-infrastructure
       title: GUI Test Infrastructure
+      diff_base: 7605372ce0974b7f652c25f8e56cc77ed5f18458
       tasks:
         - number: 1
           slug: add-test-runner-dependencies-and-config
