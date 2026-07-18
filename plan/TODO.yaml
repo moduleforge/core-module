@@ -27,7 +27,8 @@ phases:
           tier: sonnet-med
           git:
             branch: phase-01-task-02-add-initial-component-and-lib
-            commit: []
+            commit:
+                - b578d75
             merge: null
         - number: 3
           slug: wire-gui-tests-into-root-test-target
