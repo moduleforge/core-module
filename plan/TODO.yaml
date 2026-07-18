@@ -30,7 +30,7 @@ phases:
             branch: phase-01-task-02-add-initial-component-and-lib
             commit:
                 - b578d75
-            merge: null
+            merge: 3075f71
         - number: 3
           slug: wire-gui-tests-into-root-test-target
           title: Wire GUI Tests Into Root Test Target
