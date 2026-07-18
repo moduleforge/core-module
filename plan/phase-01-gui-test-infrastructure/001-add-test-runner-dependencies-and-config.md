@@ -87,6 +87,15 @@ Run all of the following from `gui/` (after `bun install` to pick up the new loc
 - `gui/package.json`, `gui/tsconfig.json`, `gui/tsup.config.ts`, `gui/vite.config.ts` — current config this task must not regress.
 - [Bun's Testing Library guide](https://bun.com/docs/guides/test/testing-library) — upstream source for the two-file preload split and the `Matchers<T>` (no default) augmentation pattern.
 
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-18
+- **Validation summary:** `bun run test` (0 fail, 0 test files, exit 0 after fix below), `bun run typecheck` (pass, no tsconfig change needed — Requirement 6 confirmed), `bun run build` (success; `dist/` contains only `index.js`, `index.mjs`, `index.d.ts`/`.mts`, and their maps — no test/preload/support files leaked in). `git diff --stat` confirms the change set is limited to `gui/package.json`, `gui/bun.lock`, `gui/happydom.ts`, `gui/testing-library-setup.ts`, `gui/bunfig.toml`, `gui/src/test-support/matchers.d.ts`.
+- **Affected source files:** `gui/package.json`, `gui/bun.lock`, `gui/happydom.ts`, `gui/testing-library-setup.ts`, `gui/bunfig.toml`, `gui/src/test-support/matchers.d.ts`.
+- **Assumptions applied:** Bun 1.3.14 was the available toolchain (matches the Assumptions section exactly); `bun install` had registry access.
+- **Discrepancy from this doc's spike-verified expectation:** Requirement 5's literal script (`"test": "bun test"`) does **not** produce a clean exit-0 zero-test run against the installed Bun 1.3.14 — `bun test` with zero matching test files exits 1 with `error: 0 test files matching ...`, not the 0-fail/exit-0 outcome this doc's Validation section describes as an acceptable passing state. This appears to be a gap in the spike (the spike's feasibility run always had 4 real test cases; it does not record having exercised the true zero-test-file case). Fixed in-scope by changing the `test` script to `"bun test --pass-with-no-tests"` (Bun's own flag for exactly this scenario, per `bun test --help`); `bun run test` now exits 0 with zero test files, satisfying the Validation section's literal expectation. Note this fix is script-scoped: bare `bun test` (bypassing the `package.json` script) still exits 1 on zero test files in this Bun version, since Bun has no `bunfig.toml`-level equivalent to `--pass-with-no-tests`. This will stop mattering once task 002 adds real test files (nonzero match count no longer hits this path).
+
 ## Metadata
 
 architectural_impact: false
