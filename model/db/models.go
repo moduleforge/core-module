@@ -12,9 +12,10 @@ import (
 )
 
 type App struct {
-	ID   int64  `json:"id"`
-	Slug string `json:"slug"`
-	Name string `json:"name"`
+	ID        int64              `json:"id"`
+	Slug      string             `json:"slug"`
+	Name      string             `json:"name"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Corporation struct {

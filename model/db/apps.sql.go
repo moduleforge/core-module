@@ -15,7 +15,7 @@ import (
 
 const getAppBySlug = `-- name: GetAppBySlug :one
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE a.slug = $1
@@ -48,7 +48,7 @@ func (q *Queries) GetAppBySlug(ctx context.Context, slug string) (GetAppBySlugRo
 
 const getAppByUUID = `-- name: GetAppByUUID :one
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE e.uuid = $1
@@ -92,21 +92,27 @@ type InsertAppParams struct {
 	Name string `json:"name"`
 }
 
+type InsertAppRow struct {
+	ID   int64  `json:"id"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
 // Entity creation (fundamental_type = 'app') and archival reuse the existing
 // generic entities.sql queries (GetTypeBySlug + CreateEntity to create,
 // ArchiveEntity to archive) — the same pattern every other entity subtype
 // (corporation, natural_person, service_account) already follows. Only the
 // apps-table-specific operations are defined here.
-func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (App, error) {
+func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (InsertAppRow, error) {
 	row := q.db.QueryRow(ctx, insertApp, arg.ID, arg.Slug, arg.Name)
-	var i App
+	var i InsertAppRow
 	err := row.Scan(&i.ID, &i.Slug, &i.Name)
 	return i, err
 }
 
 const listApps = `-- name: ListApps :many
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE e.archived_at IS NULL
