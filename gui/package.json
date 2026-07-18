@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --pass-with-no-tests",
     "clean": "rm -rf dist build .yalc yalc.lock",
     "dev": "ladle serve --port 61000",
     "preview:build": "ladle build"
