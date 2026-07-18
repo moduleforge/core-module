@@ -1,0 +1,57 @@
+# Plan Summary: gui-test-runner
+
+## What was planned and why
+
+This plan resolved follow-up **vr20** ("gui/ package has no test runner configured"), recorded 2026-07-15 against tag `phase-02-gui-error-widgets`: `gui/` (`@moduleforge/core-gui`) had no test runner configured at all — no `vitest`/`jest`/`bun test` dependency and no `test` script — even though the React Developer role doc calls for component tests as a core responsibility, and sibling tasks 002/003 had shipped without tests since neither task doc's Validation section required them.
+
+The plan added a `bun:test` + `happy-dom` + Testing Library test runner to `mod-core/gui`, which previously had zero test tooling, and established the initial testing pattern for the package (not exhaustive coverage). Scope was deliberately bounded to `gui/`'s own tooling and its immediate consumers (the root `Makefile` and `AGENTS.md`); exhaustive component coverage, CI workflow changes (none exist in this repo), and standardizing a test runner across sibling ModuleForge modules' `gui/` packages were all explicitly out of scope. Hard constraints were that the change must not break `make build` / `bun run build` (tsup) or `bun run typecheck` (`tsc --noEmit`), and must not introduce dependencies incompatible with the `react`/`react-dom` `^19` peer ranges already pinned in `gui/package.json`.
+
+## What shipped
+
+Single phase, **`gui-test-infrastructure`**, three sequential/parallel-annotated tasks, all done:
+
+- **Task 001 — Add Test Runner Dependencies And Config** (commit `13e38df`, merged `700b1d0`). Added the `bun test` + happy-dom + Testing Library stack to `gui/` per the spike-verified recipe: 5 devDependencies, a two-file preload split (`gui/happydom.ts`, `gui/testing-library-setup.ts`), `gui/bunfig.toml`, and `src/test-support/matchers.d.ts`. `gui/tsconfig.json` was left untouched, confirming the spike's claim that no tsconfig changes were needed. The task also caught and fixed a real gap the spike hadn't surfaced: Bun 1.3.14 exits 1 (not 0) on a zero-test `bun test` run, so the `test` script uses `--pass-with-no-tests`. All validation (test/typecheck/build) passed.
+
+- **Task 002 — Add Initial Component And Lib Tests** (commit `b578d75`, merged `3075f71`). Added the first three real test files in `gui/`: `FieldError.test.tsx` (4 cases), `ErrorBanner.test.tsx` (6 cases), and `lib/api-client.test.ts` (4 cases: 200 success, 204 empty body, network-error rejection, 404 non-2xx envelope), mocking `global.fetch` per-test with `afterEach` restoration. The task worktree needed a `bun install` to materialize `node_modules` from the already-correct `gui/bun.lock` before validation could run — an install-from-existing-lockfile operation, not a dependency change. All four validation checks (test, typecheck, build, repeat-run for leakage) passed cleanly.
+
+- **Task 003 — Wire GUI Tests Into Root Test Target** (commit `9e64281`, merged `e4b0980`). Wired the `gui/` `bun run test` script (added by task 001) into the root `Makefile`'s `test` target, adding a `bun run test` step for gui immediately before the existing `bun run typecheck` step, and updated the target's header comment and help description to read "model, api, and gui; typecheck gui". Updated `AGENTS.md`'s Build commands and Test commands sections to match, adding direct per-subproject `cd gui && bun run test` / `cd gui && bun run typecheck` lines and retiring the stale "gui is typecheck-only" framing. A full `make test` run exited 0 end-to-end; the gui test step saw zero test files at that point since sibling task 002 had not yet landed in that worktree — an expected, non-blocking condition given `--pass-with-no-tests`.
+
+In addition to the three plan tasks, one follow-on trivial fix shipped in this session: **commit `e9becb8`** ("docs: align comment column in AGENTS.md test commands block"), merged as **`7a2c8e2`**. This was a comment-alignment nit in `AGENTS.md` flagged by the phase-boundary correctness review after task 003 landed, and was fixed and merged as part of closing out this session even though it is not itself a plan task.
+
+## Key decisions
+
+- **Test runner: `bun test` + `@happy-dom/global-registrator` + Testing Library, over Vitest or Jest.** `gui/`'s package manager and script runner is already Bun (`bun.lock` present, all scripts invoked via `bun run`), and `bun test` is a Jest-API-compatible runner (`describe`/`test`/`expect`/`mock`) already present in the `bun` binary this project already requires. This choice adds no new *test-framework* dependency — only DOM/testing-library support packages (`@happy-dom/global-registrator`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/jest-dom`, `@types/bun`). Vitest was rejected despite native Vite integration (`gui/` already has a `vite.config.ts`) because it would introduce a second test-runner dependency graph on top of a project that already standardizes its JS/TS toolchain on Bun, with no functional advantage found for this package's current, modest testing needs. Jest was rejected as foreign to the stack, requiring a Babel/ts-jest transform pipeline duplicating work Vite/tsup/Bun already do, with no existing local Jest usage to amortize setup cost against. A hands-on feasibility spike (recorded in `plan/notes/test-runner-choice.md`) confirmed React 19 rendering, `@testing-library/jest-dom` matcher types under `gui/tsconfig.json`'s existing strict settings (no tsconfig changes needed), and `global.fetch` mocking for the `request()` wrapper all work cleanly on the installed Bun 1.3.14 toolchain.
+
+- **Two-file preload split is required, not stylistic.** The spike found that a single combined preload file importing `@testing-library/react` and calling `GlobalRegistrator.register()` fails at runtime, because ESM import hoisting evaluates `@testing-library/react`'s module-level code (which touches `document`) before the registrator call. Task 001 implements the required split verbatim: `gui/happydom.ts` (registrator only), then `gui/testing-library-setup.ts` (`expect.extend` + `afterEach(cleanup)`), matching Bun's own documented pattern.
+
+- **`Matchers<T>` type augmentation must declare no default type parameter**, to interface-merge cleanly with `bun-types`' own `Matchers<T = unknown>` declaration without a `TS2428` conflict — confirmed by the spike and implemented in `src/test-support/matchers.d.ts`.
+
+- **Test files are colocated as `*.test.ts(x)` next to the source they test**, mirroring the existing `*.stories.tsx` colocation convention already used in `gui/`, so no separate `test/`/`__tests__/` directory convention was introduced and tsup's bundle/`dts` output (which only follows the import graph from `src/index.ts`) never picks the test files up.
+
+- **`--pass-with-no-tests` on the `gui/` `test` script**, added in task 001 after discovering (not anticipated by the spike) that Bun 1.3.14's `bun test` exits 1, not 0, on a zero-test run — this keeps the script passing both before task 002's test files land and after.
+
+## Follow-up items
+
+- **Bun 1.3.14 `bun test` exit-code quirk on zero tests** (followup `fUUe`, tag `gui-test-infrastructure`). Bun 1.3.14's `bun test` exits 1 (not 0) when zero test files match, contrary to what task 001's Validation section originally described as an acceptable passing state — a gap in the spike's feasibility run. Resolved in-scope via `--pass-with-no-tests` on the `test` script; now that task 002 has added real test files, bare `bun test` also passes again, so this flag is informational for phase-01 review rather than a pending action.
+
+- **Flow-tooling process note: nested lockfile detection** (followup `0xGl`, tag `gui-test-infrastructure`). Task 002's worktree did not have `node_modules` present at task start even though `gui/bun.lock` already contained the required devDependencies from task 001 — `dependencies_installed` was reported as "none" since only the repo root lacks a lockfile, and `prepare-task-worktree`'s dependency-install detection apparently only checks root-level lockfiles, not nested lockfiles like `gui/bun.lock`. The task agent ran `bun install` inside `gui/` to materialize `node_modules` (no lockfile/manifest changes resulted) rather than halting. Worth carrying forward as a process note for future plan executions in monorepo-style layouts with a nested-only lockfile: every task worktree touching `gui/` will need its own `bun install` step until this detection gap is addressed.
+
+- **Lockfile-hoisting note (ansi-regex/ansi-styles) — verified benign, no follow-up needed.** The phase-boundary review's security lens flagged a lockfile-hoisting note involving `ansi-regex`/`ansi-styles` versions in `gui/bun.lock`. The manager independently verified this via web search and confirmed it is benign, ordinary transitive-dependency hoisting rather than a real issue — no follow-up item was recorded for it.
+
+- **Follow-up vr20 itself** is resolved by this plan; its removal from `plan/followups.yaml` is a manager action outside this plan's own scope.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — GUI Test Infrastructure
+
+- [x] [001-add-test-runner-dependencies-and-config.md](./phase-01-gui-test-infrastructure/001-add-test-runner-dependencies-and-config.md) — tier `sonnet-med` · branch `phase-01-task-01-add-test-runner-dependencies-a` · commit `13e38df` · merge `700b1d0`
+- [x] [002-add-initial-component-and-lib-tests.md](./phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md) — tier `sonnet-med` · branch `phase-01-task-02-add-initial-component-and-lib` · commit `b578d75` · merge `3075f71`
+- [x] [003-wire-gui-tests-into-root-test-target.md](./phase-01-gui-test-infrastructure/003-wire-gui-tests-into-root-test-target.md) — tier `sonnet-med` · branch `phase-01-task-03-wire-gui-tests-into-root-test` · commit `9e64281` · merge `e4b0980`

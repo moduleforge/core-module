@@ -5,3 +5,13 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Pre-existing gap (not introduced by this plan): gui/ has no vitest/jest dependency or test script, though the React Developer role doc calls for component tests as a core responsibility. Sibling tasks 002/003 shipped without tests since neither task doc''s Validation section required them. Decide whether/when to add a test runner to gui/.'
+    - title: 'Bun 1.3.14''s `bun test` exits 1 (not 0) when '
+      id: fUUe
+      date: "2026-07-18"
+      tag: gui-test-infrastructure
+      text: '[phase-01-gui-test-infrastructure/001-add-test-runner-dependencies-and-config.md] Bun 1.3.14''s `bun test` exits 1 (not 0) when zero test files match, contrary to what this task doc''s Validation section described as an acceptable passing state — a gap in the spike''s feasibility run. Resolved in-scope via `--pass-with-no-tests` on the `test` script. Once task 002 adds real test files, bare `bun test` will also pass again — this flag is informational for phase-01 review, not a pending action.'
+    - title: 'Task worktree''s node_modules was not present '
+      id: 0xGl
+      date: "2026-07-18"
+      tag: gui-test-infrastructure
+      text: '[phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md] Task worktree''s node_modules was not present at task start even though gui/bun.lock already contained the required devDependencies from task 001 (dependencies_installed was reported as ''none'' since only the repo root lacks a lockfile — create-worktree.sh''s dependency-install detection apparently only checks root-level lockfiles, not nested gui/bun.lock). The task agent ran `bun install` inside gui/ to materialize node_modules (no lockfile/manifest changes resulted) rather than halting. Worth a process note for future plan executions in monorepo-style layouts with a nested-only lockfile: prepare-task-worktree''s dependency detection doesn''t descend into subdirectories, so every task worktree touching gui/ will need its own `bun install` step.'

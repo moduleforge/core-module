@@ -9,7 +9,7 @@
 #
 # Targets:
 #   build    — build model, api, and gui
-#   test     — run unit tests on model and api; typecheck gui
+#   test     — run unit tests on model, api, and gui; typecheck gui
 #   clean    — remove build artifacts from model, api, and gui
 #   preview  — run the Ladle workbench for gui (localhost:61000)
 #   help     — list available targets
@@ -33,11 +33,13 @@ build: ## Build model, api, and gui
 	@cd $(GUI_DIR) && bun run build
 
 .PHONY: test
-test: ## Test model and api; typecheck gui
+test: ## Test model, api, and gui; typecheck gui
 	@for d in $(GO_SUBPROJECTS); do \
 		echo "==> test: core-module/$$d"; \
 		$(MAKE) --no-print-directory -C $$d test; \
 	done
+	@echo "==> test: core-module/$(GUI_DIR)"
+	@cd $(GUI_DIR) && bun run test
 	@echo "==> typecheck: core-module/$(GUI_DIR)"
 	@cd $(GUI_DIR) && bun run typecheck
 

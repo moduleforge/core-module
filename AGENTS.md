@@ -31,7 +31,7 @@ See [docs/mf-standards/manifest-spec.md](./docs/mf-standards/manifest-spec.md) f
 
 ```sh
 make build           # build model (sqlc generate), api (go build ./...), and gui
-make test            # unit-test api; typecheck gui (model has no unit tests)
+make test            # unit-test api; unit-test + typecheck gui (model has no unit tests)
 make clean           # remove build artifacts from all sub-projects
 ```
 
@@ -46,10 +46,12 @@ cd gui   && bun run build    # Vite/tsup bundle
 ## Test commands
 
 ```sh
-make test                    # unit tests (api) + gui typecheck
+make test                    # unit tests (api) + gui test + gui typecheck
 cd api && make test          # go test ./...
 cd api && make lint          # go vet ./... + gofmt check
 cd api && make lint-fix      # gofmt -w .
+cd gui && bun run test       # bun test (component/unit tests)
+cd gui && bun run typecheck  # tsc --noEmit
 cd model && make verify      # goose validate + sqlc compile
 cd model && make lint        # apply migrations to ephemeral Postgres (requires Docker)
 ```
