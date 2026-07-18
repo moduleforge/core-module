@@ -1,0 +1,15 @@
+{
+  "generated_at_commit": "c69e8db",
+  "generated_at": "2026-07-18T23:43:35Z",
+  "method": "self-compute",
+  "command_run": null,
+  "metrics": {
+    "go": { "files": 72, "loc": 12306, "complexity_estimate": 1250 },
+    "bash": { "files": 1, "loc": 74, "complexity_estimate": 13 },
+    "markdown": { "files": 14, "loc": 1204, "complexity_estimate": 0 },
+    "typescript": { "files": 34, "loc": 1733, "complexity_estimate": 132 },
+    "javascript": { "files": 1, "loc": 8, "complexity_estimate": 0 },
+    "sql": { "files": 24, "loc": 765, "complexity_estimate": 18 },
+    "totals": { "files": 146, "loc": 16090, "complexity_estimate": 1413 }
+  }
+}
