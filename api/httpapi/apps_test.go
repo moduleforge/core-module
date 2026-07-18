@@ -18,6 +18,7 @@ import (
 	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/entity"
 	"github.com/moduleforge/core-api/observer"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -91,6 +92,12 @@ type appsFakeQuerier struct {
 	archiveErr      error
 	getAppByUUIDErr error
 	listAppsErr     error
+
+	// getAppByUUIDCalls counts GetAppByUUID invocations so tests can assert
+	// the full row is never loaded when authorization denies the request
+	// (i.e. authz runs against the bare resolved id before any row data is
+	// fetched).
+	getAppByUUIDCalls int
 }
 
 func newAppsFakeQuerier() *appsFakeQuerier {
@@ -135,19 +142,20 @@ func (q *appsFakeQuerier) CreateEntity(_ context.Context, fundamentalTypeID int6
 	return ent, nil
 }
 
-func (q *appsFakeQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (coredb.App, error) {
+func (q *appsFakeQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (coredb.InsertAppRow, error) {
 	if q.insertAppErr != nil {
-		return coredb.App{}, q.insertAppErr
+		return coredb.InsertAppRow{}, q.insertAppErr
 	}
 	ent := q.entities[arg.ID]
 	q.apps[arg.ID] = coredb.GetAppByUUIDRow{
 		ID: arg.ID, Uuid: ent.Uuid, Slug: arg.Slug, Name: arg.Name,
 		CreatedAt: ent.CreatedAt, UpdatedAt: ent.UpdatedAt,
 	}
-	return coredb.App{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
+	return coredb.InsertAppRow{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
 }
 
 func (q *appsFakeQuerier) GetAppByUUID(_ context.Context, argUuid uuid.UUID) (coredb.GetAppByUUIDRow, error) {
+	q.getAppByUUIDCalls++
 	if q.getAppByUUIDErr != nil {
 		return coredb.GetAppByUUIDRow{}, q.getAppByUUIDErr
 	}
@@ -235,8 +243,29 @@ func (q *appsFakeQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (
 func (q *appsFakeQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
 	return coredb.GetEntityByIDRow{}, nil
 }
-func (q *appsFakeQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
-	return coredb.GetEntityByUUIDRow{}, nil
+
+// GetEntityByUUID backs entity.Resolver.Resolve, which AppsHandler now calls
+// (via loadAppByUUIDParam) to authorize against the bare entity id before
+// loading the full app row. It must actually resolve — a stub that always
+// succeeds would silently defeat the not-found test cases below.
+func (q *appsFakeQuerier) GetEntityByUUID(_ context.Context, argUuid uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
+	for id, a := range q.apps {
+		if a.Uuid == argUuid {
+			return coredb.GetEntityByUUIDRow{
+				ID: id, Uuid: a.Uuid, FundamentalTypeID: 99, FundamentalTypeSlug: "app",
+				CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, ArchivedAt: a.ArchivedAt,
+			}, nil
+		}
+	}
+	for id, e := range q.entities {
+		if e.Uuid == argUuid {
+			return coredb.GetEntityByUUIDRow{
+				ID: id, Uuid: e.Uuid, FundamentalTypeID: e.FundamentalTypeID, FundamentalTypeSlug: "app",
+				CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt, ArchivedAt: e.ArchivedAt,
+			}, nil
+		}
+	}
+	return coredb.GetEntityByUUIDRow{}, pgx.ErrNoRows
 }
 func (q *appsFakeQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
@@ -265,9 +294,19 @@ var _ coredb.Querier = (*appsFakeQuerier)(nil)
 
 type appsFakeAuthorizer struct {
 	err error
+
+	// lastAction/lastTarget record the most recent Authorize call so tests
+	// can assert on what target id AppsHandler passed — in particular, that
+	// Create passes the resolved app type id (not nil) and that
+	// GetApp/UpdateApp/DeleteApp pass the resolved entity id (not the full
+	// row) ahead of loading data.
+	lastAction string
+	lastTarget *int64
 }
 
-func (a *appsFakeAuthorizer) Authorize(_ context.Context, _ string, _ *int64) error {
+func (a *appsFakeAuthorizer) Authorize(_ context.Context, action string, target *int64) error {
+	a.lastAction = action
+	a.lastTarget = target
 	return a.err
 }
 
@@ -277,7 +316,8 @@ func (a *appsFakeAuthorizer) Authorize(_ context.Context, _ string, _ *int64) er
 // bypassing real SQL/tx routing (mirrors service/mock_test.go's
 // mockQuerierFactory pattern in this repo's other test package).
 func newTestAppsHandler(q *appsFakeQuerier, az *appsFakeAuthorizer) *AppsHandler {
-	h := NewAppsHandler(newFakeAppsDB(), q, az, observer.NewObserverGroup(), entity.NewResolver())
+	typeResolver := types.NewFromMap(map[string]int64{"app": 99})
+	h := NewAppsHandler(newFakeAppsDB(), q, az, observer.NewObserverGroup(), entity.NewResolver(), typeResolver)
 	h.newQuerier = func(_ pgx.Tx) coredb.Querier { return q }
 	return h
 }
@@ -292,7 +332,8 @@ func appsRouter(h *AppsHandler) chi.Router {
 
 func TestAppsCreate_201(t *testing.T) {
 	q := newAppsFakeQuerier()
-	h := newTestAppsHandler(q, &appsFakeAuthorizer{})
+	az := &appsFakeAuthorizer{}
+	h := newTestAppsHandler(q, az)
 	router := appsRouter(h)
 
 	body, _ := json.Marshal(createAppRequest{Slug: "demo", Name: "Demo App"})
@@ -303,6 +344,19 @@ func TestAppsCreate_201(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	// Create must authorize with the resolved app type id, not a nil
+	// target, matching CorporationService.Create/NaturalPersonService.Create/
+	// ServiceAccountService.Create in api/service/.
+	if az.lastAction != "create" {
+		t.Errorf("authz action: got %q, want %q", az.lastAction, "create")
+	}
+	if az.lastTarget == nil {
+		t.Fatal("authz target: got nil, want the resolved app type id")
+	}
+	if *az.lastTarget != 99 {
+		t.Errorf("authz target: got %d, want %d (app type id)", *az.lastTarget, 99)
 	}
 
 	var resp map[string]any
@@ -476,7 +530,8 @@ func TestAppsList_ExcludesArchived(t *testing.T) {
 func TestAppsGetApp_200(t *testing.T) {
 	q := newAppsFakeQuerier()
 	appUUID := q.seedApp("demo", "Demo App")
-	h := newTestAppsHandler(q, &appsFakeAuthorizer{})
+	az := &appsFakeAuthorizer{}
+	h := newTestAppsHandler(q, az)
 	router := appsRouter(h)
 
 	req := adminReq(http.MethodGet, "/apps/"+appUUID.String(), nil)
@@ -492,6 +547,39 @@ func TestAppsGetApp_200(t *testing.T) {
 	}
 	if resp["uuid"] != appUUID.String() {
 		t.Errorf("uuid: got %v, want %v", resp["uuid"], appUUID.String())
+	}
+
+	// Authorize must run against the resolved bare entity id (1, the first
+	// id newAppsFakeQuerier's nextSeq hands out), not a nil or full-row
+	// target.
+	if az.lastAction != "read" {
+		t.Errorf("authz action: got %q, want %q", az.lastAction, "read")
+	}
+	if az.lastTarget == nil || *az.lastTarget != 1 {
+		t.Errorf("authz target: got %v, want pointer to 1 (the resolved entity id)", az.lastTarget)
+	}
+}
+
+// TestAppsGetApp_403_AuthorizesBeforeLoad asserts that when authorization
+// denies the request, the full app row is never loaded — i.e. authorization
+// runs against the bare resolved entity id before GetAppByUUID's row fetch,
+// so an unauthorized caller cannot use response timing/shape to distinguish
+// "app exists" from "app doesn't exist" ahead of the authz decision.
+func TestAppsGetApp_403_AuthorizesBeforeLoad(t *testing.T) {
+	q := newAppsFakeQuerier()
+	appUUID := q.seedApp("demo", "Demo App")
+	h := newTestAppsHandler(q, &appsFakeAuthorizer{err: apiresp.ErrForbidden})
+	router := appsRouter(h)
+
+	req := adminReq(http.MethodGet, "/apps/"+appUUID.String(), nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if q.getAppByUUIDCalls != 0 {
+		t.Errorf("GetAppByUUID calls: got %d, want 0 (full row must not load before authz)", q.getAppByUUIDCalls)
 	}
 }
 
@@ -528,7 +616,8 @@ func TestAppsGetApp_400_BadUUID(t *testing.T) {
 func TestAppsUpdateApp_200(t *testing.T) {
 	q := newAppsFakeQuerier()
 	appUUID := q.seedApp("demo", "Demo App")
-	h := newTestAppsHandler(q, &appsFakeAuthorizer{})
+	az := &appsFakeAuthorizer{}
+	h := newTestAppsHandler(q, az)
 	router := appsRouter(h)
 
 	body, _ := json.Marshal(updateAppRequest{Name: "Renamed App"})
@@ -549,6 +638,13 @@ func TestAppsUpdateApp_200(t *testing.T) {
 	if resp["slug"] != "demo" {
 		t.Errorf("slug should be unchanged: got %v, want %q", resp["slug"], "demo")
 	}
+
+	if az.lastAction != "update" {
+		t.Errorf("authz action: got %q, want %q", az.lastAction, "update")
+	}
+	if az.lastTarget == nil || *az.lastTarget != 1 {
+		t.Errorf("authz target: got %v, want pointer to 1 (the resolved entity id)", az.lastTarget)
+	}
 }
 
 func TestAppsUpdateApp_404_NotFound(t *testing.T) {
@@ -566,12 +662,35 @@ func TestAppsUpdateApp_404_NotFound(t *testing.T) {
 	}
 }
 
+// TestAppsUpdateApp_403_AuthorizesBeforeLoad asserts authorization runs
+// against the bare resolved entity id before UpdateApp loads the full row
+// (mirroring TestAppsGetApp_403_AuthorizesBeforeLoad).
+func TestAppsUpdateApp_403_AuthorizesBeforeLoad(t *testing.T) {
+	q := newAppsFakeQuerier()
+	appUUID := q.seedApp("demo", "Demo App")
+	h := newTestAppsHandler(q, &appsFakeAuthorizer{err: apiresp.ErrForbidden})
+	router := appsRouter(h)
+
+	body, _ := json.Marshal(updateAppRequest{Name: "Renamed App"})
+	req := adminReq(http.MethodPut, "/apps/"+appUUID.String(), bytes.NewBuffer(body))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if q.getAppByUUIDCalls != 0 {
+		t.Errorf("GetAppByUUID calls: got %d, want 0 (full row must not load before authz)", q.getAppByUUIDCalls)
+	}
+}
+
 // --- DELETE /apps/{uuid} ---
 
 func TestAppsDeleteApp_204_ArchivesAndDropsFromList(t *testing.T) {
 	q := newAppsFakeQuerier()
 	appUUID := q.seedApp("demo", "Demo App")
-	h := newTestAppsHandler(q, &appsFakeAuthorizer{})
+	az := &appsFakeAuthorizer{}
+	h := newTestAppsHandler(q, az)
 	router := appsRouter(h)
 
 	req := adminReq(http.MethodDelete, "/apps/"+appUUID.String(), nil)
@@ -580,6 +699,12 @@ func TestAppsDeleteApp_204_ArchivesAndDropsFromList(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+	if az.lastAction != "delete" {
+		t.Errorf("authz action: got %q, want %q", az.lastAction, "delete")
+	}
+	if az.lastTarget == nil || *az.lastTarget != 1 {
+		t.Errorf("authz target: got %v, want pointer to 1 (the resolved entity id)", az.lastTarget)
 	}
 
 	// Validation criterion: archive sets entities.archived_at and the app
@@ -609,5 +734,26 @@ func TestAppsDeleteApp_404_NotFound(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status: got %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+// TestAppsDeleteApp_403_AuthorizesBeforeLoad asserts authorization runs
+// against the bare resolved entity id before DeleteApp loads the full row
+// (mirroring TestAppsGetApp_403_AuthorizesBeforeLoad).
+func TestAppsDeleteApp_403_AuthorizesBeforeLoad(t *testing.T) {
+	q := newAppsFakeQuerier()
+	appUUID := q.seedApp("demo", "Demo App")
+	h := newTestAppsHandler(q, &appsFakeAuthorizer{err: apiresp.ErrForbidden})
+	router := appsRouter(h)
+
+	req := adminReq(http.MethodDelete, "/apps/"+appUUID.String(), nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if q.getAppByUUIDCalls != 0 {
+		t.Errorf("GetAppByUUID calls: got %d, want 0 (full row must not load before authz)", q.getAppByUUIDCalls)
 	}
 }

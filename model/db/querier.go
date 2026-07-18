@@ -33,7 +33,7 @@ type Querier interface {
 	// ArchiveEntity to archive) — the same pattern every other entity subtype
 	// (corporation, natural_person, service_account) already follows. Only the
 	// apps-table-specific operations are defined here.
-	InsertApp(ctx context.Context, arg InsertAppParams) (App, error)
+	InsertApp(ctx context.Context, arg InsertAppParams) (InsertAppRow, error)
 	ListAllTypes(ctx context.Context) ([]Type, error)
 	ListApps(ctx context.Context) ([]ListAppsRow, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error

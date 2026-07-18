@@ -11,21 +11,21 @@ RETURNING id, slug, name;
 
 -- name: GetAppByUUID :one
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE e.uuid = $1;
 
 -- name: GetAppBySlug :one
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE a.slug = $1;
 
 -- name: ListApps :many
 SELECT
-  e.id, e.uuid, a.slug, a.name, e.created_at, e.updated_at, e.archived_at
+  e.id, e.uuid, a.slug, a.name, e.created_at, a.updated_at, e.archived_at
 FROM apps a
 JOIN entities e ON a.id = e.id
 WHERE e.archived_at IS NULL

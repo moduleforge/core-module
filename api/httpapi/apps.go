@@ -19,6 +19,7 @@ import (
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/opctx"
 	"github.com/moduleforge/core-api/txhelper"
+	"github.com/moduleforge/core-api/types"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -39,8 +40,9 @@ import (
 // package, AppsHandler does not sit on the service.Services aggregate: apps
 // have no Profile-shaped read model and no encrypted fields, so a
 // dedicated, lighter-weight handler (mirroring mod-users' original
-// AppsHandler shape) avoids pulling in cipher/typeResolver dependencies
-// apps do not need.
+// AppsHandler shape) avoids pulling in the cipher dependency apps do not
+// need. It does still take typeResolver, like its service.Services
+// siblings, so Create can authorize against a typed target.
 //
 // Membership management (assigning/removing users, editing roles) is not
 // part of this handler — those operations stay in mod-users (Phase 02 of
@@ -52,27 +54,37 @@ type AppsHandler struct {
 	newQuerier func(pgx.Tx) coredb.Querier // factory for tx-scoped querier; defaults to coredb.New
 	az         authz.Authorizer
 	observers  *observer.ObserverGroup
-	// entityResolver is accepted so NewAppsHandler's signature lines up with
-	// the rest of core's manifest-wired constructors (queries:coredb,
-	// service:authorizer, service:observerGroup, service:entityResolver).
-	// GetApp/UpdateApp/DeleteApp resolve {uuid} via the GetAppByUUID join
-	// query instead of a separate entityResolver.Resolve call: that single
-	// round trip already returns the row's id (== the entity id, per the
-	// apps FK-anchor pattern) alongside slug/name, so a second lookup would
-	// add a query without adding information.
+	// entityResolver resolves the {uuid} path param to the app's internal
+	// id (apps.id == entities.id, per the FK-anchor pattern) before any
+	// authorization decision is made — GetApp/UpdateApp/DeleteApp must not
+	// load the full row (which would let an unauthorized caller distinguish
+	// "app exists" from "app doesn't exist" ahead of the authz check).
 	entityResolver *entity.Resolver
+	// typeResolver resolves the 'app' type slug to its internal type id so
+	// Create can authorize against a typed target, matching
+	// CorporationService.Create/NaturalPersonService.Create/
+	// ServiceAccountService.Create in api/service/.
+	typeResolver *types.Resolver
 }
 
 // NewAppsHandler constructs an AppsHandler. Args are ordered to match the
 // module manifest's arg-source list: infra:pool, queries:coredb,
-// service:authorizer, service:observerGroup, service:entityResolver.
+// service:authorizer, service:observerGroup, service:entityResolver,
+// service:typeResolver.
+//
+// entityResolver.AllowNotFound("app") is set here so a resolve-miss on
+// {uuid} continues to surface as 404 (the resolver's default policy masks a
+// missing entity as 403), mirroring mod-users' own membership handler for
+// apps (api/internal/handlers/apps.go's NewAppsHandler).
 func NewAppsHandler(
 	pool txhelper.DB,
 	q coredb.Querier,
 	az authz.Authorizer,
 	observers *observer.ObserverGroup,
 	entityResolver *entity.Resolver,
+	typeResolver *types.Resolver,
 ) *AppsHandler {
+	entityResolver.AllowNotFound("app")
 	return &AppsHandler{
 		pool:           pool,
 		q:              q,
@@ -80,6 +92,7 @@ func NewAppsHandler(
 		az:             az,
 		observers:      observers,
 		entityResolver: entityResolver,
+		typeResolver:   typeResolver,
 	}
 }
 
@@ -142,8 +155,11 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authorize: create is admin-only.
-	if err := h.az.Authorize(r.Context(), "create", nil); err != nil {
+	// Authorize: create is admin-only. Resolve the app type id so the
+	// policy can discriminate by resource type, matching the sibling
+	// entity-subtype services (CorporationService.Create et al.).
+	typeID := h.typeResolver.IDForSlugMust("app")
+	if err := h.az.Authorize(r.Context(), "create", &typeID); err != nil {
 		apiresp.WriteError(w, r, err)
 		return
 	}
@@ -152,7 +168,7 @@ func (h *AppsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		entityUUID uuid.UUID
 		entityID   int64
 		createdAt  pgtype.Timestamptz
-		app        coredb.App
+		app        coredb.InsertAppRow
 	)
 
 	txErr := txhelper.Run(r.Context(), h.pool, func(ctx context.Context, tx pgx.Tx) error {
@@ -238,14 +254,25 @@ func (h *AppsHandler) GetApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, ok := h.loadAppByUUIDParam(w, r)
+	appID, appUUID, ok := h.loadAppByUUIDParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Authorize: read — admin only for apps.
-	if err := h.az.Authorize(r.Context(), "read", &app.ID); err != nil {
+	// Authorize: read — admin only for apps. Authorize against the bare
+	// entity id, resolved above, before loading the full row.
+	if err := h.az.Authorize(r.Context(), "read", &appID); err != nil {
 		apiresp.WriteError(w, r, err)
+		return
+	}
+
+	app, err := h.q.GetAppByUUID(r.Context(), appUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			apiresp.WriteError(w, r, apiresp.ErrNotFound)
+		} else {
+			apiresp.WriteError(w, r, fmt.Errorf("apps: load by uuid: %w", err))
+		}
 		return
 	}
 
@@ -264,14 +291,25 @@ func (h *AppsHandler) UpdateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, ok := h.loadAppByUUIDParam(w, r)
+	appID, appUUID, ok := h.loadAppByUUIDParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Authorize: update — admin only for apps.
-	if err := h.az.Authorize(r.Context(), "update", &app.ID); err != nil {
+	// Authorize: update — admin only for apps. Authorize against the bare
+	// entity id, resolved above, before loading the full row.
+	if err := h.az.Authorize(r.Context(), "update", &appID); err != nil {
 		apiresp.WriteError(w, r, err)
+		return
+	}
+
+	app, err := h.q.GetAppByUUID(r.Context(), appUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			apiresp.WriteError(w, r, apiresp.ErrNotFound)
+		} else {
+			apiresp.WriteError(w, r, fmt.Errorf("apps: load by uuid: %w", err))
+		}
 		return
 	}
 
@@ -349,14 +387,25 @@ func (h *AppsHandler) DeleteApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, ok := h.loadAppByUUIDParam(w, r)
+	appID, appUUID, ok := h.loadAppByUUIDParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Authorize: delete — admin only for apps.
-	if err := h.az.Authorize(r.Context(), "delete", &app.ID); err != nil {
+	// Authorize: delete — admin only for apps. Authorize against the bare
+	// entity id, resolved above, before loading the full row.
+	if err := h.az.Authorize(r.Context(), "delete", &appID); err != nil {
 		apiresp.WriteError(w, r, err)
+		return
+	}
+
+	app, err := h.q.GetAppByUUID(r.Context(), appUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			apiresp.WriteError(w, r, apiresp.ErrNotFound)
+		} else {
+			apiresp.WriteError(w, r, fmt.Errorf("apps: load by uuid: %w", err))
+		}
 		return
 	}
 
@@ -382,26 +431,32 @@ func (h *AppsHandler) DeleteApp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// loadAppByUUIDParam extracts the {uuid} chi param and loads the app via
-// the entities/apps join query, returning ErrNotFound on miss (matching
-// the source mod-users handler's behaviour — apps are an admin-only
-// resource with no existence-masking requirement).
-func (h *AppsHandler) loadAppByUUIDParam(w http.ResponseWriter, r *http.Request) (coredb.GetAppByUUIDRow, bool) {
+// loadAppByUUIDParam extracts the {uuid} chi param and resolves it to the
+// app's internal id via entityResolver — apps.id == entities.id, per the
+// FK-anchor entity-subtype pattern for apps — without loading the full app
+// row. This lets GetApp/UpdateApp/DeleteApp authorize against the bare id
+// before any row data (and thus its existence) is revealed to an
+// unauthorized caller, matching EntityService.GetByUUID/
+// CorporationService.GetByEntityUUID in api/service/ and mod-users' own
+// membership handler for apps (api/internal/handlers/apps.go's
+// loadAppByUUIDParam).
+//
+// An unknown app uuid surfaces as ErrNotFound (see NewAppsHandler's
+// entityResolver.AllowNotFound("app") call), matching the source mod-users
+// handler's behaviour — apps are an admin-only resource with no
+// existence-masking requirement.
+func (h *AppsHandler) loadAppByUUIDParam(w http.ResponseWriter, r *http.Request) (int64, uuid.UUID, bool) {
 	rawUUID := chi.URLParam(r, "uuid")
 	parsed, err := uuid.Parse(rawUUID)
 	if err != nil {
 		apiresp.WriteError(w, r, apiresp.ErrInvalidInput)
-		return coredb.GetAppByUUIDRow{}, false
+		return 0, uuid.UUID{}, false
 	}
 
-	app, err := h.q.GetAppByUUID(r.Context(), parsed)
+	appID, err := h.entityResolver.Resolve(r.Context(), h.q, parsed, "app")
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			apiresp.WriteError(w, r, apiresp.ErrNotFound)
-		} else {
-			apiresp.WriteError(w, r, fmt.Errorf("apps: load by uuid: %w", err))
-		}
-		return coredb.GetAppByUUIDRow{}, false
+		apiresp.WriteError(w, r, err)
+		return 0, uuid.UUID{}, false
 	}
-	return app, true
+	return appID, parsed, true
 }

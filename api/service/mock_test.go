@@ -426,7 +426,7 @@ func (m *mockQuerier) GetTypeByID(_ context.Context, id int64) (coredb.Type, err
 	return coredb.Type{}, pgx.ErrNoRows
 }
 
-func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (coredb.App, error) {
+func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (coredb.InsertAppRow, error) {
 	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
 	entityUUID := uuid.UUID{}
 	if e, ok := m.entitiesByID[arg.ID]; ok {
@@ -440,7 +440,7 @@ func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	return coredb.App{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
+	return coredb.InsertAppRow{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
 }
 
 func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {

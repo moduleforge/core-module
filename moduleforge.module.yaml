@@ -82,7 +82,7 @@ provides:
     # same alias coreDeps/coreServices above already use for this module's
     # api/httpapi package. Arg order matches corehttpapi.NewAppsHandler's doc
     # comment: infra:pool, queries:coredb, service:authorizer,
-    # service:observerGroup, service:entityResolver.
+    # service:observerGroup, service:entityResolver, service:typeResolver.
     - name: appsHandler
       type: "*corehttpapi.AppsHandler"
       constructor: corehttpapi.NewAppsHandler
@@ -92,6 +92,7 @@ provides:
         - service:authorizer
         - service:observerGroup
         - service:entityResolver
+        - service:typeResolver
 
   observers:
     - name: noopSentinel

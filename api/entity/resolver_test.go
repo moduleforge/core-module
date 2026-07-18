@@ -73,8 +73,8 @@ func (s *resolverStubQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Ty
 func (s *resolverStubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb.Type, error) {
 	return coredb.Type{}, nil
 }
-func (s *resolverStubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.App, error) {
-	return coredb.App{}, nil
+func (s *resolverStubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.InsertAppRow, error) {
+	return coredb.InsertAppRow{}, nil
 }
 func (s *resolverStubQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
 	return nil, nil
