@@ -18,6 +18,8 @@ type Querier interface {
 	CreateLegalEntity(ctx context.Context, entityID int64) (int64, error)
 	CreateNaturalPerson(ctx context.Context, arg CreateNaturalPersonParams) (CreateNaturalPersonRow, error)
 	CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error)
+	GetAppBySlug(ctx context.Context, slug string) (GetAppBySlugRow, error)
+	GetAppByUUID(ctx context.Context, argUuid uuid.UUID) (GetAppByUUIDRow, error)
 	GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error)
 	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
@@ -26,8 +28,16 @@ type Querier interface {
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
 	GetTypeByID(ctx context.Context, id int64) (Type, error)
 	GetTypeBySlug(ctx context.Context, slug string) (Type, error)
+	// Entity creation (fundamental_type = 'app') and archival reuse the existing
+	// generic entities.sql queries (GetTypeBySlug + CreateEntity to create,
+	// ArchiveEntity to archive) — the same pattern every other entity subtype
+	// (corporation, natural_person, service_account) already follows. Only the
+	// apps-table-specific operations are defined here.
+	InsertApp(ctx context.Context, arg InsertAppParams) (App, error)
 	ListAllTypes(ctx context.Context) ([]Type, error)
+	ListApps(ctx context.Context) ([]ListAppsRow, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
+	UpdateApp(ctx context.Context, arg UpdateAppParams) error
 	// NOTE: pass NULL for ein to leave it unchanged; pass an empty bytea
 	// to clear it. A non-empty bytea replaces it.
 	UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error

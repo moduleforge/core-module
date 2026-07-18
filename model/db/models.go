@@ -11,6 +11,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type App struct {
+	ID   int64  `json:"id"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
 type Corporation struct {
 	ID           int64              `json:"id"`
 	EntityID     int64              `json:"entity_id"`
