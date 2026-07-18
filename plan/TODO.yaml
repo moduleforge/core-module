@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: gui-test-infrastructure
       title: GUI Test Infrastructure
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-test-runner-dependencies-and-config
+          title: Add Test Runner Dependencies And Config
+          path: phase-01-gui-test-infrastructure/001-add-test-runner-dependencies-and-config.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
