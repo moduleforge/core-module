@@ -25,6 +25,7 @@ phases:
           path: phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md
           done: false
           tier: sonnet-med
+          digest: 'Added the first three real test files in gui/: FieldError.test.tsx (4 cases), ErrorBanner.test.tsx (6 cases), lib/api-client.test.ts (4 cases: 200 success, 204 empty body, network-error rejection, 404 non-2xx envelope), mocking global.fetch per-test with afterEach restoration. Worktree needed `bun install` to materialize node_modules from the already-correct gui/bun.lock before validation could run — an install-from-existing-lockfile operation, not a dependency change. All four validation checks (test, typecheck, build, repeat-run for leakage) passed cleanly.'
           git:
             branch: phase-01-task-02-add-initial-component-and-lib
             commit:
