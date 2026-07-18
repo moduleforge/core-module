@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-initial-component-and-lib-tests
+          title: Add Initial Component And Lib Tests
+          path: phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
