@@ -36,6 +36,6 @@ phases:
           done: false
           tier: sonnet-med
           git:
-            branch: null
+            branch: phase-01-task-03-wire-gui-tests-into-root-test
             commit: []
             merge: null
