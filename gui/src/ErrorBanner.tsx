@@ -1,3 +1,4 @@
+import { AlertCircle } from 'lucide-react';
 import type { ApiError } from './lib/api-types';
 import { Alert, AlertTitle, AlertDescription } from './ui/alert';
 import { cn } from './lib/utils';
@@ -49,6 +50,7 @@ export function ErrorBanner({ error, className }: ErrorBannerProps) {
 
   return (
     <Alert variant="destructive" className={cn(className)}>
+      <AlertCircle className="size-4" />
       {title && <AlertTitle>{title}</AlertTitle>}
       <AlertDescription>{description}</AlertDescription>
     </Alert>
