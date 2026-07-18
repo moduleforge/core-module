@@ -49,6 +49,23 @@ Run from `gui/`:
 - [`plan/notes/test-runner-choice.md`](../notes/test-runner-choice.md) — the runner/config decision and spike this task's tests run against.
 - `gui/src/FieldError.tsx`, `gui/src/ErrorBanner.tsx`, `gui/src/lib/api-client.ts`, `gui/src/lib/api-types.ts`, `gui/src/ui/alert.tsx` — source under test.
 
+## Status
+
+Implementation outcome: **succeeded** (2026-07-18).
+
+- `gui/src/FieldError.test.tsx` — 4 tests (undefined, null, populated-error alert text, `id` propagation).
+- `gui/src/ErrorBanner.test.tsx` — 6 tests (undefined, null, plain-string, `ApiError`-like, explicit `{title, description}`, dedicated `role="alert"` assertion).
+- `gui/src/lib/api-client.test.ts` — 4 tests (200 success, 204 empty body, network-error rejection, 404 nested-envelope non-2xx), with `global.fetch` restored in `afterEach`.
+- `bun run test` reported `14 pass / 0 fail / 23 expect() calls` across 3 files, both on the initial run and a second re-run (no leaked global state).
+- `bun run typecheck` passed with no errors.
+- `bun run build` succeeded; `ls dist` confirms no `*.test.ts(x)` files in the build output.
+- The worktree had no installed `node_modules` at task start despite `gui/bun.lock` already containing the task-001 test-runner devDependencies; ran `bun install` inside `gui/` to materialize `node_modules` from the existing lockfile before running validation (no `package.json`/`bun.lock` changes resulted).
+
+Affected source files (repo-relative):
+- `gui/src/FieldError.test.tsx`
+- `gui/src/ErrorBanner.test.tsx`
+- `gui/src/lib/api-client.test.ts`
+
 ## Metadata
 
 architectural_impact: false
