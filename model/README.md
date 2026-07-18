@@ -3,7 +3,7 @@
 Generic entity-identity foundation for the moduleforge platform. This module
 holds the goose versioned migrations and sqlc-generated Go queries for the
 base entity hierarchy: `entities`, `legal_entities`, `natural_persons`,
-`corporations`, and `service_accounts`. It is extracted from mod-users so
+`corporations`, `service_accounts`, and `apps`. It is extracted from mod-users so
 that any downstream module can depend on a stable, shared identity schema
 without pulling in mod-users application logic.
 
