@@ -46,6 +46,12 @@ func (s *resolverStubQuerier) CreateNaturalPerson(_ context.Context, _ coredb.Cr
 func (s *resolverStubQuerier) CreateServiceAccount(_ context.Context, _ coredb.CreateServiceAccountParams) (coredb.ServiceAccount, error) {
 	return coredb.ServiceAccount{}, nil
 }
+func (s *resolverStubQuerier) GetAppBySlug(_ context.Context, _ string) (coredb.GetAppBySlugRow, error) {
+	return coredb.GetAppBySlugRow{}, nil
+}
+func (s *resolverStubQuerier) GetAppByUUID(_ context.Context, _ uuid.UUID) (coredb.GetAppByUUIDRow, error) {
+	return coredb.GetAppByUUIDRow{}, nil
+}
 func (s *resolverStubQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (coredb.GetCorporationByEntityIDRow, error) {
 	return coredb.GetCorporationByEntityIDRow{}, nil
 }
@@ -67,10 +73,19 @@ func (s *resolverStubQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Ty
 func (s *resolverStubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb.Type, error) {
 	return coredb.Type{}, nil
 }
+func (s *resolverStubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.App, error) {
+	return coredb.App{}, nil
+}
 func (s *resolverStubQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
 	return nil, nil
 }
+func (s *resolverStubQuerier) ListApps(_ context.Context) ([]coredb.ListAppsRow, error) {
+	return nil, nil
+}
 func (s *resolverStubQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
+func (s *resolverStubQuerier) UpdateApp(_ context.Context, _ coredb.UpdateAppParams) error {
+	return nil
+}
 func (s *resolverStubQuerier) UpdateCorporation(_ context.Context, _ coredb.UpdateCorporationParams) error {
 	return nil
 }

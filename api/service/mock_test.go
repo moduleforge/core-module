@@ -153,6 +153,7 @@ type mockQuerier struct {
 	naturalPersons map[int64]coredb.GetNaturalPersonByEntityIDRow
 	corporations   map[int64]coredb.GetCorporationByEntityIDRow
 	serviceAccts   map[int64]coredb.ServiceAccount
+	apps           map[int64]coredb.GetAppByUUIDRow // entity_id -> app row (id == entity_id)
 	types          map[string]coredb.Type
 
 	createEntityFn         func(ctx context.Context, fundamentalTypeID int64) (coredb.Entity, error)
@@ -170,6 +171,7 @@ func newMockQuerier() *mockQuerier {
 		naturalPersons: make(map[int64]coredb.GetNaturalPersonByEntityIDRow),
 		corporations:   make(map[int64]coredb.GetCorporationByEntityIDRow),
 		serviceAccts:   make(map[int64]coredb.ServiceAccount),
+		apps:           make(map[int64]coredb.GetAppByUUIDRow),
 		types:          make(map[string]coredb.Type),
 	}
 	// Pre-seed core types so service Create calls work.
@@ -337,6 +339,27 @@ func (m *mockQuerier) CreateServiceAccount(_ context.Context, arg coredb.CreateS
 	return sa, nil
 }
 
+func (m *mockQuerier) GetAppBySlug(_ context.Context, slug string) (coredb.GetAppBySlugRow, error) {
+	for _, a := range m.apps {
+		if a.Slug == slug {
+			return coredb.GetAppBySlugRow{
+				ID: a.ID, Uuid: a.Uuid, Slug: a.Slug, Name: a.Name,
+				CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, ArchivedAt: a.ArchivedAt,
+			}, nil
+		}
+	}
+	return coredb.GetAppBySlugRow{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) GetAppByUUID(_ context.Context, argUuid uuid.UUID) (coredb.GetAppByUUIDRow, error) {
+	for _, a := range m.apps {
+		if a.Uuid == argUuid {
+			return a, nil
+		}
+	}
+	return coredb.GetAppByUUIDRow{}, pgx.ErrNoRows
+}
+
 func (m *mockQuerier) GetCorporationByEntityID(_ context.Context, entityID int64) (coredb.GetCorporationByEntityIDRow, error) {
 	if corp, ok := m.corporations[entityID]; ok {
 		return corp, nil
@@ -403,6 +426,23 @@ func (m *mockQuerier) GetTypeByID(_ context.Context, id int64) (coredb.Type, err
 	return coredb.Type{}, pgx.ErrNoRows
 }
 
+func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (coredb.App, error) {
+	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	entityUUID := uuid.UUID{}
+	if e, ok := m.entitiesByID[arg.ID]; ok {
+		entityUUID = e.Uuid
+	}
+	m.apps[arg.ID] = coredb.GetAppByUUIDRow{
+		ID:        arg.ID,
+		Uuid:      entityUUID,
+		Slug:      arg.Slug,
+		Name:      arg.Name,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	return coredb.App{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
+}
+
 func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
 	out := make([]coredb.Type, 0, len(m.types))
 	for _, t := range m.types {
@@ -411,7 +451,30 @@ func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
 	return out, nil
 }
 
+func (m *mockQuerier) ListApps(_ context.Context) ([]coredb.ListAppsRow, error) {
+	out := make([]coredb.ListAppsRow, 0, len(m.apps))
+	for _, a := range m.apps {
+		if a.ArchivedAt != nil {
+			continue
+		}
+		out = append(out, coredb.ListAppsRow{
+			ID: a.ID, Uuid: a.Uuid, Slug: a.Slug, Name: a.Name,
+			CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, ArchivedAt: a.ArchivedAt,
+		})
+	}
+	return out, nil
+}
+
 func (m *mockQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockQuerier) UpdateApp(_ context.Context, arg coredb.UpdateAppParams) error {
+	if a, ok := m.apps[arg.ID]; ok {
+		a.Slug = arg.Slug
+		a.Name = arg.Name
+		m.apps[arg.ID] = a
+	}
 	return nil
 }
 
