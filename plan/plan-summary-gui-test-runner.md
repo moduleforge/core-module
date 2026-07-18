@@ -39,3 +39,19 @@ In addition to the three plan tasks, one follow-on trivial fix shipped in this s
 - **Lockfile-hoisting note (ansi-regex/ansi-styles) — verified benign, no follow-up needed.** The phase-boundary review's security lens flagged a lockfile-hoisting note involving `ansi-regex`/`ansi-styles` versions in `gui/bun.lock`. The manager independently verified this via web search and confirmed it is benign, ordinary transitive-dependency hoisting rather than a real issue — no follow-up item was recorded for it.
 
 - **Follow-up vr20 itself** is resolved by this plan; its removal from `plan/followups.yaml` is a manager action outside this plan's own scope.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — GUI Test Infrastructure
+
+- [x] [001-add-test-runner-dependencies-and-config.md](./phase-01-gui-test-infrastructure/001-add-test-runner-dependencies-and-config.md) — tier `sonnet-med` · branch `phase-01-task-01-add-test-runner-dependencies-a` · commit `13e38df` · merge `700b1d0`
+- [x] [002-add-initial-component-and-lib-tests.md](./phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md) — tier `sonnet-med` · branch `phase-01-task-02-add-initial-component-and-lib` · commit `b578d75` · merge `3075f71`
+- [x] [003-wire-gui-tests-into-root-test-target.md](./phase-01-gui-test-infrastructure/003-wire-gui-tests-into-root-test-target.md) — tier `sonnet-med` · branch `phase-01-task-03-wire-gui-tests-into-root-test` · commit `9e64281` · merge `e4b0980`
