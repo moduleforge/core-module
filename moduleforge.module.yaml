@@ -73,7 +73,7 @@ provides:
       constructor: observer.NewNoopObserver
       args: []
 
-    # appsHandler serves the top-level /apps CRUD (Create/List/GetApp/
+    # coreAppsHandler serves the top-level /apps CRUD (Create/List/GetApp/
     # UpdateApp/DeleteApp). Closes followup Gp5C: mod-users' reference server
     # wired these routes as raw inline chi in its own main.go, never declared
     # in any module manifest, so they were unreachable on any mfgen-generated
@@ -83,7 +83,7 @@ provides:
     # api/httpapi package. Arg order matches corehttpapi.NewAppsHandler's doc
     # comment: infra:pool, queries:coredb, service:authorizer,
     # service:observerGroup, service:entityResolver, service:typeResolver.
-    - name: appsHandler
+    - name: coreAppsHandler
       type: "*corehttpapi.AppsHandler"
       constructor: corehttpapi.NewAppsHandler
       args:
@@ -111,7 +111,7 @@ provides:
       args:
         - service:coreDeps
 
-    # Top-level /apps CRUD (followup Gp5C). handler: appsHandler references
+    # Top-level /apps CRUD (followup Gp5C). handler: coreAppsHandler references
     # the already-constructed provides.services entry above (no separate
     # constructor/args here — mirrors mod-authz's authzServices route entry),
     # and register: composes RegisterAppRoutes onto the shared /v1 route tree
@@ -125,7 +125,7 @@ provides:
     # mod-users' reference server exposed via inline chi (never reachable on
     # a generated app, since it was never declared in any manifest).
     - prefix: /v1
-      handler: appsHandler
+      handler: coreAppsHandler
       register: corehttpapi.RegisterAppRoutes
       scope: authenticated
 
