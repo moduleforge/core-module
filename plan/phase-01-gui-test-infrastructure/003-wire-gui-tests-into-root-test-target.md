@@ -92,3 +92,11 @@ This is a config/docs task, not covered by a standard skill — implement direct
 ## Metadata
 
 architectural_impact: false
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-18
+- **Validation summary:** `make help` lists `test` as `Test model, api, and gui; typecheck gui`. Standalone `cd gui && bun install && bun run test` exits 0 (0 test files matched — sibling task 002 had not landed in this worktree at validation time; `--pass-with-no-tests` makes this a valid pass per the task doc's guidance). Full `make test` from the project root ran model (no unit tests — generated code), api (`go test ./...`, all packages ok), and gui (`bun run test` then `bun run typecheck`), exiting 0 end-to-end. `git diff -- Makefile AGENTS.md` is limited to the lines the Requirements describe. `grep -n "typecheck gui$" Makefile AGENTS.md` matches only the two updated `Makefile` lines (header comment and target's `##` description), both reading the new "...and gui; typecheck gui" phrasing, not the old typecheck-only framing.
+- **Affected files:** [`Makefile`](../../Makefile), [`AGENTS.md`](../../AGENTS.md)
+- **Assumptions:** none beyond what the task doc states (no `## Assumptions` section was present).
