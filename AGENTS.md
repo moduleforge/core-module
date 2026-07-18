@@ -50,8 +50,8 @@ make test                    # unit tests (api) + gui test + gui typecheck
 cd api && make test          # go test ./...
 cd api && make lint          # go vet ./... + gofmt check
 cd api && make lint-fix      # gofmt -w .
-cd gui && bun run test        # bun test (component/unit tests)
-cd gui && bun run typecheck   # tsc --noEmit
+cd gui && bun run test       # bun test (component/unit tests)
+cd gui && bun run typecheck  # tsc --noEmit
 cd model && make verify      # goose validate + sqlc compile
 cd model && make lint        # apply migrations to ephemeral Postgres (requires Docker)
 ```
