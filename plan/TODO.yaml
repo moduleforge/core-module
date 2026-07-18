@@ -26,3 +26,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: wire-gui-tests-into-root-test-target
+          title: Wire GUI Tests Into Root Test Target
+          path: phase-01-gui-test-infrastructure/003-wire-gui-tests-into-root-test-target.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
