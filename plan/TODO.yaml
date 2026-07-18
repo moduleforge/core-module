@@ -35,6 +35,7 @@ phases:
           path: phase-01-gui-test-infrastructure/003-wire-gui-tests-into-root-test-target.md
           done: false
           tier: sonnet-med
+          digest: Wired the gui/ `bun run test` script (added by task 001) into the root Makefile's `test` target, adding a `bun run test` step for gui immediately before the existing `bun run typecheck` step, and updated the header comment and target's help description to read 'model, api, and gui; typecheck gui'. Updated AGENTS.md's Build commands and Test commands sections to match, adding direct per-subproject `cd gui && bun run test` / `cd gui && bun run typecheck` lines, retiring the stale 'gui is typecheck-only' framing. Full `make test` ran end-to-end and exited 0; gui test step saw zero test files since sibling task 002 had not yet landed in this worktree — an expected, non-blocking condition since bun's --pass-with-no-tests flag makes that a valid pass.
           git:
             branch: phase-01-task-03-wire-gui-tests-into-root-test
             commit:
