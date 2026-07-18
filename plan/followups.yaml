@@ -5,8 +5,3 @@ items:
       date: "2026-07-15"
       tag: phase-02-gui-error-widgets
       text: 'Pre-existing gap (not introduced by this plan): gui/ has no vitest/jest dependency or test script, though the React Developer role doc calls for component tests as a core responsibility. Sibling tasks 002/003 shipped without tests since neither task doc''s Validation section required them. Decide whether/when to add a test runner to gui/.'
-    - title: Default token storage uses localStorage
-      id: pBoG
-      date: "2026-07-15"
-      tag: phase-02-gui-error-widgets
-      text: 'Phase-02 security review (security-002, suggestion/low-confidence): default ApiClientAuthHandler (gui/src/lib/api-client.ts ~50-60) stores/reads the bearer token via window.localStorage, readable by any script on the page (XSS-exfiltrable). Intentionally mirrors existing mod-users behavior per code comment, not a new regression; configureApiClient seam already lets consumers substitute a safer strategy. No action needed now - revisit if/when the project moves toward httpOnly-cookie or in-memory-token storage.'
