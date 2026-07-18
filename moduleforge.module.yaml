@@ -73,6 +73,26 @@ provides:
       constructor: observer.NewNoopObserver
       args: []
 
+    # appsHandler serves the top-level /apps CRUD (Create/List/GetApp/
+    # UpdateApp/DeleteApp). Closes followup Gp5C: mod-users' reference server
+    # wired these routes as raw inline chi in its own main.go, never declared
+    # in any module manifest, so they were unreachable on any mfgen-generated
+    # app. Apps are now core entities (fundamental_type = "app"), so the
+    # handler lives in mod-core alongside entityResolver. corehttpapi is the
+    # same alias coreDeps/coreServices above already use for this module's
+    # api/httpapi package. Arg order matches corehttpapi.NewAppsHandler's doc
+    # comment: infra:pool, queries:coredb, service:authorizer,
+    # service:observerGroup, service:entityResolver.
+    - name: appsHandler
+      type: "*corehttpapi.AppsHandler"
+      constructor: corehttpapi.NewAppsHandler
+      args:
+        - infra:pool
+        - queries:coredb
+        - service:authorizer
+        - service:observerGroup
+        - service:entityResolver
+
   observers:
     - name: noopSentinel
       service: noopObserver
@@ -89,6 +109,24 @@ provides:
       innerMount: true
       args:
         - service:coreDeps
+
+    # Top-level /apps CRUD (followup Gp5C). handler: appsHandler references
+    # the already-constructed provides.services entry above (no separate
+    # constructor/args here — mirrors mod-authz's authzServices route entry),
+    # and register: composes RegisterAppRoutes onto the shared /v1 route tree
+    # instead of mounting a second full router at /v1 (the same
+    # duplicate-Mount panic, gap G14, that the mountFromModule/innerMount
+    # entry above avoids for the entities router, and that mod-tags'
+    # register:-onto-/v1 entry documents for the same reason). Because
+    # RegisterAppRoutes itself registers absolute /apps and /apps/{uuid}
+    # paths (see api/httpapi/apps.go), nesting it inside the shared /v1
+    # group yields /v1/apps, /v1/apps/{uuid}, matching the /v1/apps surface
+    # mod-users' reference server exposed via inline chi (never reachable on
+    # a generated app, since it was never declared in any manifest).
+    - prefix: /v1
+      handler: appsHandler
+      register: corehttpapi.RegisterAppRoutes
+      scope: authenticated
 
 requires:
   services:
