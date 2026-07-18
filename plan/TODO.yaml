@@ -13,6 +13,7 @@ phases:
           path: phase-01-gui-test-infrastructure/001-add-test-runner-dependencies-and-config.md
           done: false
           tier: sonnet-med
+          digest: 'Added bun test + happy-dom + Testing Library stack to gui/ per the spike-verified recipe: 5 devDependencies, two-file preload split (gui/happydom.ts, gui/testing-library-setup.ts), gui/bunfig.toml, src/test-support/matchers.d.ts. tsconfig.json untouched (spike claim confirmed). Fixed a real gap: Bun 1.3.14 exits 1 on zero-test bun test, so test script uses --pass-with-no-tests. All validation (test/typecheck/build) passes.'
           git:
             branch: phase-01-task-01-add-test-runner-dependencies-a
             commit:
