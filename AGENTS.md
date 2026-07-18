@@ -4,7 +4,7 @@ This file is the canonical reference for contributors and AI agents working on t
 
 ## Project overview
 
-`mod-core` is the foundational domain model for the ModuleForge platform. It defines the `entities` and `legal_entities` tables, owns UUID generation and assignment for every entity in the system, and exposes the service-layer abstractions (Entity interface, entity types, observers, cipher) that peer modules depend on.
+`mod-core` is the foundational domain model for the ModuleForge platform. It defines the `entities` table and the full entity-subtype hierarchy built on it — `legal_entities`, `natural_persons`, `corporations`, `service_accounts`, and `apps` (an admin-managed application registry, a concrete entity subtype analogous to `service_accounts`) — owns UUID generation and assignment for every entity in the system, and exposes the service-layer abstractions (Entity interface, entity types, observers, cipher) that peer modules depend on.
 
 The module ships three sub-projects:
 
@@ -89,7 +89,7 @@ All packages below live under `api/` (`github.com/moduleforge/core-api`).
 
 | Package | Purpose |
 |---|---|
-| `entity/` | `Entity` interface + concrete service-layer types (`LegalEntity`, `NaturalPerson`, `Corporation`, `ServiceAccount`). These are not DB row structs; they carry the resource slug, internal entity ID, and public UUID. |
+| `entity/` | `Entity` interface + concrete service-layer types (`LegalEntity`, `NaturalPerson`, `Corporation`, `ServiceAccount`). These are not DB row structs; they carry the resource slug, internal entity ID, and public UUID. `apps` is also an entity subtype (fundamental type `app`, child of `entity`) but has no service-layer type here — it has no Profile-shaped read model or encrypted fields, so it's served directly by a dedicated `httpapi.AppsHandler` instead (see the `httpapi/` row below). |
 | `observer/` | `MutationObserver` interface and `ObserverGroup` concrete type. `ObserverGroup` fans out to N observers in parallel with configurable error policy (`PolicyPropagate` / `PolicySwallow`). Provides `Observe`, `MustObserve`, `MayObserve` per-call-site policy overrides, and `ObserveAfterCommit` for post-tx hooks. |
 | `fieldcrypto/` | Public façade for the AES-256-GCM field cipher. Reads `CORE_FIELD_KEY_HEX` from the environment. Implementation lives in `internal/fieldcrypto/`; this package re-exports only what callers outside core need. |
 | `service/` | `Services` aggregate wrapping `EntityService`, `NaturalPersonService`, `CorporationService`, and `ServiceAccountService`. Constructed via `service.New(...)` and passed to `httpapi.NewRouter`. Its sentinel errors (`ErrNotFound`, `ErrForbidden`, `ErrInvalidInput`, `ErrConflict`) alias the canonical `apiresp` sentinels below. |
@@ -99,14 +99,14 @@ All packages below live under `api/` (`github.com/moduleforge/core-api`).
 | `opctx/` | Typed context accessors for `ActorEntityID`, `SudoActorEntityID`, and `RequestID`. Set by HTTP middleware; consumed by service methods and the `Authorizer`. |
 | `txhelper/` | Thin transaction-helper utilities used by service methods to open and commit pgx transactions. |
 | `apiresp/` | Canonical shared response/error contract: the sentinel set (`ErrUnauthenticated`, `ErrForbidden`, `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`), `WriteJSON` (bare success encoder), `WriteError` (sentinel→status/code mapper and nested `{error:{code,message,details?}}` envelope encoder; logs 5xx via `slog` with request context and never leaks raw error text in the response body), and `InvalidInput(...)` (field-error builder producing the `FieldError`-carrying error `WriteError` surfaces as `details`). Every ModuleForge module is expected to import this in place of a copy-pasted response trio; mod-core's own `httpapi` package dogfoods it. |
-| `httpapi/` | Chi router wiring and HTTP handlers for `/entities/*` routes. `httpapi.NewRouter(deps)` returns a mountable `chi.Router`. Success and error responses are written via `apiresp.WriteJSON`/`apiresp.WriteError`. |
+| `httpapi/` | Chi router wiring and HTTP handlers for `/entities/*` routes. `httpapi.NewRouter(deps)` returns a mountable `chi.Router`. Success and error responses are written via `apiresp.WriteJSON`/`apiresp.WriteError`. Also home to `apps.go`'s `AppsHandler` (`NewAppsHandler` / `RegisterAppRoutes`) — the admin-only top-level `/apps` CRUD (Create/List/GetApp/UpdateApp/DeleteApp), declared as the `coreAppsHandler` service in the module manifest and mounted at `/v1/apps` via `RegisterAppRoutes` onto the shared `/v1` route tree (not through `httpapi.NewRouter`). |
 
 Model packages (`github.com/moduleforge/core-model`):
 
 | Package | Purpose |
 |---|---|
 | `model/db/` | sqlc-generated Go query code. Do not edit by hand; regenerate with `make gen`. |
-| `model/migrations/` | goose migration files for the full entity hierarchy (`entities`, `legal_entities`, `natural_persons`, `corporations`, `service_accounts`). |
+| `model/migrations/` | goose migration files for the full entity hierarchy (`entities`, `legal_entities`, `natural_persons`, `corporations`, `service_accounts`, `apps`) — including the `app` fundamental-type seed (`0014_type_app.sql`), the FK-anchored `apps` table and its type-check trigger (`0015_apps.sql`), and its `updated_at` column and trigger (`0016_apps_updated_at.sql`). |
 | `model/queries/` | SQL query files consumed by sqlc, one file per entity kind. |
 
 ### gui/ error and toast toolkit
