@@ -24,6 +24,6 @@ phases:
           done: false
           tier: sonnet-med
           git:
-            branch: null
+            branch: phase-01-task-02-add-conflict-constructor
             commit: []
             merge: null
