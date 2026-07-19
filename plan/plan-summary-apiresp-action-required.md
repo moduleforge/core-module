@@ -139,3 +139,18 @@ baseline empty-path rejection. All three registered mod-users action codes curre
 relative string literals (`/verify-email`, `/step-up?return=%2Fself%2Fidentities`,
 `/setup/oidc`), so today's correct callers never trip the guard — but Wave-1 call sites that build
 `path` dynamically must be validated against these rules up front.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — Action-Required Writer And Conflict Constructor
+
+- [x] [001-add-action-required-writer.md](./phase-01-action-required-and-conflict/001-add-action-required-writer.md) — tier `sonnet-med` · branch `phase-01-task-01-add-action-required-writer` · commit `f2489f9` · merge `d4d06b426eca822f3be1626891b697eda8c74c53`
+- [x] [002-add-conflict-constructor.md](./phase-01-action-required-and-conflict/002-add-conflict-constructor.md) — tier `sonnet-med` · branch `phase-01-task-02-add-conflict-constructor` · commit `40352ce` · merge `7303ab533011309db7a1321b87da47954f6f43d4`
