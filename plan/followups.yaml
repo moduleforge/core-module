@@ -5,3 +5,8 @@ items:
       date: "2026-07-18"
       tag: gui-test-infrastructure
       text: '[phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md] Task worktree''s node_modules was not present at task start even though gui/bun.lock already contained the required devDependencies from task 001 (dependencies_installed was reported as ''none'' since only the repo root lacks a lockfile — create-worktree.sh''s dependency-install detection apparently only checks root-level lockfiles, not nested gui/bun.lock). The task agent ran `bun install` inside gui/ to materialize node_modules (no lockfile/manifest changes resulted) rather than halting. Worth a process note for future plan executions in monorepo-style layouts with a nested-only lockfile: prepare-task-worktree''s dependency detection doesn''t descend into subdirectories, so every task worktree touching gui/ will need its own `bun install` step.'
+    - title: WriteActionRequired hot-path unconfirmed
+      id: b2nA
+      date: "2026-07-19"
+      tag: action-required-and-conflict
+      text: 'Phase-1 efficiency review (apiresp-action-required plan): isAppRelativePath''s net/url.Parse call allocates more than strictly necessary for a scheme/host-only check. Not a regression (all-new code), and no caller of WriteActionRequired exists anywhere in mod-core yet, so real per-request call frequency is undetermined. Worth a quick look once a consuming module (e.g. mod-users Wave-1) wires in real call sites -- if genuinely hot, consider a lighter string-based check instead of full url.Parse.'
