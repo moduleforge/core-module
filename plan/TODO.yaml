@@ -18,7 +18,7 @@ phases:
             branch: phase-01-task-01-add-action-required-writer
             commit:
                 - f2489f9
-            merge: null
+            merge: d4d06b426eca822f3be1626891b697eda8c74c53
         - number: 2
           slug: add-conflict-constructor
           title: Add Conflict Constructor
