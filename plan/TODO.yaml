@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-conflict-constructor
+          title: Add Conflict Constructor
+          path: phase-01-action-required-and-conflict/002-add-conflict-constructor.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
