@@ -30,4 +30,4 @@ phases:
             branch: phase-01-task-02-add-conflict-constructor
             commit:
                 - 40352ce
-            merge: null
+            merge: 7303ab533011309db7a1321b87da47954f6f43d4
