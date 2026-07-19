@@ -11,7 +11,7 @@ phases:
           slug: add-action-required-writer
           title: Add Action-Required Writer
           path: phase-01-action-required-and-conflict/001-add-action-required-writer.md
-          done: false
+          done: true
           tier: sonnet-med
           digest: 'Implemented the action-required response kind as the third apiresp writer in a single new file api/apiresp/action.go: ActionBody/ActionEnvelope wire types matching the design doc''s JSON shape exactly, ActionCode{Code, Status} documented as carrying no package-level registry/validation (ownership stays per-module), and WriteActionRequired(w, r, action, message, path, data) which writes action.Status verbatim (503 included, never remapped) via the existing WriteJSON, sets Action.Data only when data != nil, and panics via an unexported isAppRelativePath helper (net/url-based scheme/host/empty-path check) when path is not application-relative -- implementing the structural open-redirect guard decided in the companion decisions note. Doc comments state both caller obligations (path relative -- enforced; data minimal/non-sensitive -- caller-discipline only). Table-driven tests in api/apiresp/action_test.go (external apiresp_test package) cover the three registered mod-users flows end-to-end at their bound statuses, the data omitempty behavior on the raw body, and the path guard''s panic/no-panic cases (including empty path). make build, make lint, and make test all pass; only the two new files are touched.'
           git:
