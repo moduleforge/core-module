@@ -15,7 +15,8 @@ phases:
           tier: sonnet-med
           git:
             branch: phase-01-task-01-add-action-required-writer
-            commit: []
+            commit:
+                - f2489f9
             merge: null
         - number: 2
           slug: add-conflict-constructor
