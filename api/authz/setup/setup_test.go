@@ -1,11 +1,27 @@
 package setup_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/moduleforge/core-api/authz/setup"
 )
+
+// ownArmClause builds the exact own-arm WHERE-clause text — the type
+// predicate conjoined with the owner_id equality — as GrantTableGenerator
+// emits it for slug. The type predicate substring recurs verbatim on all
+// three UNION arms (wildcard, own, TargetChain), so checking the type
+// predicate and the owner_id equality as independent strings.Contains calls
+// cannot detect a regression that drops the type predicate from specifically
+// the own arm while leaving it on the other two arms: strings.Contains would
+// still find both substrings somewhere in the body. Checking the conjoined
+// substring proves the type predicate is scoping the SAME clause as the
+// owner_id check, which is what stops one type's owned rows (e.g. an actor's
+// tags) from leaking into another type's access function (e.g. task).
+func ownArmClause(slug string) string {
+	return fmt.Sprintf("type_is_or_descends_from(e.fundamental_type_id, '%s')\n    AND e.owner_id = p_actor_entity_id", slug)
+}
 
 // --- GenerateFuncs tests ---
 
@@ -198,8 +214,10 @@ func TestGrantTableGenerator_Tag(t *testing.T) {
 	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'tag')") {
 		t.Errorf("tag body missing type predicate; got:\n%s", body)
 	}
-	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
-		t.Errorf("tag body missing owner_id own-clause; got:\n%s", body)
+	// Own-arm specific: the type predicate and owner_id equality must appear
+	// conjoined in the same WHERE clause (see ownArmClause doc comment).
+	if !strings.Contains(body, ownArmClause("tag")) {
+		t.Errorf("tag body missing conjoined own-arm clause (type predicate scoping owner_id check); got:\n%s", body)
 	}
 	if strings.Contains(body, "subject_id") {
 		t.Errorf("tag body must not reference subject_id (access predicate dropped); got:\n%s", body)
@@ -235,8 +253,10 @@ func TestGrantTableGenerator_Task(t *testing.T) {
 	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'task')") {
 		t.Errorf("task body missing type predicate; got:\n%s", body)
 	}
-	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
-		t.Errorf("task body missing owner_id own-clause; got:\n%s", body)
+	// Own-arm specific: the type predicate and owner_id equality must appear
+	// conjoined in the same WHERE clause (see ownArmClause doc comment).
+	if !strings.Contains(body, ownArmClause("task")) {
+		t.Errorf("task body missing conjoined own-arm clause (type predicate scoping owner_id check); got:\n%s", body)
 	}
 	if !strings.Contains(body, "JOIN TargetChain") {
 		t.Errorf("task body missing granted-target TargetChain join; got:\n%s", body)
@@ -259,8 +279,10 @@ func TestGrantTableGenerator_NaturalPerson(t *testing.T) {
 		t.Errorf("body missing ActorChain CTE; got:\n%s", body)
 	}
 	// Own predicate: owner_id = actor (owns-itself convention), scoped to type.
-	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
-		t.Errorf("natural_person body missing self-access clause; got:\n%s", body)
+	// Checked as a conjoined substring (see ownArmClause doc comment) so the
+	// type predicate and owner_id equality are proven to be in the same clause.
+	if !strings.Contains(body, ownArmClause("natural_person")) {
+		t.Errorf("natural_person body missing conjoined own-arm clause (type predicate scoping owner_id check); got:\n%s", body)
 	}
 	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'natural_person')") {
 		t.Errorf("natural_person body missing type predicate; got:\n%s", body)
@@ -314,8 +336,10 @@ func TestGrantTableGenerator_ServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
-		t.Errorf("service_account body missing self-access clause; got:\n%s", body)
+	// Checked as a conjoined substring (see ownArmClause doc comment) so the
+	// type predicate and owner_id equality are proven to be in the same clause.
+	if !strings.Contains(body, ownArmClause("service_account")) {
+		t.Errorf("service_account body missing conjoined own-arm clause (type predicate scoping owner_id check); got:\n%s", body)
 	}
 	if !strings.Contains(body, "type_is_or_descends_from(e.fundamental_type_id, 'service_account')") {
 		t.Errorf("service_account body missing type predicate; got:\n%s", body)
@@ -401,8 +425,12 @@ func TestGrantTableGenerator_NoDownstreamTableRefs(t *testing.T) {
 			if !strings.Contains(body, wantTypePredicate) {
 				t.Errorf("body missing type predicate %q; got:\n%s", wantTypePredicate, body)
 			}
-			if !strings.Contains(body, "e.owner_id = p_actor_entity_id") {
-				t.Errorf("body missing owner_id own-clause; got:\n%s", body)
+			// Own-arm specific: checked as a conjoined substring (see
+			// ownArmClause doc comment) so the type predicate and owner_id
+			// equality are proven to be in the same clause, not merely present
+			// somewhere in the body.
+			if !strings.Contains(body, ownArmClause(slug)) {
+				t.Errorf("slug %q: body missing conjoined own-arm clause (type predicate scoping owner_id check); got:\n%s", slug, body)
 			}
 		})
 	}
