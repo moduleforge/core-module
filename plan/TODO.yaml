@@ -23,6 +23,7 @@ phases:
           path: phase-01-action-required-and-conflict/002-add-conflict-constructor.md
           done: false
           tier: sonnet-med
+          digest: 'Added api/apiresp/conflict.go with a conflictError type and Conflict(details ...FieldError) error constructor mirroring invalidinput.go''s invalidInputError/InvalidInput one-for-one, bound to ErrConflict instead of ErrInvalidInput. Extracted an unexported fieldDetailCarrier interface (fieldDetails() []FieldError) in invalidinput.go, implemented by both invalidInputError and conflictError, and rewrote the shared fieldErrors accessor to match via errors.As(err, &carrier) instead of a two-type fallback -- future detail-carrying error types need no further edits to fieldErrors. Added api/apiresp/conflict_test.go (package apiresp_test) with TestConflict_WithDetails and TestConflict_NoDetails mirroring the existing TestInvalidInput_* tests: errors.Is against ErrConflict, the 409/conflict envelope shape with populated details, and omitempty absence of details in the raw JSON body when none supplied. go build, go vet, gofmt -l, and go test ./... all clean; pre-existing TestInvalidInput_* tests still pass unchanged, confirming the fieldErrors refactor is behavior-preserving.'
           git:
             branch: phase-01-task-02-add-conflict-constructor
             commit:
