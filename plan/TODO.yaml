@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: action-required-and-conflict
       title: Action-Required Writer And Conflict Constructor
+      diff_base: 7b3d46597b5f33d8bc73556f8b57546956addc80
       tasks:
         - number: 1
           slug: add-action-required-writer
