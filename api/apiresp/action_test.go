@@ -143,13 +143,41 @@ func TestWriteActionRequired_Data(t *testing.T) {
 			t.Fatalf("response body unexpectedly contains \"data\": %s", rec.Body.String())
 		}
 	})
+
+	t.Run("with typed-nil pointer data", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/self", nil)
+
+		// A typed-nil (non-nil interface holding a nil *struct{}) must be
+		// treated the same as an untyped nil: omitted from the body, not
+		// serialized as "data":null. This exercises the classic Go
+		// nil-interface gotcha where data != nil evaluates true even though
+		// the underlying pointer is nil.
+		var p *struct{ X int }
+		apiresp.WriteActionRequired(rec, req, action, "Single sign-on is not finished configuring.", "/setup/oidc", p)
+
+		var env actionEnvelope
+		if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+			t.Fatalf("decode body: %v (body=%s)", err, rec.Body.String())
+		}
+		if _, present := env.Action["data"]; present {
+			t.Fatalf("action.data: expected absent for typed-nil pointer, got present: %v", env.Action["data"])
+		}
+
+		if strings.Contains(rec.Body.String(), "data") {
+			t.Fatalf("response body unexpectedly contains \"data\" for typed-nil pointer: %s", rec.Body.String())
+		}
+	})
 }
 
 // TestWriteActionRequired_PathGuard verifies the action.path structural
-// guard: WriteActionRequired panics for a path carrying a URL scheme or a
-// "//"-prefixed (protocol-relative) authority, and does not panic for
-// ordinary application-relative paths, including one carrying a query
-// string.
+// guard: WriteActionRequired panics for a path carrying a URL scheme, a
+// "//"-prefixed (protocol-relative) authority, a backslash-based host
+// confusion (browsers treat "\" as interchangeable with "/" when entering
+// the authority-slashes state), or multi-slash authority collapsing (2+
+// leading "/" or "\" characters, not just a literal "//" prefix) — and
+// does not panic for ordinary application-relative paths, including one
+// carrying a query string.
 func TestWriteActionRequired_PathGuard(t *testing.T) {
 	action := apiresp.ActionCode{Code: "users.email_unverified", Status: http.StatusForbidden}
 
@@ -162,6 +190,11 @@ func TestWriteActionRequired_PathGuard(t *testing.T) {
 		{"protocol-relative authority", "//evil.example/x", true},
 		{"javascript scheme", "javascript:alert(1)", true},
 		{"empty path", "", true},
+		{"backslash host confusion (leading slash-backslash)", "/\\evil.example/x", true},
+		{"backslash host confusion (double backslash)", "\\\\evil.example/x", true},
+		{"backslash host confusion (backslash-slash)", "\\/evil.example/x", true},
+		{"triple-slash authority collapsing", "///evil.example", true},
+		{"quadruple-slash authority collapsing", "////evil.example", true},
 		{"ordinary relative path", "/verify-email", false},
 		{"relative path with query", "/step-up?return=%2Fself%2Fidentities", false},
 	}
