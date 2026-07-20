@@ -30,4 +30,4 @@ phases:
             branch: phase-01-task-02-verify-consumer-and-regression
             commit:
                 - efaf632
-            merge: null
+            merge: "4292986"
