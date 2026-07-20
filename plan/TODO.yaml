@@ -14,7 +14,7 @@ phases:
           done: false
           tier: sonnet-high
           git:
-            branch: null
+            branch: phase-01-task-01-add-css-compile-step
             commit: []
             merge: null
         - number: 2
