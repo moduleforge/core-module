@@ -106,3 +106,36 @@ only — do not touch `model/`, `api/`, or anything in mod-users.
 - After adding `@tailwindcss/cli` and confirming a bare CLI compile produces expected CSS.
 - After wiring the `build` script and confirming `bun run build` emits both JS and CSS.
 - After updating the build docs and confirming Ladle preview still builds.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-07-19
+- **Option chosen:** Option B (recommended) — `.ladle/styles.css` kept as the single source of
+  truth; `gui/vite.config.ts` and `gui/.ladle/components.tsx` left untouched.
+- **Changes:**
+  - `gui/package.json` — added `@tailwindcss/cli` to `devDependencies`, pinned to `4.3.1`
+    (exact match to the installed `tailwindcss@4.3.1`, so the CLI's own bundled `tailwindcss`
+    dependency dedupes against the existing install rather than adding a second copy — the
+    `^4` range other Tailwind devDependencies use would have resolved `4.3.3` and produced a
+    duplicate `tailwindcss` in `node_modules`). Added `build:css` script
+    (`tailwindcss -i .ladle/styles.css -o dist/index.css --minify`) and changed `build` to
+    `tsup && bun run build:css` so the CSS step runs after tsup's `clean: true` wipe.
+  - `gui/bun.lock` — updated via `bun install` to add `@tailwindcss/cli@4.3.1` and its
+    transitive deps (`@parcel/watcher`, `@tailwindcss/node@4.3.1`, `@tailwindcss/oxide@4.3.1`,
+    etc.); no other dependency versions changed.
+  - `gui/README.md` — extended the existing Build-section sentence to mention
+    `dist/index.css` and the `@moduleforge/core-gui/styles.css` export.
+- **Validation:** all checks in `## Validation` passed (see structured report for command
+  output). `gui/dist/index.css` is ~29.3 KB minified, contains the expected theme vars
+  (`--background`, `--foreground`, `--primary`, `--radius`, `.dark` overrides) and utility
+  classes (`bg-background`, `text-foreground`, `border-border`, plus `cva()`-sourced classes
+  like `bg-primary`/`bg-destructive` and the `@apply`-derived `outline-color` rule from
+  `outline-ring/50`). tsup's five outputs (`index.js`, `index.mjs`, `index.d.ts`,
+  `index.d.mts`, `.map` files) are unchanged and coexist with `index.css` after a single
+  `bun run build`. `bun run preview:build` (Ladle) succeeds. `git diff --stat` against the
+  pre-task commit shows changes confined to `gui/README.md`, `gui/bun.lock`, and
+  `gui/package.json`.
+- **Assumptions relied on:** all three `## Assumptions` held as stated — `tailwindcss@4.3.1`
+  and `@tailwindcss/vite@4.3.1` were already installed; `gui/dist/` had no `index.css` before
+  this task; consumer verification and the full regression chain are deferred to task 002.
