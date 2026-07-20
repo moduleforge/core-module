@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: css-build
       title: CSS Build
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-css-compile-step
+          title: Add Tailwind CSS Compile Step To The Gui Publish Build
+          path: phase-01-css-build/001-add-css-compile-step.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
