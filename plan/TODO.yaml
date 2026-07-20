@@ -15,7 +15,8 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-01-task-01-add-css-compile-step
-            commit: []
+            commit:
+                - a2ddd26
             merge: null
         - number: 2
           slug: verify-consumer-and-regression
