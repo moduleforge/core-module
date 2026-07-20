@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: verify-consumer-and-regression
+          title: Verify CSS Output End To End In A Real Consumer And Full Regression
+          path: phase-01-css-build/002-verify-consumer-and-regression.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
