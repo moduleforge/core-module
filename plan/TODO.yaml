@@ -23,7 +23,7 @@ phases:
           slug: verify-consumer-and-regression
           title: Verify CSS Output End To End In A Real Consumer And Full Regression
           path: phase-01-css-build/002-verify-consumer-and-regression.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Re-ran mod-core/gui's build and confirmed dist/index.css is a real, non-empty (29973-byte) compiled Tailwind stylesheet with expected theme CSS variables and utility classes. Published via yalc from mod-core/gui and linked into mod-users/gui per mod-users/AGENTS.md §4, then used Bun's import.meta.resolve to prove @moduleforge/core-gui/styles.css resolves through the package's real exports map to the yalc-linked dist/index.css, byte-identical to both the yalc store copy and mod-core's freshly built artifact. Fully reverted mod-users afterward (yalc remove + git checkout on bun.lock); git -C mod-users status shows zero tracked-file changes attributable to this task and no commits were made. Ran the full mod-core regression — gui typecheck, gui tests (15/15 passing), and root make build (model + api + gui) — all green. Pure verification task; only diff is the task document's Status section.
           git:
