@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: css-build
       title: CSS Build
+      diff_base: 56fa812039b0b71beb24f0f2e3336b7255a167ca
       tasks:
         - number: 1
           slug: add-css-compile-step
