@@ -85,3 +85,18 @@ and are carried forward here as freestanding notes:
 - **Pre-existing dependency vulnerabilities.** `bun audit` on `gui/`'s lockfile surfaced 5
   pre-existing moderate/high-severity vulnerabilities in `vite` and `esbuild` (via `tsup`).
   Confirmed present before this plan's changes and unaffected by them.
+
+## Final Task State
+
+# TODO
+
+## Purpose and scope
+
+Tracking document for the active plan.
+
+## Tasks
+
+### Phase 01 — CSS Build
+
+- [x] [001-add-css-compile-step.md](./phase-01-css-build/001-add-css-compile-step.md) — tier `sonnet-high` · branch `phase-01-task-01-add-css-compile-step` · commit `a2ddd26` · merge `383ecb2`
+- [x] [002-verify-consumer-and-regression.md](./phase-01-css-build/002-verify-consumer-and-regression.md) — tier `sonnet-high` · branch `phase-01-task-02-verify-consumer-and-regression` · commit `efaf632` · merge `4292986`
