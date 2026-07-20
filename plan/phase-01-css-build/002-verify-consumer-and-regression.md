@@ -103,3 +103,38 @@ tracked mod-users file; restore any transient yalc state when done.
 - After the yalc publish + link and confirming the export resolves to real CSS.
 - After restoring mod-users to a clean state.
 - After the full mod-core regression (typecheck, test, root make build) passes.
+
+## Status
+
+- **Outcome:** succeeded — 2026-07-19.
+- **Artifact re-confirmed:** `gui/dist/index.css` rebuilt via `bun run build` (and again via
+  root `make build`) is 29,973 bytes, non-empty, and greps clean for theme CSS vars
+  (`--background:oklch(...)`, `--foreground:oklch(...)`, `--primary:oklch(...)`) and used
+  utility classes (`.bg-background{...}`, `.text-foreground{...}`, `.bg-primary{...}`).
+- **yalc smoke-check:** `yalc publish` from `mod-core/gui` (`@moduleforge/core-gui@0.0.0`
+  published), then from `/Users/zane/playground/moduleforge/mod-users/gui`:
+  `yalc add @moduleforge/core-gui` + `bun install`. Resolved
+  `@moduleforge/core-gui/styles.css` from `mod-users/gui` via
+  `bun -e "await import.meta.resolve(...)"`, which returned
+  `.../mod-users/gui/node_modules/@moduleforge/core-gui/dist/index.css` (exports-map
+  resolution, not a manual path guess). That resolved file is byte-identical (`diff` clean,
+  29,973 bytes) to both the yalc-published `.yalc/@moduleforge/core-gui/dist/index.css` copy
+  and to mod-core's freshly built `gui/dist/index.css`, and greps clean for the same theme
+  vars and utility classes as above.
+- **mod-users restored:** `yalc remove @moduleforge/core-gui` reverted
+  `mod-users/gui/package.json`'s transient `file:.yalc/` dependency line; `bun install`'s
+  `bun.lock` diff (3 lines, `@moduleforge/core-gui` resolution entries) was reverted via
+  `git checkout -- bun.lock`; the gitignored `mod-users/gui/.yalc/` dir was removed manually.
+  `git -C mod-users diff -- gui/package.json bun.lock` is empty; `git -C mod-users status`
+  shows zero changes attributable to this task (pre-existing, unrelated `.flow/session-id`
+  modification and untracked `.flow/tasks/*.json` files were already present before this task
+  touched the repo — confirmed by checking `git -C mod-users status` before starting the yalc
+  workflow — and were left untouched). No commits were made in mod-users.
+- **Regression:** `cd gui && bun run typecheck` (tsc --noEmit) passes with no output.
+  `cd gui && bun run test` passes (15 pass, 0 fail, 25 expect() calls). `make build` at the
+  mod-core root passes (model, api, gui all build; gui build emits `dist/index.css`).
+- **mod-core worktree:** `git status` clean throughout (gui/dist/ is gitignored; no source
+  changes were required — this was a pure verification task).
+- **Dependencies:** `bun install` was run inside `gui/` per the dispatch's
+  `dependencies_installed: none` note (root-level lockfile detection gap), matching the
+  supplied instruction.
