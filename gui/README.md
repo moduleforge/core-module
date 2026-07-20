@@ -8,7 +8,7 @@ React component library for entity editing UIs. Provides `<ProfileEditor>` and r
 npm run build
 ```
 
-Outputs `dist/index.js` (CJS), `dist/index.mjs` (ESM), and `dist/index.d.ts` (types) via tsup, plus `dist/index.css` (compiled Tailwind theme + utilities via the Tailwind v4 CLI) for consumers importing `@moduleforge/core-gui/styles.css`.
+Outputs `dist/index.js` (CJS), `dist/index.mjs` (ESM), and `dist/index.d.ts` (types) via tsup, plus `dist/index.css` (compiled Tailwind theme + utilities via the Tailwind v4 CLI) for consumers importing `@moduleforge/core-gui/styles.css`. `@tailwindcss/cli`'s pinned version must be bumped in lockstep whenever `tailwindcss` or `@tailwindcss/vite` is upgraded, or the publish-build CSS compiler and the Ladle dev-preview compiler can drift to different Tailwind engine versions.
 
 ## Linking into a consumer (yalc workflow)
 
