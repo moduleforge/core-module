@@ -27,5 +27,6 @@ phases:
           tier: sonnet-high
           git:
             branch: phase-01-task-02-verify-consumer-and-regression
-            commit: []
+            commit:
+                - efaf632
             merge: null
