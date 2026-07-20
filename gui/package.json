@@ -16,7 +16,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && bun run build:css",
+    "build:css": "tailwindcss -i .ladle/styles.css -o dist/index.css --minify",
     "typecheck": "tsc --noEmit",
     "test": "bun test --pass-with-no-tests",
     "clean": "rm -rf dist build .yalc yalc.lock",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20",
     "@ladle/react": "^5",
+    "@tailwindcss/cli": "4.3.1",
     "@tailwindcss/vite": "^4",
     "@testing-library/dom": "^10",
     "@testing-library/jest-dom": "^6",
