@@ -13,6 +13,7 @@ phases:
           path: phase-01-css-build/001-add-css-compile-step.md
           done: false
           tier: sonnet-high
+          digest: Added a Tailwind v4 CSS compile step to gui's publish build so dist/index.css (already promised by gui/package.json's "./styles.css" export) is actually produced. Kept gui/.ladle/styles.css as the single Tailwind source (Option B), added @tailwindcss/cli pinned to 4.3.1, wired build to "tsup && bun run build:css" so the CSS step survives tsup's clean:true. Verified bun run build emits both the five original tsup artifacts and a genuine ~29KB minified index.css with expected theme vars, dark-mode overrides, and component-sourced utility classes. Confirmed Ladle's preview build still succeeds untouched. All changes confined to gui/.
           git:
             branch: phase-01-task-01-add-css-compile-step
             commit:
