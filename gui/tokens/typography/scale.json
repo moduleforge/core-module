@@ -1,0 +1,59 @@
+{
+  "$description": "Typography tier — type scale as tokens (mode-independent). Loosely modeled on the MD3 type scale (adapted, not copied). Each level is a group of size / line-height / weight / tracking sub-tokens aliasing the raw ramps in tokens/base/font.json. Entirely NEW in this migration — mod-core/gui/.ladle/styles.css defines no type scale — so these introduce no drift (nothing renders them yet). Task 002 decides how to emit them (e.g. --mf-text-h1-size / -line-height / -weight / -tracking, or a composite).",
+  "mf": {
+    "text-h1": {
+      "size": { "$type": "dimension", "$value": "{font.size.5xl}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.tight}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.bold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.tighter}" }
+    },
+    "text-h2": {
+      "size": { "$type": "dimension", "$value": "{font.size.4xl}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.tight}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.bold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.tight}" }
+    },
+    "text-h3": {
+      "size": { "$type": "dimension", "$value": "{font.size.3xl}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.snug}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.semibold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.tight}" }
+    },
+    "text-h4": {
+      "size": { "$type": "dimension", "$value": "{font.size.2xl}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.snug}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.semibold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.normal}" }
+    },
+    "text-h5": {
+      "size": { "$type": "dimension", "$value": "{font.size.xl}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.snug}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.semibold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.normal}" }
+    },
+    "text-h6": {
+      "size": { "$type": "dimension", "$value": "{font.size.lg}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.normal}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.semibold}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.normal}" }
+    },
+    "text-body": {
+      "size": { "$type": "dimension", "$value": "{font.size.base}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.relaxed}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.normal}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.normal}" }
+    },
+    "text-body-sm": {
+      "size": { "$type": "dimension", "$value": "{font.size.sm}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.normal}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.normal}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.normal}" }
+    },
+    "text-label": {
+      "size": { "$type": "dimension", "$value": "{font.size.sm}" },
+      "line-height": { "$type": "number", "$value": "{font.line-height.normal}" },
+      "weight": { "$type": "fontWeight", "$value": "{font.weight.medium}" },
+      "tracking": { "$type": "dimension", "$value": "{font.tracking.wide}" }
+    }
+  }
+}
