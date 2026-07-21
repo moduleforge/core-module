@@ -1,0 +1,6 @@
+{
+  "$description": "Raw / base radius tier. Literal dimension. The single base radius from mod-core/gui/.ladle/styles.css (--radius: 0.625rem). Derived steps live in semantic/radius.json.",
+  "radius": {
+    "base": { "$type": "dimension", "$value": "0.625rem", "$description": "styles.css: --radius. All derived radius steps are multiples of this." }
+  }
+}
