@@ -74,7 +74,7 @@ export function ProfileEditor({ initial, onSave, readOnly = false }: ProfileEdit
               </div>
             )}
             {success && (
-              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 px-3 py-2 text-sm text-success">
                 <CheckCircle2 className="size-4" />
                 Profile updated successfully.
               </div>
