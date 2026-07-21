@@ -27,8 +27,11 @@ function ExampleAlerts() {
 export const Variants: Story = () => <ExampleAlerts />;
 
 /**
- * Proves both variants still render correctly when the subtree is flipped via
- * `data-mf-theme="inverse"`.
+ * Demonstrates both variants' token-level color scoping when the subtree is flipped via
+ * `data-mf-theme="inverse"`. This confirms the token flip itself, not full `dark:`-variant
+ * parity: the destructive variant also carries a `dark:border-destructive` modifier that does
+ * not retrigger under `data-mf-theme="inverse"` — a known, documented gap (see
+ * `../tokens/CONTRACT.md`'s "Known limitation").
  */
 export const InverseSection: Story = () => (
   <div className="flex flex-col gap-6">
