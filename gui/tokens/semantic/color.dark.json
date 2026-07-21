@@ -1,0 +1,47 @@
+{
+  "$description": "Semantic / purpose color tier — DARK mode set. Same --mf-* token paths as color.light.json, aliased to the dark-appropriate raw values (mirrors the .dark block in mod-core/gui/.ladle/styles.css). Alternative source set to color.light.json — task 002 builds the dark output from this file.",
+  "mf": {
+    "primary": { "$type": "color", "$value": "{color.neutral.200}", "$description": "MD3 primary. shadcn --primary (dark)." },
+    "primary-foreground": { "$type": "color", "$value": "{color.neutral.800}", "$description": "MD3 on-primary. shadcn --primary-foreground (dark)." },
+    "primary-hover": { "$type": "color", "$value": "{color.neutral.150}", "$description": "NEW role. Slightly darkened primary for hover in dark mode." },
+    "brand-highlight": { "$type": "color", "$value": "{color.neutral.200}", "$description": "NEW role. Placeholder = primary (achromatic palette; overridden by brand style packages)." },
+
+    "secondary": { "$type": "color", "$value": "{color.neutral.700}", "$description": "MD3 secondary. shadcn --secondary (dark)." },
+    "secondary-foreground": { "$type": "color", "$value": "{color.neutral.50}", "$description": "MD3 on-secondary. shadcn --secondary-foreground (dark)." },
+    "tertiary": { "$type": "color", "$value": "{color.neutral.700}", "$description": "NEW role (MD3 tertiary). Defaults to secondary's surface." },
+    "tertiary-foreground": { "$type": "color", "$value": "{color.neutral.50}", "$description": "NEW role (MD3 on-tertiary). Defaults to secondary-foreground." },
+
+    "accent": { "$type": "color", "$value": "{color.neutral.700}", "$description": "shadcn --accent (dark)." },
+    "accent-foreground": { "$type": "color", "$value": "{color.neutral.50}", "$description": "shadcn --accent-foreground (dark)." },
+
+    "background": { "$type": "color", "$value": "{color.neutral.900}", "$description": "MD3 background. shadcn --background (dark)." },
+    "surface": { "$type": "color", "$value": "{color.neutral.800}", "$description": "MD3 surface. shadcn --card (dark)." },
+    "surface-foreground": { "$type": "color", "$value": "{color.neutral.50}", "$description": "MD3 on-surface. shadcn --card-foreground (dark)." },
+    "surface-variant": { "$type": "color", "$value": "{color.neutral.700}", "$description": "MD3 surface-variant. shadcn --muted (dark)." },
+    "surface-variant-foreground": { "$type": "color", "$value": "{color.neutral.400}", "$description": "MD3 on-surface-variant. shadcn --muted-foreground (dark)." },
+    "popover": { "$type": "color", "$value": "{color.neutral.800}", "$description": "shadcn --popover (dark)." },
+    "popover-foreground": { "$type": "color", "$value": "{color.neutral.50}", "$description": "shadcn --popover-foreground (dark)." },
+
+    "text-body": { "$type": "color", "$value": "{color.neutral.50}", "$description": "MD3 on-background. shadcn --foreground (dark)." },
+    "text-heading": { "$type": "color", "$value": "{color.neutral.50}", "$description": "NEW role. Defaults to text-body." },
+    "text-muted": { "$type": "color", "$value": "{color.neutral.400}", "$description": "Muted text (dark). Same as surface-variant-foreground." },
+
+    "link": { "$type": "color", "$value": "{color.blue.base-dark}", "$description": "NEW role." },
+    "link-hover": { "$type": "color", "$value": "{color.blue.strong-dark}", "$description": "NEW role." },
+    "link-active": { "$type": "color", "$value": "{color.blue.strong-dark}", "$description": "NEW role." },
+    "link-visited": { "$type": "color", "$value": "{color.purple.dark}", "$description": "NEW role." },
+
+    "error": { "$type": "color", "$value": "{color.red.dark}", "$description": "MD3 error. shadcn --destructive (dark, exact)." },
+    "error-foreground": { "$type": "color", "$value": "{color.neutral.900}", "$description": "MD3 on-error. NEW; dark text on the light-tone dark-mode red." },
+    "warning": { "$type": "color", "$value": "{color.amber.dark}", "$description": "NEW role." },
+    "warning-foreground": { "$type": "color", "$value": "{color.neutral.900}", "$description": "NEW role." },
+    "info": { "$type": "color", "$value": "{color.blue.base-dark}", "$description": "NEW role." },
+    "info-foreground": { "$type": "color", "$value": "{color.neutral.900}", "$description": "NEW role." },
+    "success": { "$type": "color", "$value": "{color.green.dark}", "$description": "NEW role." },
+    "success-foreground": { "$type": "color", "$value": "{color.neutral.900}", "$description": "NEW role." },
+
+    "border": { "$type": "color", "$value": "{color.neutral.alpha-10}", "$description": "MD3 outline. shadcn --border (dark, white@10%)." },
+    "input": { "$type": "color", "$value": "{color.neutral.alpha-15}", "$description": "shadcn --input (dark, white@15%)." },
+    "ring": { "$type": "color", "$value": "{color.neutral.500}", "$description": "Focus ring. shadcn --ring (dark)." }
+  }
+}

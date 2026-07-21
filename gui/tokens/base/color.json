@@ -1,0 +1,49 @@
+{
+  "$description": "Raw / base color tier. Literal oklch values only. Never referenced directly by components — the semantic tier (semantic/color.*.json) aliases into these. Do not add purpose or role meaning here.",
+  "color": {
+    "$description": "Mode-independent literal color primitives.",
+    "neutral": {
+      "$description": "Achromatic (0-chroma) oklch lightness ramp. Every existing shadcn token value in mod-core/gui/.ladle/styles.css is one of these steps. Step names encode relative lightness (0 = white, 900 = near-black); they are not fixed to a 10-step scale.",
+      "0": { "$type": "color", "$value": "oklch(1 0 0)", "$description": "Pure white. styles.css: background/card/popover (light)." },
+      "50": { "$type": "color", "$value": "oklch(0.985 0 0)", "$description": "styles.css: *-foreground (light), foreground/*-foreground (dark)." },
+      "100": { "$type": "color", "$value": "oklch(0.97 0 0)", "$description": "styles.css: secondary/muted/accent surfaces (light)." },
+      "150": { "$type": "color", "$value": "oklch(0.87 0 0)", "$description": "NEW step (not in styles.css). Introduced for the dark-mode primary-hover default." },
+      "200": { "$type": "color", "$value": "oklch(0.922 0 0)", "$description": "styles.css: border/input (light), primary (dark)." },
+      "400": { "$type": "color", "$value": "oklch(0.708 0 0)", "$description": "styles.css: ring (light), muted-foreground (dark)." },
+      "500": { "$type": "color", "$value": "oklch(0.556 0 0)", "$description": "styles.css: muted-foreground (light), ring (dark)." },
+      "700": { "$type": "color", "$value": "oklch(0.269 0 0)", "$description": "styles.css: secondary/muted/accent surfaces (dark)." },
+      "750": { "$type": "color", "$value": "oklch(0.3 0 0)", "$description": "NEW step (not in styles.css). Introduced for the light-mode primary-hover default." },
+      "800": { "$type": "color", "$value": "oklch(0.205 0 0)", "$description": "styles.css: primary/secondary-fg/accent-fg (light), card/popover (dark)." },
+      "900": { "$type": "color", "$value": "oklch(0.145 0 0)", "$description": "styles.css: foreground (light), background (dark)." },
+      "alpha-10": { "$type": "color", "$value": "oklch(1 0 0 / 10%)", "$description": "styles.css: border (dark). White at 10% alpha." },
+      "alpha-15": { "$type": "color", "$value": "oklch(1 0 0 / 15%)", "$description": "styles.css: input (dark). White at 15% alpha." }
+    },
+    "red": {
+      "$description": "Destructive / error hue. The two steps are the exact styles.css --destructive light and dark values.",
+      "light": { "$type": "color", "$value": "oklch(0.577 0.245 27.325)", "$description": "styles.css: --destructive (light)." },
+      "dark": { "$type": "color", "$value": "oklch(0.704 0.191 22.216)", "$description": "styles.css: --destructive (dark)." }
+    },
+    "amber": {
+      "$description": "NEW hue (no prior styles.css value). Warning role default. Chosen tasteful amber; overridable by style packages.",
+      "light": { "$type": "color", "$value": "oklch(0.75 0.15 75)" },
+      "dark": { "$type": "color", "$value": "oklch(0.82 0.13 80)" }
+    },
+    "blue": {
+      "$description": "NEW hue (no prior styles.css value). Info + link role defaults. Two strengths per mode.",
+      "base-light": { "$type": "color", "$value": "oklch(0.55 0.18 255)" },
+      "base-dark": { "$type": "color", "$value": "oklch(0.7 0.14 255)" },
+      "strong-light": { "$type": "color", "$value": "oklch(0.48 0.18 255)" },
+      "strong-dark": { "$type": "color", "$value": "oklch(0.78 0.13 255)" }
+    },
+    "green": {
+      "$description": "NEW hue (no prior styles.css value). Success role default.",
+      "light": { "$type": "color", "$value": "oklch(0.6 0.15 150)" },
+      "dark": { "$type": "color", "$value": "oklch(0.72 0.14 150)" }
+    },
+    "purple": {
+      "$description": "NEW hue (no prior styles.css value). Visited-link role default.",
+      "light": { "$type": "color", "$value": "oklch(0.52 0.18 300)" },
+      "dark": { "$type": "color", "$value": "oklch(0.7 0.14 300)" }
+    }
+  }
+}

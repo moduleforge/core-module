@@ -1,0 +1,8 @@
+{
+  "$description": "Typography tier — semantic font families. The --mf-font-* roles components consume, aliasing the raw stacks in tokens/base/font.json.",
+  "mf": {
+    "font-sans": { "$type": "fontFamily", "$value": "{font.family.sans}", "$description": "Default UI / body family. shadcn --font-sans." },
+    "font-mono": { "$type": "fontFamily", "$value": "{font.family.mono}", "$description": "Monospace family. shadcn --font-mono." },
+    "font-heading": { "$type": "fontFamily", "$value": "{font.family.sans}", "$description": "NEW role. Defaults to the sans stack; distinct token so headings can diverge later without touching body text." }
+  }
+}
