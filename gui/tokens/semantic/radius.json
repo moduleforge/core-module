@@ -1,0 +1,30 @@
+{
+  "$description": "Semantic radius tier (mode-independent). --mf-radius is the base; sm/md/lg/xl derive from it. mod-core/gui/.ladle/styles.css defines these as calc(var(--radius) * k). DTCG has no calc primitive, so each derived token carries BOTH the pre-computed literal $value (so the compiled default matches today's render exactly) AND the multiplier in $extensions, letting task 002 choose to emit calc(var(--mf-radius) * k) instead — which is preferable so a runtime --mf-radius override cascades to the derived steps. See tokens/README.md.",
+  "mf": {
+    "radius": { "$type": "dimension", "$value": "{radius.base}", "$description": "Base radius. styles.css: --radius-lg == var(--radius)." },
+    "radius-sm": {
+      "$type": "dimension",
+      "$value": "0.375rem",
+      "$description": "styles.css: calc(var(--radius) * 0.6).",
+      "$extensions": { "com.moduleforge.radius": { "base": "{radius.base}", "multiplier": 0.6 } }
+    },
+    "radius-md": {
+      "$type": "dimension",
+      "$value": "0.5rem",
+      "$description": "styles.css: calc(var(--radius) * 0.8).",
+      "$extensions": { "com.moduleforge.radius": { "base": "{radius.base}", "multiplier": 0.8 } }
+    },
+    "radius-lg": {
+      "$type": "dimension",
+      "$value": "0.625rem",
+      "$description": "styles.css: var(--radius).",
+      "$extensions": { "com.moduleforge.radius": { "base": "{radius.base}", "multiplier": 1.0 } }
+    },
+    "radius-xl": {
+      "$type": "dimension",
+      "$value": "0.875rem",
+      "$description": "styles.css: calc(var(--radius) * 1.4).",
+      "$extensions": { "com.moduleforge.radius": { "base": "{radius.base}", "multiplier": 1.4 } }
+    }
+  }
+}
