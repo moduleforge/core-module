@@ -6,7 +6,13 @@
    core-gui, including those declared inside cva() calls. */
 @source "../src";
 
-@custom-variant dark (&:is(.dark *));
+/* The `dark:` Tailwind variant follows the unified `data-mf-theme="dark"` scope, with the legacy
+   `.dark` class bridged alongside it for back-compat. Keep this in sync with the dark selector
+   list emitted by ../tokens/dist/tokens.css. See ../tokens/CONTRACT.md.
+   Note: `data-mf-theme="inverse"` reassigns the token custom properties for its subtree but does
+   not, by itself, re-trigger `dark:` utility variants — that is a documented limitation handled
+   in the task-002 primitive audit, not here. */
+@custom-variant dark (&:is(.dark *, [data-mf-theme="dark"] *));
 
 /* Compiled design-token bundle (Style Dictionary, from ../tokens/*.json). Carries the
    @property typed declarations, the @theme inline mapping, and the :root / .dark baked-default
