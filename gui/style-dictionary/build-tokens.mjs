@@ -140,6 +140,11 @@ async function resolveTokens(source) {
     // and transform errors are unaffected by this and still throw with full detail (verbosity
     // stays 'verbose' so a genuine broken-reference error prints the offending token, not just
     // a "re-run with --verbose" pointer).
+    // Trade-off: Style Dictionary v5's `warnings` option is on/off only (no finer granularity
+    // to silence just the description collision above), so disabling it here also silences
+    // genuine future token-VALUE collisions between the source files in this instance's
+    // `source` array. If those source arrays are ever restructured, temporarily re-enable
+    // warnings (`warnings: 'warn'`) to check for real collisions before disabling them again.
     log: { verbosity: 'verbose', warnings: 'disabled', errors: { brokenReferences: 'throw' } },
     platforms: {
       css: { transformGroup: 'css' },
@@ -179,7 +184,11 @@ async function main() {
     .sort(byName);
 
   const colorDarkTokens = (
-    await resolveTokens(['tokens/base/color.json', 'tokens/semantic/color.dark.json'])
+    await resolveTokens([
+      'tokens/base/color.json',
+      'tokens/semantic/color.dark.json',
+      'tokens/component/overrides.json',
+    ])
   )
     .filter(isSemanticToken)
     .filter((t) => t.$type === 'color')
