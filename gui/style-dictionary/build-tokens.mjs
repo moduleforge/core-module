@@ -102,6 +102,14 @@ const COLOR_THEME_MAP = [
   ['mf-border', '--color-border'],
   ['mf-input', '--color-input'],
   ['mf-ring', '--color-ring'],
+  // Added by task-002 (primitive audit): ProfileEditor's success banner used raw
+  // `green-*` Tailwind palette classes because `--mf-success`/`--mf-success-foreground`
+  // were defined (tokens/semantic/color.{light,dark}.json) but never wired to a Tailwind
+  // color utility. Wiring them here — mirroring every other semantic color role — lets the
+  // banner consume `bg-success`/`text-success`/`border-success` through the same
+  // fallback-chained `@theme` contract instead of a hardcoded, non-token color.
+  ['mf-success', '--color-success'],
+  ['mf-success-foreground', '--color-success-foreground'],
 ];
 
 const FONT_THEME_MAP = [
