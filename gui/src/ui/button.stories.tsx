@@ -41,9 +41,12 @@ export const States: Story = () => (
 );
 
 /**
- * Proves every variant still renders correctly when its subtree is flipped via
- * `data-mf-theme="inverse"` — the scoping value that reassigns the `--mf-*` color custom
- * properties for a subtree independent of the page's own light/dark mode.
+ * Demonstrates every variant's token-level color scoping under `data-mf-theme="inverse"` — the
+ * scoping value that reassigns the `--mf-*` color custom properties for a subtree independent of
+ * the page's own light/dark mode. This confirms the token flip itself, not full `dark:`-variant
+ * parity: `button` also carries `dark:`-gated opacity/emphasis modifiers (e.g.
+ * `dark:border-input dark:bg-input/30`) that do not retrigger under `data-mf-theme="inverse"` — a
+ * known, documented gap (see `../tokens/CONTRACT.md`'s "Known limitation").
  */
 export const InverseSection: Story = () => (
   <div className="flex flex-col gap-6">

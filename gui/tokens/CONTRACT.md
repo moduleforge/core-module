@@ -91,7 +91,8 @@ Wired into the Tailwind `@theme` color map (consumed through cva utility classes
 `--mf-surface-foreground`, `--mf-popover`, `--mf-popover-foreground`, `--mf-primary`,
 `--mf-primary-foreground`, `--mf-secondary`, `--mf-secondary-foreground`, `--mf-surface-variant`
 (→ `muted`), `--mf-surface-variant-foreground`, `--mf-accent`, `--mf-accent-foreground`,
-`--mf-error` (→ `destructive`), `--mf-border`, `--mf-input`, `--mf-ring`.
+`--mf-error` (→ `destructive`), `--mf-border`, `--mf-input`, `--mf-ring`, `--mf-success`
+(→ `success`), `--mf-success-foreground` (→ `success-foreground`).
 
 Defined and settable, consumed by direct reference or reserved for later primitives (not currently
 in the Tailwind color map):
@@ -99,7 +100,7 @@ in the Tailwind color map):
 `--mf-primary-hover`, `--mf-brand-highlight`, `--mf-tertiary`, `--mf-tertiary-foreground`,
 `--mf-text-heading`, `--mf-text-muted`, `--mf-link`, `--mf-link-visited`, `--mf-link-hover`,
 `--mf-link-active`, `--mf-error-foreground`, `--mf-warning`, `--mf-warning-foreground`,
-`--mf-info`, `--mf-info-foreground`, `--mf-success`, `--mf-success-foreground`.
+`--mf-info`, `--mf-info-foreground`.
 
 ### Radius
 
@@ -173,12 +174,19 @@ consumer still toggling `.dark` (or `dark:` Tailwind utilities) keeps working:
 The Ladle wrapper (`.ladle/components.tsx`) was migrated onto the attribute — its theme-addon
 toggle now sets `data-mf-theme="light|dark"`.
 
-**Known limitation.** `data-mf-theme="inverse"` reassigns the token *custom properties* for its
-subtree but does not, by itself, re-trigger `dark:` *Tailwind utility variants*. Components that
-lean on `dark:` utilities for subtle tweaks (a handful of primitives) are reconciled in the task
-`002` primitive audit; the token-level inverse flip is correct regardless. Deeply nested
-inverse-within-inverse is also out of scope — inverse is designed for a single flip relative to the
-page mode.
+**Known limitation (accepted, still open).** `data-mf-theme="inverse"` reassigns the token *custom
+properties* for its subtree but does not, by itself, re-trigger `dark:` *Tailwind utility variants*.
+A handful of primitives lean on `dark:` utilities for subtle opacity/emphasis tweaks (e.g.
+`dark:border-input dark:bg-input/30` on `button`, `dark:border-destructive` on `alert`/`toast`); on
+those primitives the token-level color flip under `data-mf-theme="inverse"` is correct, but the
+`dark:`-gated modifier does not retrigger, since `inverse` is not the `dark` class/media state the
+`dark:` variant checks for. The task `002` primitive audit surveyed this gap and deliberately
+deferred fixing it — closing it would mean changing shared component code to key those modifiers
+off `data-mf-theme` instead of (or in addition to) `dark:`, which was judged a regression risk not
+worth taking in that pass. No component code has been changed to close this gap; it remains an
+open, accepted limitation of the current inverse-scoping mechanism, documented here for anyone
+extending it later. Deeply nested inverse-within-inverse is also out of scope — inverse is designed
+for a single flip relative to the page mode.
 
 ## Security posture
 
