@@ -84,6 +84,13 @@ const SUPPORTED_MANIFEST_FORMAT_VERSION = 1;
 const MANIFEST_FILENAME = 'style-package.json';
 const STYLE_LINK_MARKER = 'data-mf-style-package';
 const CACHE_BUST_PARAM = 'mf-style-version';
+/**
+ * Defensive cap on a fetched manifest's raw response body, applied before
+ * `JSON.parse`. No legitimate `style-package.json` (four short string
+ * fields + a small assets block) approaches this size; this only guards
+ * against an oversized/misbehaving response being parsed in full.
+ */
+const MAX_MANIFEST_BODY_LENGTH = 16 * 1024;
 
 // ─── Public option / result types ───────────────────────────────────────────
 
@@ -120,20 +127,42 @@ export interface LoadStylePackageOptions {
    * mismatch — e.g. to route the signal to a production telemetry/log hook.
    * Called whether or not `strict` is set (strict mode still reports the
    * mismatch it acted on).
+   *
+   * The `info` passed here carries manifest-supplied strings
+   * (`packageName`/`packageVersion`/`targetContractVersion`) that are not
+   * validated for length or content beyond "is a string" — a production
+   * implementation that persists/logs these fields should bound and/or
+   * escape them first, the same way it would any other untrusted input.
    */
   onContractMismatch?: (info: ContractMismatchInfo) => void;
+  /**
+   * Skips the same-origin check the loader otherwise applies to every
+   * resolved `styleBundle`/asset URL (see `STYLE-PACKAGE-CONTRACT.md`'s
+   * "Security posture"). **Off by default**: a style package's assets must
+   * resolve to the same origin as its own manifest, since an absolute URL
+   * in an independently-hosted (and possibly compromised or spoofed)
+   * manifest could otherwise silently point the injected stylesheet or
+   * brand assets at an arbitrary third-party origin. Set this to `true`
+   * only for a known-legitimate cross-origin hosting setup (e.g. serving
+   * the compiled bundle from a CDN origin distinct from the manifest's).
+   */
+  allowCrossOriginAssets?: boolean;
 }
 
 /**
  * Result of `loadStylePackage`. `status` is `'loaded'` for every case that
  * injects the bundle (the default policy, including a non-strict MAJOR
- * mismatch — loaded with a warning) and `'skipped-strict-mismatch'` only when
+ * mismatch — loaded with a warning); `'skipped-strict-mismatch'` only when
  * `options.strict` refused a MAJOR-mismatched package, leaving mod-core's
- * defaults active. `assets`/`bundleUrl`/`linkElement` are populated only in
- * the `'loaded'` case.
+ * defaults active; and `'superseded'` when a later `loadStylePackage` call
+ * for the same `doc` had already started before this call's async work
+ * (fetch/resolution) completed — this call's outcome is discarded without
+ * touching the DOM or `getActiveStylePackage`'s tracked state, leaving the
+ * later call's result in effect. `assets`/`bundleUrl`/`linkElement` are
+ * populated only in the `'loaded'` case.
  */
 export interface LoadStylePackageResult {
-  status: 'loaded' | 'skipped-strict-mismatch';
+  status: 'loaded' | 'skipped-strict-mismatch' | 'superseded';
   /** The manifest exactly as fetched/provided (relative URLs unresolved). */
   manifest: StylePackageManifest;
   /** `manifest.assets` with every relative URL resolved to absolute, ready for the app shell to render directly. `undefined` when the manifest declares no assets, or the load was skipped. */
@@ -153,6 +182,17 @@ export interface LoadStylePackageResult {
 // concurrent tests, or a multi-frame host), without leaking references once a
 // `Document` is discarded.
 const activeStylePackages = new WeakMap<Document, LoadStylePackageResult | null>();
+
+// Monotonic sequencing guard against overlapping concurrent `loadStylePackage`
+// calls for the same `doc`: an earlier call whose fetch/resolution resolves
+// later than a subsequently-started call could otherwise overwrite the later
+// call's DOM/state. Each call captures its own token at start; only the call
+// holding the latest token for its `doc` is allowed to perform the DOM swap /
+// update `activeStylePackages`. A per-`Document` (rather than a single global)
+// latest-token map lets independent `doc`s load concurrently without
+// superseding each other.
+let loadSequenceCounter = 0;
+const latestLoadSequenceByDoc = new WeakMap<Document, number>();
 
 // ─── Manifest fetch + validation ────────────────────────────────────────────
 
@@ -182,6 +222,72 @@ function assertManifestShape(manifest: unknown, source: string): asserts manifes
         `this loader understands formatVersion ${SUPPORTED_MANIFEST_FORMAT_VERSION} only.`,
     );
   }
+  assertAssetsShape(candidate.assets, source);
+}
+
+/** Type guard for a single `assets.logos` value: a bare URL string, or a `{ light?, dark? }` variant map of URL strings. */
+function isValidLogoValue(value: unknown): boolean {
+  if (typeof value === 'string') return true;
+  if (value === null || typeof value !== 'object') return false;
+  const variants = value as { light?: unknown; dark?: unknown };
+  return (
+    (variants.light === undefined || typeof variants.light === 'string') &&
+    (variants.dark === undefined || typeof variants.dark === 'string')
+  );
+}
+
+/** Type guard for a single `assets.fonts` entry: a string `family` and a `string[]` `src`. */
+function isValidFontDescriptor(font: unknown): boolean {
+  if (font === null || typeof font !== 'object') return false;
+  const candidate = font as { family?: unknown; src?: unknown };
+  return (
+    typeof candidate.family === 'string' &&
+    Array.isArray(candidate.src) &&
+    candidate.src.every((src) => typeof src === 'string')
+  );
+}
+
+/**
+ * Validates the optional `assets` sub-shape (logos/fonts) against
+ * `STYLE-PACKAGE-CONTRACT.md`'s schema. `assertManifestShape` only checked
+ * the four required top-level string fields and `formatVersion`; without
+ * this, a malformed `assets` block (e.g. a logo value that is neither a
+ * string nor a `{light,dark}` object, or a font entry missing `src`) would
+ * reach `resolveAssets` and throw a raw, uncaught `TypeError` instead of the
+ * documented "Malformed style-package manifest" error.
+ */
+function assertAssetsShape(assets: unknown, source: string): void {
+  if (assets === undefined) return;
+  if (assets === null || typeof assets !== 'object') {
+    throw new Error(`Malformed style-package manifest (${source}): "assets" must be an object when present.`);
+  }
+  const candidate = assets as { logos?: unknown; fonts?: unknown };
+  if (candidate.logos !== undefined) {
+    if (candidate.logos === null || typeof candidate.logos !== 'object') {
+      throw new Error(`Malformed style-package manifest (${source}): "assets.logos" must be an object when present.`);
+    }
+    for (const [role, value] of Object.entries(candidate.logos as Record<string, unknown>)) {
+      if (!isValidLogoValue(value)) {
+        throw new Error(
+          `Malformed style-package manifest (${source}): "assets.logos.${role}" must be a string URL or a ` +
+            `{ light?, dark? } object of string URLs.`,
+        );
+      }
+    }
+  }
+  if (candidate.fonts !== undefined) {
+    if (!Array.isArray(candidate.fonts)) {
+      throw new Error(`Malformed style-package manifest (${source}): "assets.fonts" must be an array when present.`);
+    }
+    candidate.fonts.forEach((font, index) => {
+      if (!isValidFontDescriptor(font)) {
+        throw new Error(
+          `Malformed style-package manifest (${source}): "assets.fonts[${index}]" must have a string "family" ` +
+            `and a string[] "src".`,
+        );
+      }
+    });
+  }
 }
 
 async function fetchManifest(baseUrl: string): Promise<{ manifest: StylePackageManifest; manifestUrl: string }> {
@@ -196,12 +302,65 @@ async function fetchManifest(baseUrl: string): Promise<{ manifest: StylePackageM
   if (!response.ok) {
     throw new Error(`Failed to fetch style-package manifest at ${manifestUrl}: HTTP ${response.status}`);
   }
-  const manifest: unknown = await response.json();
+  const body = await response.text();
+  if (body.length > MAX_MANIFEST_BODY_LENGTH) {
+    throw new Error(
+      `Malformed style-package manifest (${manifestUrl}): response body exceeds the ` +
+        `${MAX_MANIFEST_BODY_LENGTH}-byte defensive cap for a style-package manifest.`,
+    );
+  }
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(body);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid JSON';
+    throw new Error(`Malformed style-package manifest (${manifestUrl}): failed to parse JSON body: ${message}`);
+  }
   assertManifestShape(manifest, manifestUrl);
   return { manifest, manifestUrl };
 }
 
-function resolveAssets(assets: StylePackageAssets | undefined, manifestUrl: string): StylePackageAssets | undefined {
+/**
+ * Enforces the same-origin asset-pinning policy: `resolvedUrl` must share
+ * `manifestUrl`'s origin unless the caller opted out via
+ * `options.allowCrossOriginAssets`. Without this, an absolute URL in a
+ * manifest (compromised, spoofed, or simply misconfigured) silently wins
+ * over `manifestUrl`'s origin, letting the loader inject a `<link>`/asset
+ * pointed at an arbitrary third-party origin.
+ */
+function assertSameOrigin(resolvedUrl: string, manifestUrl: string, context: string): void {
+  const resolvedOrigin = new URL(resolvedUrl).origin;
+  const manifestOrigin = new URL(manifestUrl).origin;
+  if (resolvedOrigin !== manifestOrigin) {
+    throw new Error(
+      `Malformed style-package manifest (${manifestUrl}): "${context}" resolves to origin "${resolvedOrigin}", ` +
+        `which does not match the manifest's own origin "${manifestOrigin}". A style package's assets must be ` +
+        `same-origin with its manifest by default, since an independently-hosted/untrusted manifest could ` +
+        `otherwise point the injected stylesheet or brand assets at an arbitrary third-party origin. Pass ` +
+        `{ allowCrossOriginAssets: true } to loadStylePackage to permit intentional cross-origin hosting ` +
+        `(e.g. a CDN origin distinct from the manifest's own).`,
+    );
+  }
+}
+
+function resolveAssetUrl(
+  value: string,
+  manifestUrl: string,
+  allowCrossOriginAssets: boolean,
+  context: string,
+): string {
+  const resolved = new URL(value, manifestUrl).toString();
+  if (!allowCrossOriginAssets) {
+    assertSameOrigin(resolved, manifestUrl, context);
+  }
+  return resolved;
+}
+
+function resolveAssets(
+  assets: StylePackageAssets | undefined,
+  manifestUrl: string,
+  allowCrossOriginAssets: boolean,
+): StylePackageAssets | undefined {
   if (!assets) return undefined;
   const resolved: StylePackageAssets = {};
   if (assets.logos) {
@@ -209,18 +368,24 @@ function resolveAssets(assets: StylePackageAssets | undefined, manifestUrl: stri
       Object.entries(assets.logos).map(([role, value]) => [
         role,
         typeof value === 'string'
-          ? new URL(value, manifestUrl).toString()
+          ? resolveAssetUrl(value, manifestUrl, allowCrossOriginAssets, `assets.logos.${role}`)
           : {
-              light: value.light ? new URL(value.light, manifestUrl).toString() : undefined,
-              dark: value.dark ? new URL(value.dark, manifestUrl).toString() : undefined,
+              light: value.light
+                ? resolveAssetUrl(value.light, manifestUrl, allowCrossOriginAssets, `assets.logos.${role}.light`)
+                : undefined,
+              dark: value.dark
+                ? resolveAssetUrl(value.dark, manifestUrl, allowCrossOriginAssets, `assets.logos.${role}.dark`)
+                : undefined,
             },
       ]),
     );
   }
   if (assets.fonts) {
-    resolved.fonts = assets.fonts.map((font) => ({
+    resolved.fonts = assets.fonts.map((font, fontIndex) => ({
       ...font,
-      src: font.src.map((src) => new URL(src, manifestUrl).toString()),
+      src: font.src.map((src, srcIndex) =>
+        resolveAssetUrl(src, manifestUrl, allowCrossOriginAssets, `assets.fonts[${fontIndex}].src[${srcIndex}]`),
+      ),
     }));
   }
   return resolved;
@@ -274,6 +439,11 @@ function withCacheBustVersion(url: string, version: string): string {
  * previously-injected one. Appends before removing so a swap never leaves a
  * paint frame with zero style-package link in `<head>` (see the module
  * doc-comment's FOUC note for what this does and does not guarantee).
+ *
+ * Prefers the previous link element already held in `activeStylePackages`
+ * (an O(1) direct removal) over scanning `<head>`; the `querySelectorAll`
+ * scan is kept only as a defensive fallback for when no tracked reference
+ * exists (e.g. the first load for a `doc` the loader has not tracked before).
  */
 function swapStyleLink(doc: Document, href: string): HTMLLinkElement {
   const link = doc.createElement('link');
@@ -282,10 +452,14 @@ function swapStyleLink(doc: Document, href: string): HTMLLinkElement {
   link.setAttribute(STYLE_LINK_MARKER, 'true');
   doc.head.appendChild(link);
 
-  const previous = Array.from(doc.head.querySelectorAll(`link[${STYLE_LINK_MARKER}="true"]`)).filter(
-    (el) => el !== link,
-  );
-  previous.forEach((el) => el.remove());
+  const previousLink = activeStylePackages.get(doc)?.linkElement;
+  if (previousLink) {
+    previousLink.remove();
+  } else {
+    Array.from(doc.head.querySelectorAll(`link[${STYLE_LINK_MARKER}="true"]`))
+      .filter((el) => el !== link)
+      .forEach((el) => el.remove());
+  }
 
   return link;
 }
@@ -314,12 +488,23 @@ function swapStyleLink(doc: Document, href: string): HTMLLinkElement {
  * `tokens/CONTRACT.md`'s "Runtime brand selection" case). Callers drive mode
  * with `setThemeMode` below; this keeps the one unified scoping mechanism
  * doing both jobs without a second attribute.
+ *
+ * Guards against overlapping concurrent calls for the same `doc`: each call
+ * captures a monotonic sequence token at start, and only performs its DOM
+ * swap / updates `getActiveStylePackage`'s tracked state if no later call
+ * has since started for that `doc` — otherwise it resolves with
+ * `status: 'superseded'` and leaves the later call's outcome untouched. This
+ * prevents an earlier call that resolves later (e.g. a slower network
+ * response) from silently overwriting a subsequent call's result.
  */
 export async function loadStylePackage(
   source: string | StylePackageManifest,
   options: LoadStylePackageOptions = {},
 ): Promise<LoadStylePackageResult> {
   const doc = options.doc ?? document;
+  const sequence = ++loadSequenceCounter;
+  latestLoadSequenceByDoc.set(doc, sequence);
+  const isLatestCall = (): boolean => latestLoadSequenceByDoc.get(doc) === sequence;
 
   let manifest: StylePackageManifest;
   let manifestUrl: string;
@@ -343,15 +528,28 @@ export async function loadStylePackage(
   }
 
   if (!contractCompatible && options.strict) {
+    if (!isLatestCall()) {
+      return { status: 'superseded', manifest, contractCompatible };
+    }
     unloadStylePackage({ doc });
     const result: LoadStylePackageResult = { status: 'skipped-strict-mismatch', manifest, contractCompatible };
     activeStylePackages.set(doc, result);
     return result;
   }
 
-  const bundleUrl = withCacheBustVersion(new URL(manifest.styleBundle, manifestUrl).toString(), manifest.version);
+  const allowCrossOriginAssets = options.allowCrossOriginAssets ?? false;
+  const resolvedBundleUrl = new URL(manifest.styleBundle, manifestUrl).toString();
+  if (!allowCrossOriginAssets) {
+    assertSameOrigin(resolvedBundleUrl, manifestUrl, 'styleBundle');
+  }
+  const bundleUrl = withCacheBustVersion(resolvedBundleUrl, manifest.version);
+  const assets = resolveAssets(manifest.assets, manifestUrl, allowCrossOriginAssets);
+
+  if (!isLatestCall()) {
+    return { status: 'superseded', manifest, contractCompatible };
+  }
+
   const linkElement = swapStyleLink(doc, bundleUrl);
-  const assets = resolveAssets(manifest.assets, manifestUrl);
 
   const result: LoadStylePackageResult = {
     status: 'loaded',

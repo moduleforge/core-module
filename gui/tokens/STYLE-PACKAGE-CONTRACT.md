@@ -321,6 +321,19 @@ Registering the typed `@property` on `-default` rather than on `--mf-x` does **n
 type lives with the token identity, and both the build pipeline and a future validator read it from
 the contract, independent of which twin carries the runtime `@property` registration.
 
+**Origin pinning for the manifest's own URLs.** Separately from the values-manifest posture above —
+which constrains *what a package may set* — the loader also pins *where a manifest's own referenced
+URLs may point*. `styleBundle` and every `assets.logos`/`assets.fonts[].src` entry are resolved
+relative to the manifest's own URL (`new URL(value, manifestUrl)`), and the loader rejects a resolved
+URL by default unless it shares the manifest's origin. This matters because a style package is
+independently hosted (fetched over HTTP from wherever `options.baseUrl`/`source` names) — without this
+check, an absolute URL in a compromised, spoofed, or simply misconfigured manifest response would
+silently win over the manifest's own origin, letting the injected `<link rel="stylesheet">` (or a
+logo/font asset) point at an arbitrary third-party origin. The default is **same-origin-only**; a
+caller with a legitimate cross-origin hosting setup (e.g. serving the compiled bundle from a CDN
+origin distinct from the manifest's) opts in explicitly via `loadStylePackage`'s
+`allowCrossOriginAssets: true`, which skips the check for that call.
+
 ## Style-package project layout and build convention
 
 This section is the concrete template Phase 4 task `001` follows to produce a style package. It is

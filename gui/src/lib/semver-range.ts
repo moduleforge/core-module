@@ -16,6 +16,14 @@ interface SemverVersion {
 
 const VERSION_RE = /^(\d+)\.(\d+)\.(\d+)/;
 
+/**
+ * Defensive cap on a range string's length, checked before any parsing/
+ * iteration. No legitimate `targetContractVersion` range (a handful of
+ * comparator clauses) approaches this length; this only guards against an
+ * oversized/misbehaving manifest field being iterated in full.
+ */
+const MAX_RANGE_LENGTH = 256;
+
 function parseVersion(input: string): SemverVersion {
   const match = VERSION_RE.exec(input.trim());
   if (!match) {
@@ -90,6 +98,9 @@ function parseComparatorClause(clause: string): Comparator[] {
  * `theme-loader.ts`'s `isContractCompatible` does).
  */
 export function satisfiesRange(version: string, range: string): boolean {
+  if (range.length > MAX_RANGE_LENGTH) {
+    throw new Error(`Semver range exceeds the ${MAX_RANGE_LENGTH}-character defensive cap: "${range.slice(0, 40)}…"`);
+  }
   const target = parseVersion(version);
   const comparators = range
     .split(/\s+/)
