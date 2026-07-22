@@ -198,6 +198,113 @@ describe('loadStylePackage', () => {
     expect(result.contractCompatible).toBe(true);
     expect(mismatches).toEqual([]);
   });
+
+  test('rejects a cross-origin styleBundle URL by default (same-origin pinning)', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(manifestResponse(baseManifest({ styleBundle: 'https://evil.example.com/style.css' }))),
+    ) as unknown as typeof fetch;
+
+    await expect(loadStylePackage(BASE_URL)).rejects.toThrow(/Malformed style-package manifest/);
+    expect(activeLinks()).toHaveLength(0);
+  });
+
+  test('rejects a cross-origin asset URL (logo) by default (same-origin pinning)', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(
+        manifestResponse(
+          baseManifest({
+            assets: { logos: { mark: 'https://evil.example.com/logo.svg' } },
+          }),
+        ),
+      ),
+    ) as unknown as typeof fetch;
+
+    await expect(loadStylePackage(BASE_URL)).rejects.toThrow(/Malformed style-package manifest/);
+  });
+
+  test('allowCrossOriginAssets: true permits a cross-origin styleBundle URL', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(manifestResponse(baseManifest({ styleBundle: 'https://cdn.other-example.com/style.css' }))),
+    ) as unknown as typeof fetch;
+
+    const result = await loadStylePackage(BASE_URL, { allowCrossOriginAssets: true });
+
+    expect(result.status).toBe('loaded');
+    expect(result.bundleUrl).toBe('https://cdn.other-example.com/style.css?mf-style-version=1.0.0');
+    expect(activeLinks()).toHaveLength(1);
+  });
+
+  test('allowCrossOriginAssets: true permits cross-origin asset (logo/font) URLs', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(
+        manifestResponse(
+          baseManifest({
+            assets: {
+              logos: { mark: 'https://cdn.other-example.com/logo.svg' },
+              fonts: [{ family: 'Liquid Sans', src: ['https://cdn.other-example.com/liquid-sans.woff2'] }],
+            },
+          }),
+        ),
+      ),
+    ) as unknown as typeof fetch;
+
+    const result = await loadStylePackage(BASE_URL, { allowCrossOriginAssets: true });
+
+    expect(result.assets?.logos?.mark).toBe('https://cdn.other-example.com/logo.svg');
+    expect(result.assets?.fonts?.[0].src).toEqual(['https://cdn.other-example.com/liquid-sans.woff2']);
+  });
+
+  test('throws on a malformed assets.logos value (neither a string nor a light/dark object)', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(
+        manifestResponse({
+          ...baseManifest(),
+          assets: { logos: { mark: 42 } },
+        } as unknown as Partial<StylePackageManifest>),
+      ),
+    ) as unknown as typeof fetch;
+
+    await expect(loadStylePackage(BASE_URL)).rejects.toThrow(/Malformed style-package manifest/);
+  });
+
+  test('throws on a malformed assets.fonts entry (missing src)', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve(
+        manifestResponse({
+          ...baseManifest(),
+          assets: { fonts: [{ family: 'Liquid Sans' }] },
+        } as unknown as Partial<StylePackageManifest>),
+      ),
+    ) as unknown as typeof fetch;
+
+    await expect(loadStylePackage(BASE_URL)).rejects.toThrow(/Malformed style-package manifest/);
+  });
+
+  test('a superseded call resolves with status "superseded" and does not overwrite a later call\'s state', async () => {
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    let callCount = 0;
+    global.fetch = mock(() => {
+      callCount += 1;
+      if (callCount === 1) return firstResponse;
+      return Promise.resolve(manifestResponse(baseManifest({ name: 'second-brand', styleBundle: './second.css' })));
+    }) as unknown as typeof fetch;
+
+    const firstCall = loadStylePackage(BASE_URL);
+    const secondCall = await loadStylePackage(BASE_URL);
+
+    expect(secondCall.status).toBe('loaded');
+    expect(getActiveStylePackage()?.manifest.name).toBe('second-brand');
+
+    resolveFirst(manifestResponse(baseManifest({ name: 'first-brand', styleBundle: './first.css' })));
+    const firstResult = await firstCall;
+
+    expect(firstResult.status).toBe('superseded');
+    expect(activeLinks()).toHaveLength(1);
+    expect(getActiveStylePackage()?.manifest.name).toBe('second-brand');
+  });
 });
 
 describe('setThemeMode', () => {
