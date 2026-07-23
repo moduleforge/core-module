@@ -4,26 +4,36 @@ items:
       id: 0xGl
       date: "2026-07-18"
       tags:
-        - "type:bug"
-        - "priority:unspecified"
-        - "effort:unspecified"
-        - "plan/phase:gui-test-infrastructure"
+        - type:bug
+        - priority:unspecified
+        - effort:unspecified
+        - plan/phase:gui-test-infrastructure
       text: '[phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md] Task worktree''s node_modules was not present at task start even though gui/bun.lock already contained the required devDependencies from task 001 (dependencies_installed was reported as ''none'' since only the repo root lacks a lockfile — create-worktree.sh''s dependency-install detection apparently only checks root-level lockfiles, not nested gui/bun.lock). The task agent ran `bun install` inside gui/ to materialize node_modules (no lockfile/manifest changes resulted) rather than halting. Worth a process note for future plan executions in monorepo-style layouts with a nested-only lockfile: prepare-task-worktree''s dependency detection doesn''t descend into subdirectories, so every task worktree touching gui/ will need its own `bun install` step.'
     - title: WriteActionRequired hot-path unconfirmed
       id: b2nA
       date: "2026-07-19"
       tags:
-        - "type:optimization"
-        - "priority:unspecified"
-        - "effort:unspecified"
-        - "plan/phase:action-required-and-conflict"
+        - type:optimization
+        - priority:unspecified
+        - effort:unspecified
+        - plan/phase:action-required-and-conflict
       text: 'Phase-1 efficiency review (apiresp-action-required plan): isAppRelativePath''s net/url.Parse call allocates more than strictly necessary for a scheme/host-only check. Not a regression (all-new code), and no caller of WriteActionRequired exists anywhere in mod-core yet, so real per-request call frequency is undetermined. Worth a quick look once a consuming module (e.g. mod-users Wave-1) wires in real call sites -- if genuinely hot, consider a lighter string-based check instead of full url.Parse.'
     - title: 'docs-mf-standards: mark writer as built'
       id: Yghm
       date: "2026-07-19"
       tags:
-        - "type:documentation"
-        - "priority:unspecified"
-        - "effort:unspecified"
-        - "plan/phase:action-required-and-conflict"
+        - type:documentation
+        - priority:unspecified
+        - effort:unspecified
+        - plan/phase:action-required-and-conflict
       text: 'Phase-1 architecture review (apiresp-action-required plan): docs-mf-standards'' architecture/api-response-design.md still says "the full Go implementation is out of scope for this documentation repo" for WriteActionRequired''s Go-layer sketch, mirroring the pre-existing pattern for WriteError/WriteJSON before they were built. Now that WriteActionRequired is implemented and merged in mod-core (this plan), that line should be updated to reflect it''s built and merged, parallel to how the doc already reads for WriteError/WriteJSON. Cross-repo (docs-mf-standards), not fixable from mod-core. Also worth confirming the downstream mod-users Wave-1 plan is told about the action.path guard''s exact accept/reject rules (including the backslash/multi-slash hardening from this plan''s review-fix round) before it authors call sites that build path from anything less static than literal strings.'
+    - title: gui dist/index.css not produced
+      id: Kd9T
+      date: "2026-07-16"
+      tags:
+        - type:bug
+        - priority:unspecified
+        - effort:unspecified
+        - plan/phase:gui-core-gui-adoption
+        - cross-repo/origin:mod-users
+      text: '[Moved from mod-users followups, originally id JFnc — the fix belongs in mod-core''s own gui build] mod-core/gui''s built dist/ (this repo) has no dist/index.css despite package.json''s ./styles.css export. Not touched from mod-users since error-message.tsx needed no styling changes there. UPDATE (2026-07-20, reported from mod-users): Root cause identified — mod-core/gui''s tsup build (src/index.ts entry) never processes CSS; the real Tailwind v4 theme source lives at mod-core/gui/.ladle/styles.css but is wired only into the Ladle dev-preview build, not the publish build. Fix: wire a Tailwind CSS compile step into gui''s build so dist/index.css is actually produced, then verify end-to-end (yalc-linked into a consumer, confirm dist/index.css resolves with working styles) before considering this closed.'
