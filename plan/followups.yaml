@@ -18,15 +18,6 @@ items:
         - effort:unspecified
         - plan/phase:action-required-and-conflict
       text: 'Phase-1 efficiency review (apiresp-action-required plan): isAppRelativePath''s net/url.Parse call allocates more than strictly necessary for a scheme/host-only check. Not a regression (all-new code), and no caller of WriteActionRequired exists anywhere in mod-core yet, so real per-request call frequency is undetermined. Worth a quick look once a consuming module (e.g. mod-users Wave-1) wires in real call sites -- if genuinely hot, consider a lighter string-based check instead of full url.Parse.'
-    - title: 'docs-mf-standards: mark writer as built'
-      id: Yghm
-      date: "2026-07-19"
-      tags:
-        - type:documentation
-        - priority:unspecified
-        - effort:unspecified
-        - plan/phase:action-required-and-conflict
-      text: 'Phase-1 architecture review (apiresp-action-required plan): docs-mf-standards'' architecture/api-response-design.md still says "the full Go implementation is out of scope for this documentation repo" for WriteActionRequired''s Go-layer sketch, mirroring the pre-existing pattern for WriteError/WriteJSON before they were built. Now that WriteActionRequired is implemented and merged in mod-core (this plan), that line should be updated to reflect it''s built and merged, parallel to how the doc already reads for WriteError/WriteJSON. Cross-repo (docs-mf-standards), not fixable from mod-core. Also worth confirming the downstream mod-users Wave-1 plan is told about the action.path guard''s exact accept/reject rules (including the backslash/multi-slash hardening from this plan''s review-fix round) before it authors call sites that build path from anything less static than literal strings.'
     - title: gui dist/index.css not produced
       id: Kd9T
       date: "2026-07-16"
