@@ -61,7 +61,9 @@ const sharedCTEPrefix = `WITH RECURSIVE
 // the grants table (potentially via actor/target groups) determine what rows an
 // actor can see. The generic "own" clause preserves the same ownership
 // semantics that AdminOrOwnGenerator had, without the hard-coded admin check —
-// admin access is now handled by the is_admin short-circuit in the Authorizer.
+// admin access is now handled by the WildcardAdmin CTE, which is non-empty
+// when the actor (or any group the actor belongs to) holds a wildcard grant
+// row (target_id IS NULL) for the requested operation.
 //
 // The body is a single generic three-arm UNION parameterized only by the
 // runtime type-slug: it selects entities of the requested type via
