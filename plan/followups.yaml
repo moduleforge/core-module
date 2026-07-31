@@ -18,13 +18,3 @@ items:
         - effort:unspecified
         - plan/phase:action-required-and-conflict
       text: 'Phase-1 efficiency review (apiresp-action-required plan): isAppRelativePath''s net/url.Parse call allocates more than strictly necessary for a scheme/host-only check. Not a regression (all-new code), and no caller of WriteActionRequired exists anywhere in mod-core yet, so real per-request call frequency is undetermined. Worth a quick look once a consuming module (e.g. mod-users Wave-1) wires in real call sites -- if genuinely hot, consider a lighter string-based check instead of full url.Parse.'
-    - title: gui dist/index.css not produced
-      id: Kd9T
-      date: "2026-07-16"
-      tags:
-        - type:bug
-        - priority:unspecified
-        - effort:unspecified
-        - plan/phase:gui-core-gui-adoption
-        - cross-repo/origin:mod-users
-      text: '[Moved from mod-users followups, originally id JFnc — the fix belongs in mod-core''s own gui build] mod-core/gui''s built dist/ (this repo) has no dist/index.css despite package.json''s ./styles.css export. Not touched from mod-users since error-message.tsx needed no styling changes there. UPDATE (2026-07-20, reported from mod-users): Root cause identified — mod-core/gui''s tsup build (src/index.ts entry) never processes CSS; the real Tailwind v4 theme source lives at mod-core/gui/.ladle/styles.css but is wired only into the Ladle dev-preview build, not the publish build. Fix: wire a Tailwind CSS compile step into gui''s build so dist/index.css is actually produced, then verify end-to-end (yalc-linked into a consumer, confirm dist/index.css resolves with working styles) before considering this closed.'
