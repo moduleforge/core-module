@@ -10,7 +10,7 @@ The module ships three sub-projects:
 
 - `model/` — Postgres schema (goose migrations) and sqlc-generated Go query code (`github.com/moduleforge/core-model`)
 - `api/` — Go HTTP handlers, service layer, and all cross-cutting library packages (`github.com/moduleforge/core-api`)
-- `gui/` — TypeScript/React component library (`@moduleforge/core-gui`), published via yalc for local development
+- `gui/` — TypeScript/React component library (`@moduleforge/core-gui`), consumed by a composing app through a [bun workspace](./docs/mf-standards/building-applications.md#first-time-setup) that app owns — this repo does not publish or declare that workspace itself
 
 See [docs/mf-standards/manifest-spec.md](./docs/mf-standards/manifest-spec.md) for the authoritative manifest specification that describes how mod-core integrates with mfgen and the application composition layer.
 
