@@ -19,9 +19,9 @@ a **bun workspace** it owns — a root `package.json` listing this repo's `gui/`
 `workspaces`, with the app's own `gui/package.json` referring to it as `workspace:*`. This repo
 does not declare or manage that workspace; see
 [`docs/mf-standards/building-applications.md`'s First-time setup
-section](./docs/mf-standards/building-applications.md#first-time-setup) for the mechanism, and
+section](../docs/mf-standards/building-applications.md#first-time-setup) for the mechanism, and
 [`docs/mf-standards/building-modules.md`'s Cross-module GUI dependencies
-section](./docs/mf-standards/building-modules.md#cross-module-gui-dependencies) for what a
+section](../docs/mf-standards/building-modules.md#cross-module-gui-dependencies) for what a
 consumer's `gui/package.json` must satisfy to be workspace-consumable. A single `bun install` at
 the composing app's workspace root links this package in; there is no publish/link step here.
 
