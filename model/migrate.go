@@ -1,4 +1,4 @@
-package migrations
+package model
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-//go:embed *.sql
+//go:embed migrations/*.sql
 var FS embed.FS
 
 // TableName is this module's dedicated goose version-tracking table.
@@ -24,5 +24,5 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	goose.SetTableName(TableName)
-	return goose.UpContext(ctx, db, ".")
+	return goose.UpContext(ctx, db, "migrations")
 }
