@@ -71,17 +71,7 @@ gen: ## Generate Go packages from sqlc queries
 
 .PHONY: verify
 verify: ## Validate migration file format + compile-check queries (sqlc)
-	# goose validate scans every file in -dir and expects each to follow the
-	# NNNN_name.{sql,go} convention. migrations/migrate.go is a runtime helper
-	# (go:embed loader), not a migration, and its filename has no version
-	# prefix, which trips validate's filename parser. Validate a copy of just
-	# the numbered .sql files instead; this leaves migrations/ itself (and the
-	# flat *.sql layout that mod-authz's `compose` target and other consumers
-	# depend on) untouched.
-	tmpdir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmpdir"' EXIT; \
-	cp migrations/*.sql "$$tmpdir"/; \
-	goose -dir "$$tmpdir" validate
+	goose -dir migrations validate
 	sqlc compile
 
 # ---------------------------------------------------------------------------

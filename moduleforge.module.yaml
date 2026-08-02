@@ -13,6 +13,13 @@ migrations:
   range:
     first: 1
     last: 99
+  # importPath overrides the derived <go.model.modulePath>/migrations
+  # default: this module's FS/TableName/Migrate loader lives at the model
+  # sub-module's own root package (model/migrate.go, package model) rather
+  # than under model/migrations/, because goose validate rejects any .go
+  # file physically present in that directory (see docs-mf-standards
+  # manifest-spec.md's model/migrations package contract section).
+  importPath: github.com/moduleforge/core-model
 
 provides:
   services:
