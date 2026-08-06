@@ -72,15 +72,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Task doc''s validation step 6 literal command (tailwindcss -i /tmp/consumer-probe.css ... --content /tmp/consumer-probe.html) does not work in this environment: Tailwind v4''s CLI resolves the bare @import "tailwindcss" specifier via Node-style resolution starting at the importing CSS file''s own directory and walking up for node_modules; /tmp has no node_modules ancestor. Not environment-specific — inherent to the resolver. Agent substituted an equivalent probe from an untracked, deleted-before-commit temp directory inside gui/ with identical results. Suggest updating the task doc''s validation step 6 to use an in-tree (but untracked) location instead of /tmp for future re-runs.'
-    - title: 'Not a defect in this task''s scope: gui/tokens'
-      id: PhFO
-      date: "2026-08-06"
-      tags:
-        - type:ambiguity
-        - plan/phase:contract-documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Not a defect in this task''s scope: gui/tokens/STYLE-PACKAGE-CONTRACT.md (owned by Phase 2 task 002, not touched here) also had a stray </content>/</invoke> artifact at file end, same class as the one removed from CONTRACT.md here. NOTE: this is already resolved — task 002''s own report confirms it removed the identical artifact from STYLE-PACKAGE-CONTRACT.md as part of its own work, so no further action needed; recording only because task 001 and 002 ran concurrently and 001 could not see 002''s fix at the time it flagged this.'
     - title: Per-component radius override levers
       id: 7nrP
       date: "2026-08-06"
