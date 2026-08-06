@@ -27,7 +27,8 @@ phases:
           tier: opus-high
           git:
             branch: plan/gui-spacing-tokens-01-002
-            commit: []
+            commit:
+                - e03855a
             merge: null
         - number: 3
           slug: bump-token-contract-version
