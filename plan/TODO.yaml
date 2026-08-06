@@ -23,7 +23,7 @@ phases:
           slug: emit-spacing-tokens-and-container-utility
           title: Emit Spacing Tokens And Container Utility
           path: phase-01-spacing-token-contract/002-emit-spacing-tokens-and-container-utility.md
-          done: false
+          done: true
           tier: opus-high
           digest: 'Extended gui/style-dictionary/build-tokens.mjs to carry the new spacing/container-width surface: 15 typed @property registrations, 15 :root baked defaults, a --container-content @theme inline key, and a new containerUtilityBlock() emitting @utility container with margin-inline:auto, a token-backed max-width, and six-band per-axis padding ladders shaped var(<per-band lever>, calc(<base lever> * k)). Band names/multipliers read from token $extensions; compiler-side ordering only, unknown band throws. All ten validation checks passed including the Tailwind compile probe (two .container rules, built-in first, correct @variant breakpoints, utility overrides still win).'
           git:
