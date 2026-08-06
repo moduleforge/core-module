@@ -50,6 +50,28 @@ Hard rules, all inherited from CONTRACT.md's settable-vs-internal table:
   so brand and mode compose through the one attribute (per CONTRACT.md's "runtime brand selection"
   case). See [Emission rules](#emission-rules-what-the-override-bundle-must-look-like).
 
+**The layout-token lever family — a second axis.** Every token above this point in the contract is a
+single scalar per mode/scope; the content-margin tokens (contract `1.1.0`) add a second axis —
+breakpoint band — on top of the ordinary style-package-override axis:
+
+- `--mf-content-margins-lr` / `--mf-content-margins-tb` are the **base-scale levers**. Setting
+  either rescales every band through that band's compiler-baked multiplier — the same relationship
+  `--mf-radius` has to the derived radius steps.
+- `--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` are the **per-band levers**. Setting one
+  replaces the derived value for that band alone; the base lever still governs every other band.
+  **This diverges from the radius rule**: for radius the derived `--mf-radius-{sm,md,lg,xl}` steps
+  are never settable, but for content margins a per-band derived step is exactly the intended escape
+  hatch (see [Emission rules](#emission-rules-what-the-override-bundle-must-look-like) for the
+  explicit statement of this divergence).
+- `--mf-max-content-width` is an ordinary single scalar with no second axis, exactly like every
+  color/typography role.
+
+**Band-span semantics.** A per-band override governs its band's *span* — from that breakpoint up to
+the next declared band — not every width above it. For example, setting
+`--mf-content-margins-lr-sm` alone changes the inline gutter for the `40rem`–`48rem` span (the `sm`
+band, up to the next declared `md` band) and nowhere else; a brand wanting the change to persist
+across several bands must set each of them, or set the base lever instead.
+
 The bundle is what the loader injects as a versioned `<link rel="stylesheet">` (per the
 `gui-design-tokens` plan's `runtime-theming.md`, held in the plan branch rather than shipped here).
 Because it
@@ -198,6 +220,14 @@ proposed initial value is **`1.0.0`**, corresponding to the Phase 1–2 surface 
 `--mf-radius`, the typography families and type scale, and the `data-mf-theme` light/dark/inverse
 scoping).
 
+**Current value: `1.1.0`.** The spacing/container token category — `--mf-max-content-width`, the two
+base levers `--mf-content-margins-{lr,tb}`, and the twelve per-band levers
+`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` — is a **MINOR** bump under the table below: new
+roles only, nothing existing removed, renamed, or revalued. The authoritative constant is
+`MF_TOKEN_CONTRACT_VERSION`, exported from
+[`../src/lib/token-contract-version.ts`](../src/lib/token-contract-version.ts); its own doc comment
+records the same `1.1.0` / MINOR characterization, and the two must be kept in agreement.
+
 **Where it lives (for the loader to read).** The runtime loader ships in `@moduleforge/core-gui` and
 runs alongside the compiled defaults, so it reads the active contract version from mod-core directly
 — exposed as an exported constant (e.g. `MF_TOKEN_CONTRACT_VERSION`). Task `002` fixes the exact
@@ -213,6 +243,12 @@ makes every combination *render*:
 | **MAJOR** | A `--mf-x` role removed or renamed, or a `data-mf-theme` value/selector changed. | A removed/renamed `--mf-x` the package still sets is **inert** — the consuming site falls back to `--mf-x-default`. Renders, minus that override. | The package may set `--mf-x` roles the old core does not consume — **inert**, no effect. Renders. |
 | **MINOR** | New `--mf-x` role(s) added; existing roles unchanged. | Package simply does not set the new roles → they use `--mf-x-default`. Renders, fully. | Package sets new roles the old core ignores → inert. Renders. |
 | **PATCH** | A baked `--mf-x-default` value changed, or a build fix; no surface change. | No effect on the package's own `--mf-x` overrides. Renders. | Renders. |
+
+This table's **MINOR** row is exactly the case governing the `1.1.0` bump above: an older package
+built against `1.0.0` that sets none of the new spacing roles renders unaffected on `1.1.0` core (the
+roles it doesn't set simply resolve to mod-core's `-default` twins), and a newer package that does set
+them, run against a `1.0.0` core, has those roles silently ignored — inert, not broken. Both
+directions hold; the table needs no change for this bump.
 
 The through-line: **an out-of-date package always renders.** Fallback chaining
 (`var(--mf-x, var(--mf-x-default))`) guarantees any missing, removed, or renamed token resolves to
@@ -302,6 +338,18 @@ contract**: `--mf-primary` is a `<color>`, `--mf-radius` is a `<length>`, a weig
 and so on. The type per token is what any accept/reject check — build-time today, a loader-side
 validator for untrusted packages tomorrow — measures an override value against.
 
+**Content margins under the same posture.** Every spacing token introduced with contract `1.1.0` —
+`--mf-max-content-width`, both base levers, and all twelve per-band levers — is registered
+`<length>`, exactly like `--mf-radius`, so the per-band levers are type-constrained on exactly the
+same footing as every other token in this contract. **The new breakpoint-band axis adds surface, not
+a new trust boundary**: a per-band lever is still a single typed value in a fixed, closed, enumerated
+set of names, so the structural argument above (a trusted package is a values manifest *by
+construction*) is unweakened — a package gains no new degree of freedom beyond "set this one more
+named, typed slot." Note that `<length>` admits `clamp()` with a `vw` term (a valid `<length>` per
+the CSS syntax), so a brand may supply a fluid value for a band, e.g.
+`--mf-content-margins-lr-lg: clamp(1rem, 4vw, 3rem);` — that is a feature inside the typed contract,
+not an escape from it.
+
 The posture is enforced in layers, tightening as trust decreases:
 
 - **Today (trusted packages, build-time enforcement).** The build convention below emits the override
@@ -362,6 +410,8 @@ style-liquid-labs/
       color.dark.json          SPARSE DTCG --mf-* color overrides, DARK set (only changed roles)
       radius.json              OPTIONAL sparse --mf-radius override (mode-independent)
       typography.json          OPTIONAL sparse --mf-font-* / --mf-text-* overrides (mode-independent)
+      layout.json              OPTIONAL sparse --mf-max-content-width / --mf-content-margins-*
+                               overrides (mode-independent)
   assets/
     logo-mark-light.svg, logo-mark-dark.svg, logo-wordmark.svg
     fonts/liquid-sans.woff2
@@ -418,8 +468,17 @@ brand override lands in the same cascade slot as the default it replaces:
   it deliberately wants distinct inverse values.
 - **Mode-independent overrides live once in `:root`.** Radius (`--mf-radius` — the *single* settable
   radius lever; never the derived `--mf-radius-{sm,md,lg,xl}` steps, per CONTRACT.md), font families
-  (`--mf-font-sans` / `-mono` / `-heading`), and type-scale sub-tokens (`--mf-text-<level>-<axis>`)
-  are mode-independent and are **not** re-emitted in the scoped selectors.
+  (`--mf-font-sans` / `-mono` / `-heading`), type-scale sub-tokens (`--mf-text-<level>-<axis>`), and
+  the layout family — `--mf-max-content-width`, both base levers (`--mf-content-margins-lr`,
+  `--mf-content-margins-tb`), and every per-band lever
+  (`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}`) — are mode-independent and are **not**
+  re-emitted in the `data-mf-theme` scope selectors.
+
+  **Content margins diverge from the radius rule stated above, in exactly one respect: for content
+  margins, the derived per-band forms (`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}`) *are*
+  settable — that is the intended per-band escape hatch — where the equivalent derived radius steps
+  (`--mf-radius-{sm,md,lg,xl}`) are never settable.** Do not generalize the radius "never the derived
+  steps" rule to content margins.
 
 Illustrative fragment of a compiled `dist/style.css`:
 
@@ -433,6 +492,8 @@ Illustrative fragment of a compiled `dist/style.css`:
   --mf-brand-highlight: oklch(0.72 0.18 190);
   --mf-radius: 0.5rem;                        /* mode-independent: once here only */
   --mf-font-sans: "Liquid Sans", ui-sans-serif, system-ui, sans-serif;
+  --mf-content-margins-lr: 1.25rem;           /* base lever: rescales every band */
+  --mf-content-margins-lr-lg: 3rem;           /* per-band lever: lg band only */
 }
 
 [data-mf-theme="light"] {
@@ -489,5 +550,3 @@ observation for Phase 4, not a change to the contract above.
 - Plan-branch notes (held in the `gui-design-tokens` plan branch, not shipped here):
   `runtime-theming.md` (artifact definition, runtime loading model, `gui.peers` reuse, security
   posture, out-of-scope boundaries) and `scope-and-plan-split.md` (distribution/CI split).
-</content>
-</invoke>
