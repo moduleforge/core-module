@@ -147,3 +147,35 @@ architectural_impact: true
 - `gui/tokens/README.md` — the tiering convention and file-layout table these files must fit.
 - `gui/style-dictionary/build-tokens.mjs` — read the header comment for the `mf.text-body` collision
   story that motivates the naming constraints above. Do not edit it in this task.
+
+## Status
+
+Implementation outcome: **succeeded**. Date: 2026-08-06.
+
+Created `gui/tokens/base/spacing.json` (raw tier: `spacing.content-margin-base` = `1rem`,
+`spacing.max-content-width` = `80rem`) and `gui/tokens/semantic/layout.json` (semantic tier: the
+three scalar `mf.*` roles plus the twelve `mf.content-margins-{lr,tb}-<band>` derived tokens, each
+dual-carrying its literal `$value` and `$extensions["com.moduleforge.breakpoint"]` per the
+`semantic/radius.json` pattern). No other files touched.
+
+Validation summary — all seven checks passed:
+1. Both files parse as valid JSON (`node -e "JSON.parse(...)"`).
+2. Verified programmatically: every token under `mf.*` in `semantic/layout.json` is `$type: "dimension"`.
+3. Verified programmatically: all twelve derived tokens carry `$extensions["com.moduleforge.breakpoint"]`
+   with `band`, `base`, and a numeric `multiplier`.
+4. Verified programmatically: for each derived token, literal `$value` equals `1rem × multiplier`
+   (all twelve pass).
+5. Both files carry a top-level `$description`.
+6. `grep -rn 'max-content-width\|content-margins' gui/tokens/` returns hits only in the two new files
+   — no path collision with any existing token.
+7. `git status --porcelain` shows exactly two new, untracked files and no modifications to any
+   existing file.
+
+Assumptions applied (both from `## Assumptions` above, taken as given per task scope): the DTCG
+alias form resolves the same way `{radius.base}` already does in `semantic/radius.json`, and
+`$type: "dimension"` is the correct DTCG type — both are compiler-level (task `002`) concerns not
+re-verified here, consistent with the task's stated boundary.
+
+Affected source files:
+- `gui/tokens/base/spacing.json`
+- `gui/tokens/semantic/layout.json`
