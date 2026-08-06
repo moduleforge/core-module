@@ -1,0 +1,7 @@
+{
+  "$description": "Raw / base spacing tier. Literal dimensions. The single base input the content-margin ladders derive from, and the max page-content width. Derived steps live in semantic/layout.json.",
+  "spacing": {
+    "content-margin-base": { "$type": "dimension", "$value": "1rem", "$description": "The base input both content-margin ladders (inline and block) derive from." },
+    "max-content-width": { "$type": "dimension", "$value": "80rem", "$description": "Max width page content grows to. Equals Tailwind's --container-7xl and its xl breakpoint." }
+  }
+}

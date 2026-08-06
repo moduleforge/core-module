@@ -37,6 +37,13 @@ sparse** and can never leave a token undefined.
 A style package that sets `--mf-x-default` is **outside the contract** and its behavior is
 undefined (it fights the compiled bundle and breaks mode/scope switching). Supply `--mf-x` only.
 
+**Divergence for spacing/container-width per-band levers.** The general rule that a compiler-derived
+form is style-package-internal (see [Radius](#radius), below) holds for radius but not for the new
+`--mf-content-margins-{lr,tb}-<band>` per-band tokens: those derived-shape names **are**
+style-package-settable, by design — see
+[Spacing and container width](#spacing-and-container-width). Only their `-default` twins
+(`--mf-content-margins-{lr,tb}-<band>-default`) are compiler-internal, as usual.
+
 ### Where the contract is enforced
 
 **Primary lever — the Tailwind `@theme inline` layer.** The compiled bundle
@@ -76,6 +83,33 @@ instead of flowing through a Tailwind color utility. These must also chain to a 
 **Rule of thumb for component authors:** prefer a Tailwind utility (it carries the contract for
 free). If you must reference a custom property directly, always spell the full
 `var(--mf-x, var(--mf-x-default))` chain.
+
+### Tailwind container integration
+
+The compiler emits an `@utility container` block into `./dist/tokens.css`, wiring the spacing
+tokens into Tailwind's established container idiom rather than building parallel machinery:
+
+- **`@variant <band>`, not a literal `@media`.** Each band inside `@utility container` is spelled
+  `@variant sm { … }`, `@variant md { … }`, and so on, so the breakpoint *values* resolve against
+  the consuming build's own `--breakpoint-*` theme and only the band *names* are baked into
+  mod-core. A downstream app that customizes `--breakpoint-lg` gets a container whose gutter step
+  moves with it.
+- **`--container-content` / `max-w-content`.** The `@theme inline` key
+  `--container-content: var(--mf-max-content-width, var(--mf-max-content-width-default))` yields a
+  `max-w-content` utility — a cheap adoption path for a consumer that wants the width token without
+  the whole `container` utility.
+- **`@utility container` extends Tailwind's built-in container; it does not replace it.** Both
+  `.container` rules are emitted into `@layer utilities` — the built-in rule first, mod-core's
+  custom rule second. Media queries add no specificity, so the custom rule's unconditional
+  `max-width` **overrides Tailwind's entire built-in per-breakpoint max-width ladder**
+  (`40rem` → `96rem`). This is intended — the token takes ownership of the container's width — but
+  it is a **behavior change for any consumer already using `.container`**: that consumer stops
+  stepping through five breakpoint widths and gets a single `80rem` cap (mod-core's default)
+  instead.
+- **`.container` now carries `padding-block`, which Tailwind's built-in container never had.**
+  Intended; it is what `--mf-content-margins-tb` is for. The escape hatch: ordinary utilities
+  (`py-0`, `py-8`, `max-w-md`, …) are emitted after the container rules in source order and still
+  win, so a consumer can opt out of any container declaration with a plain utility.
 
 ## The fixed `--mf-*` surface
 
@@ -121,6 +155,88 @@ chain — override `--mf-radius`, not the derived steps.)
   `-tracking` forms — a known source-tier naming overlap between the color and typography tiers,
   flagged in the Phase 1 task-002 build notes.)
 
+### Spacing and container width
+
+Three scalar roles plus twelve per-band levers (six bands × two axes), all **mode-independent** —
+emitted once in `:root` and never re-emitted in the `data-mf-theme` scope selectors (see
+[Emission shape](#emission-shape) below).
+
+- **`--mf-max-content-width`** — the max width page content grows to. A single scalar; the ordinary
+  `var(--mf-max-content-width, var(--mf-max-content-width-default))` chain, no second axis.
+- **`--mf-content-margins-lr`** / **`--mf-content-margins-tb`** — the base inputs for the inline-
+  and block-axis gutter ladders. Setting either rescales **every** band, exactly as `--mf-radius`
+  rescales every derived radius step.
+- **`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}`** — the twelve per-band levers. Each
+  overrides its own band only, short-circuiting the derived calculation for that band:
+  `--mf-content-margins-lr-base`, `--mf-content-margins-lr-sm`, `--mf-content-margins-lr-md`,
+  `--mf-content-margins-lr-lg`, `--mf-content-margins-lr-xl`, `--mf-content-margins-lr-2xl`
+  (inline axis), and `--mf-content-margins-tb-base`, `--mf-content-margins-tb-sm`,
+  `--mf-content-margins-tb-md`, `--mf-content-margins-tb-lg`, `--mf-content-margins-tb-xl`,
+  `--mf-content-margins-tb-2xl` (block axis).
+
+#### Resolution expression
+
+Every per-band value resolves as:
+
+```css
+var(--mf-content-margins-lr-<band>,
+    calc(var(--mf-content-margins-lr, var(--mf-content-margins-lr-default)) * <k_band>))
+```
+
+(the `tb` axis is the identical shape with `tb` substituted for `lr`). Read outward-in, the
+precedence is:
+
+1. `--mf-content-margins-lr-<band>` — the style package's explicit override *for this band*. Wins
+   outright; the `calc()` is never evaluated.
+2. `--mf-content-margins-lr` — the style package's base-scale override. Rescales **every** band
+   through that band's own multiplier.
+3. `--mf-content-margins-lr-default` — mod-core's baked default, used when the package sets
+   neither.
+
+This is the existing [Radius](#radius) idiom
+(`--radius-md: calc(var(--mf-radius, var(--mf-radius-default)) * 0.8)`) with one outer `var()`
+added, so the per-band lever can short-circuit the `calc()` for that band alone — the two are one
+family.
+
+#### Band-span semantics
+
+Every band's declaration lives in one rule (the `@utility container` block — see
+[Tailwind container integration](#tailwind-container-integration)), and every band is `min-width`
+(`@variant <band>`), so at any viewport the **last matching** declaration wins. A per-band override
+therefore governs its band's **span** — from that breakpoint up to the next declared band — not
+every width above it. For example, setting `--mf-content-margins-lr-sm` alone changes the gutter
+between `40rem` and `48rem` (the `sm` → `md` span) and nowhere else; widths at `48rem` and above
+pick up the `md` band's own value (or its calc'd default), unaffected by the `sm` override.
+
+#### Settable vs. internal — a divergence from radius
+
+`--mf-content-margins-{lr,tb}` and `--mf-content-margins-{lr,tb}-<band>` are **all**
+style-package-settable — including the per-band forms. `--mf-content-margins-{lr,tb}-<band>-default`
+are compiler-only, exactly like `--mf-radius-{sm,md,lg,xl}-default`: they exist as typed `@property`
+reference values and are **not** part of the runtime resolution chain.
+
+This is the opposite of the radius rule: for radius, a derived step's bare `--mf-x` form is
+deliberately **not** settable ("override `--mf-radius`, not the derived steps"). For content
+margins, the derived step's bare form **is** settable — that per-band lever is the whole point of
+this shape. A reader who has internalized the radius rule needs to be told this one works
+differently.
+
+#### Fluid values are expressible
+
+Every band's value is typed `<length>`, and `clamp()` with a `vw` term computes to a length, so a
+style package that wants continuous scaling inside a band can set, e.g.,
+`--mf-content-margins-lr-lg: clamp(1rem, 4vw, 3rem)`. This is the answer to "can I do fluid
+spacing?" — yes, inside any single band.
+
+#### Known limitation (accepted, still open)
+
+`--mf-max-content-width` is a single global scalar, so an application whose shell is wide (e.g.
+`80rem`) but whose reading-oriented pages want a narrower measure cannot express both through the
+token. Adoption needs either a per-app `--mf-max-content-width` override or a narrower wrapper
+alongside the container. This sits in the same accepted-and-open register this document uses
+elsewhere for the `data-mf-theme="inverse"` / `dark:` gap (see
+[Back-compat bridge and reconciliation](#back-compat-bridge-and-reconciliation)).
+
 ## Unified scoping — `data-mf-theme`
 
 **One** `data-*` attribute reassigns the `--mf-*` custom properties for its subtree, at any DOM
@@ -159,8 +275,10 @@ The compiler emits (`./dist/tokens.css`):
 - `[data-mf-theme="dark"] [data-mf-theme="inverse"], .dark [data-mf-theme="inverse"]` — light color
   defaults (inverse in a dark context; wins on specificity).
 
-Only color roles are re-emitted in scoped selectors; radius/typography/font families are
-mode-independent and live once in `:root`.
+Only color roles are re-emitted in scoped selectors; radius/typography/font families and the
+spacing/container-width roles (`--mf-max-content-width`, `--mf-content-margins-*`, see
+[Spacing and container width](#spacing-and-container-width)) are mode-independent and live once in
+`:root`.
 
 ### Back-compat bridge and reconciliation
 
@@ -207,4 +325,3 @@ picker are explicitly out of scope now but are not architecturally foreclosed.
   contract discipline, security posture) and `token-architecture.md` (the `@theme` integration
   lever and one-scoping-mechanism rationale) — planning-side grounding, held in the plan branch
   rather than shipped in this repo.
-</content>
