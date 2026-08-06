@@ -16,6 +16,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: emit-spacing-tokens-and-container-utility
+          title: Emit Spacing Tokens And Container Utility
+          path: phase-01-spacing-token-contract/002-emit-spacing-tokens-and-container-utility.md
+          done: false
+          tier: opus-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
