@@ -37,7 +37,8 @@ phases:
           tier: haiku-med
           git:
             branch: plan/gui-spacing-tokens-01-003
-            commit: []
+            commit:
+                - 421bc66
             merge: null
         - number: 4
           slug: export-token-source-css
