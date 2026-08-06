@@ -63,3 +63,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'The mf.text-body collision documented in the compiler header (color-role tier vs typography-scale tier, worked around by the three-instance split) is still latent. New sources introduce no new collision (verified: appear only in the first instance, count exactly +15) but the underlying source-level hazard is unchanged and unowned.'
+    - title: 'Task doc''s validation step 6 literal command '
+      id: kdAa
+      date: "2026-08-06"
+      tags:
+        - type:ambiguity
+        - plan/phase:spacing-token-contract
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Task doc''s validation step 6 literal command (tailwindcss -i /tmp/consumer-probe.css ... --content /tmp/consumer-probe.html) does not work in this environment: Tailwind v4''s CLI resolves the bare @import "tailwindcss" specifier via Node-style resolution starting at the importing CSS file''s own directory and walking up for node_modules; /tmp has no node_modules ancestor. Not environment-specific — inherent to the resolver. Agent substituted an equivalent probe from an untracked, deleted-before-commit temp directory inside gui/ with identical results. Suggest updating the task doc''s validation step 6 to use an in-tree (but untracked) location instead of /tmp for future re-runs.'
