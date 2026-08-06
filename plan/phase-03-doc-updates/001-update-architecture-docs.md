@@ -133,3 +133,98 @@ architectural_impact: true
   `cd gui && bun install && bun run build:tokens` if absent (the directory is gitignored).
 - [`plan/notes/token-shape-decision.md`](../notes/token-shape-decision.md) — the design record the
   sibling project transcribed from; useful for judging whether its transcription is faithful.
+
+## Status
+
+**Outcome: succeeded.** 2026-08-06.
+
+### Repo-root doc updates
+
+- **`AGENTS.md`** — added a new `### gui/ design tokens` subsection (under `## Key types and
+  packages`, sibling to the existing `### gui/ error and toast toolkit` subsection), naming
+  `gui/tokens/`, `gui/style-dictionary/build-tokens.mjs`, both package stylesheet exports
+  (`@moduleforge/core-gui/styles.css` and `@moduleforge/core-gui/tokens.css`) with when-to-use-each
+  guidance, and pointers to `gui/tokens/CONTRACT.md` and `gui/tokens/STYLE-PACKAGE-CONTRACT.md`.
+  Every file path named in the new content was verified to exist on disk (`gui/tokens`,
+  `gui/tokens/README.md`, `gui/style-dictionary/build-tokens.mjs`, `gui/tokens/CONTRACT.md`,
+  `gui/tokens/STYLE-PACKAGE-CONTRACT.md`, `gui/README.md`); `gui/tokens/dist/tokens.css` was
+  regenerated locally (`cd gui && bun install && bun run build:tokens`) to confirm it too resolves
+  — it is gitignored build output, not committed. No relative markdown links (`[...](...)`) were
+  added in the new section, only backtick-quoted repo-relative paths, matching the immediately
+  adjacent `gui/ error and toast toolkit` subsection's existing style, so there is nothing to
+  link-check beyond the path-existence check above.
+- **`gui/README.md`** — re-read, not edited. **Judgment: accurate as-is; no extension needed.** Its
+  "Two CSS exports, and when to use which" section (added by Phase 1 task `004`) already names
+  `max-w-content` and the "token-backed `container` utility" explicitly, which is the spacing/
+  container-width category's own adoption path — there was no gap to fill. Cross-checked against
+  `gui/package.json`'s `exports` map (`./styles.css` → `dist/index.css`, `./tokens.css` →
+  `dist/tokens.css`) and the regenerated `gui/tokens/dist/tokens.css`; the two-export story is
+  accurate to what shipped.
+- **`README.md`** (repo root) — **judgment call: deliberately not edited.** The `gui/` bullet
+  summarizes `@moduleforge/core-gui` at a coarse level and has never itemized the design-token
+  system (colors, radius, typography) at this granularity through Phases 1–2; introducing a
+  spacing/container-specific mention now, without the bullet ever having named the broader token
+  system it belongs to, would read as an arbitrary partial callout rather than a proportionate
+  summary edit. The design-token system already has proper, appropriately-scoped coverage via
+  `gui/README.md`, the new `AGENTS.md` subsection above, and `gui/tokens/CONTRACT.md` /
+  `gui/tokens/STYLE-PACKAGE-CONTRACT.md`. Concluding "no mention warranted" is the explicitly
+  anticipated legitimate outcome per this task's Requirements.
+
+### Read-only verification of `docs/mf-standards/architecture/gui-design-tokens.md`
+
+The submodule pointer inside this worktree remains pinned at the pre-plan commit
+`1ab046e0b1f710497dcf81013bf9ab8fea3b479f` (confirmed via `git submodule status`) — task `002`'s
+job, not touched here. **The sibling project's update has landed** (on its `main` branch,
+independently, outside this worktree's submodule pointer): per this task's dispatch instructions,
+the sibling doc's current, merged content was read directly from the sibling project's own local
+checkout on disk (`git -C /Users/zane/playground/moduleforge/docs-mf-standards show
+main:architecture/gui-design-tokens.md`, at commit `e96646d`) rather than through this worktree's
+stale submodule content, and checked against this repo's shipped reality
+(`gui/tokens/CONTRACT.md`, `gui/tokens/STYLE-PACKAGE-CONTRACT.md`, the regenerated
+`gui/tokens/dist/tokens.css`, `gui/src/lib/theme-loader.ts`, `gui/src/lib/use-style-package.ts`,
+`gui/src/lib/token-contract-version.ts`, and `plan/notes/token-shape-decision.md`).
+
+Findings:
+
+- **Token shape (role names, per-band resolution chain and precedence, `@utility container`
+  integration): matches.** The sibling doc's "Spacing and container-width tokens" section states
+  the same 15 role names (`--mf-max-content-width`, the two base levers, the twelve per-band
+  levers), the same three-level precedence (per-band lever → base lever → compiler default), and
+  the same `@variant <band>` (not literal `@media`) mechanism — all verified byte-for-byte against
+  the regenerated `gui/tokens/dist/tokens.css` (e.g. its `@utility container` block's
+  `padding-inline`/`padding-block` `calc()` expressions and multipliers match the doc's ladder
+  table exactly).
+- **The two container behavior changes: correctly stated.** The sibling doc explicitly documents
+  that the custom `@utility container` rule's unconditional `max-width` overrides Tailwind's
+  built-in per-breakpoint max-width ladder (single `80rem` cap replacing the `40rem`→`96rem` step
+  sequence), and that `.container` gains `padding-block` (which Tailwind's built-in container never
+  had), with the `py-0`/`max-w-md`-style escape hatch noted in both. This matches
+  `gui/tokens/CONTRACT.md`'s "Tailwind container integration" section and the compiled output.
+- **"Source-of-truth documents in `mod-core`" list: every named file/export resolves.** Verified
+  directly: `gui/tokens/README.md`, `gui/tokens/CONTRACT.md`, `gui/tokens/STYLE-PACKAGE-CONTRACT.md`,
+  `gui/src/lib/theme-loader.ts`, `gui/src/lib/use-style-package.ts` all exist; the named exports
+  (`loadStylePackage`, `unloadStylePackage`, `setThemeMode`, `useStylePackage`) are all present and
+  reach `gui/src/index.ts` through the `src/lib` barrel re-export. `style-liquid-labs/` also exists
+  as the documented independent sibling repo.
+- **One discrepancy flagged (not fixed here, per task scope):** the sibling doc's "Three-tier token
+  architecture" section (its earlier "current semantic surface enumerates 35 color roles, one
+  radius lever … and the typography families/scale" summary sentence) was not updated to
+  acknowledge the new spacing/container-width category, even though the doc's own later "Spacing
+  and container-width tokens" section documents that category in full. A reader who stops at the
+  early summary sentence would undercount the semantic surface. See `flagged_for_manager` in the
+  structured report for the exact routing.
+
+### Files touched in this worktree
+
+- `AGENTS.md` (edited)
+- `gui/README.md`, `README.md` — read and judged, not edited (see above)
+- `docs/mf-standards/` — read-only, not touched; `git status` and `git submodule status` confirm no
+  change under that path and no pointer movement
+- `plan/phase-03-doc-updates/001-update-architecture-docs.md` — this Status section
+
+### Assumptions applied
+
+- Phases 1 and 2 have fully landed (per this task's `## Assumptions`) — confirmed by reading
+  `gui/tokens/CONTRACT.md`, `gui/tokens/STYLE-PACKAGE-CONTRACT.md`, and the regenerated
+  `gui/tokens/dist/tokens.css`, all of which reflect the `1.1.0` spacing/container surface as
+  shipped, not pending.

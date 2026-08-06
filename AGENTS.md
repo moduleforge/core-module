@@ -120,6 +120,33 @@ Model packages (`github.com/moduleforge/core-model`):
 
 All of the above are exported from `gui/src/index.ts`.
 
+### gui/ design tokens
+
+`@moduleforge/core-gui` (`gui/`) also ships the canonical `--mf-*` design-token system every
+ModuleForge GUI package is expected to consume rather than hand-copying its own token set:
+
+- **`gui/tokens/`** — the W3C DTCG (`$value`/`$type`) token sources: `base/` (raw primitives),
+  `semantic/` (the `--mf-*` roles, including the mode-independent color/radius/spacing-container
+  categories — see `layout.json` for the latter), `typography/`, and `component/` (a sparse
+  escape-hatch namespace). See `gui/tokens/README.md` for the full tiering convention and the
+  currently-enumerated role list.
+- **`gui/style-dictionary/build-tokens.mjs`** — the Style Dictionary compiler that resolves those
+  sources into the compiled bundle (`gui/tokens/dist/tokens.css`, gitignored — regenerate with
+  `cd gui && bun run build:tokens`): baked `--mf-x-default` values, typed `@property`
+  registrations, the Tailwind `@theme inline` mapping, and the `@utility container` block.
+- **Two package stylesheet exports, for different purposes** — see `gui/README.md`'s "Two CSS
+  exports" section for the full account:
+  - `@moduleforge/core-gui/styles.css` — the compiled bundle; import to render mod-core's own
+    components.
+  - `@moduleforge/core-gui/tokens.css` — the Tailwind *source* bundle; import into a consuming
+    app's own Tailwind entry point to get `bg-primary`, `rounded-md`, `max-w-content`, and the
+    token-backed `container` utility available in that app's own markup.
+- **`gui/tokens/CONTRACT.md`** — the fixed `--mf-*` consumption contract: fallback chaining,
+  settable-vs-internal, `data-mf-theme` scoping, and the Tailwind `container` integration.
+- **`gui/tokens/STYLE-PACKAGE-CONTRACT.md`** — the runtime style-package artifact contract: how a
+  brand's compiled override bundle + brand-asset manifest is built and loaded at runtime, without
+  rebuilding the app or `mod-core`.
+
 ## mountFromModule special case
 
 mod-core's route block in `moduleforge.module.yaml` uses `innerMount: true`:
