@@ -25,6 +25,29 @@ section](../docs/mf-standards/building-modules.md#cross-module-gui-dependencies)
 consumer's `gui/package.json` must satisfy to be workspace-consumable. A single `bun install` at
 the composing app's workspace root links this package in; there is no publish/link step here.
 
+### Two CSS exports, and when to use which
+
+This package publishes two stylesheet exports, and they serve different purposes:
+
+- **`@moduleforge/core-gui/styles.css`** — the compiled bundle (`dist/index.css`). Baked
+  `--mf-*-default` values, `@property` registrations, and mod-core's own compiled component
+  utilities. Import this to get mod-core's components rendering.
+- **`@moduleforge/core-gui/tokens.css`** — the Tailwind **source** bundle (`dist/tokens.css`,
+  copied at build time from `tokens/dist/tokens.css`). Carries the `@theme inline` key mapping
+  and the `@utility container` definition, which only take effect when processed by the
+  consumer's *own* Tailwind pass. Import this **into your Tailwind entry point** (e.g.
+  `@import "@moduleforge/core-gui/tokens.css";` alongside `@import "tailwindcss";`) if your app
+  wants `bg-primary`, `rounded-md`, `max-w-content`, or the token-backed `container` utility
+  available in its own markup.
+
+Hand-mirroring the `@theme inline` block into a consumer's own stylesheet is now unnecessary and
+discouraged — import `tokens.css` into the consumer's Tailwind entry point instead.
+
+Note the overlap: an app importing both exports gets the `:root` `--mf-*-default` declarations
+and `@property` registrations twice. This is harmless — the values are identical and the last
+one wins, so there is no visual effect — but it is real duplication. Splitting the compiled
+bundle so the two exports are disjoint is a follow-on, not yet done.
+
 ## Tailwind content glob requirement
 
 This library ships pre-built JS that contains Tailwind class names as strings. For Tailwind's content scanner to detect those classes, consumers must add the dist path to their Tailwind `content` configuration (or, for Tailwind v4's `@source` directive, the equivalent scan path):

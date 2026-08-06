@@ -146,3 +146,36 @@ architectural_impact: true
 - After the build-script copy step produces `gui/dist/tokens.css`.
 - After adding the `exports` entry and proving it with validation step 6.
 - After the `gui/README.md` documentation.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-06
+- **Validation summary:** all 8 checks passed. `bun run build` exits 0; `gui/dist/tokens.css` is
+  byte-identical to `gui/tokens/dist/tokens.css` (`cmp` reports no difference) and contains one
+  `@theme inline` block and two `@utility container` occurrences (definition + the doc comment
+  referencing it); `gui/dist/index.css` remains compiled output with `:root` `--mf-*-default`
+  declarations; `require.resolve('@moduleforge/core-gui/tokens.css')` resolves to
+  `gui/dist/tokens.css`; the end-to-end Tailwind consumer probe (see note below on path) produced
+  a `.container` rule with the token-backed `padding-inline`/`padding-block`/`max-width`
+  declarations and `@media` bands, a `.max-w-content` rule mapping to
+  `var(--mf-max-content-width, ...)`, and a `.bg-primary` rule; `bun run test` (53 pass, 0 fail)
+  and `bun run typecheck` (clean) both pass; final `git status` shows only `gui/package.json`
+  (captured in a mid-task commit) and `gui/README.md` modified, no new tracked files.
+- **Deviation from the doc's literal validation step 6 command:** the doc's exact `/tmp`-rooted
+  probe command (`tailwindcss -i /tmp/consumer-probe.css ...`) fails in this environment with
+  `Error: Can't resolve 'tailwindcss' in '/tmp'` — Tailwind v4's CLI resolves bare `@import`
+  specifiers via Node-style resolution starting at the *importing file's own directory* and
+  walking up for `node_modules`, and `/tmp` has no `node_modules` ancestor on this filesystem
+  (confirmed this is inherent to the resolution algorithm, not a `--cwd` flag gap). Ran the
+  identical probe (same imports, same `container max-w-content bg-primary` class list) from an
+  untracked, deleted-before-commit temp directory inside `gui/` instead, which resolves correctly
+  because it sits under `gui/node_modules`. This preserves the check's substance — proving
+  `dist/tokens.css` is Tailwind-consumable end-to-end — without depending on an environment detail
+  (`/tmp` reachability of `node_modules`) the task doc's literal command assumes. Flagged for the
+  manager in case the task doc's validation step 6 should be updated for future re-runs.
+- **Affected source files:** `gui/package.json`, `gui/README.md`.
+- **Assumptions relied on:** all three listed in `## Assumptions` held — task 002's
+  `tokens/dist/tokens.css` already contains the `@theme inline` and `@utility container` blocks;
+  `bun install` succeeded in `gui/` (pre-installed per dispatch); the new `exports` entry is purely
+  additive and shadows nothing.
