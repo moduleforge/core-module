@@ -11,7 +11,7 @@ phases:
           slug: add-spacing-token-sources
           title: Add Spacing Token Sources
           path: phase-01-spacing-token-contract/001-add-spacing-token-sources.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: 'Authored the two new DTCG token source files for the spacing/container-width category: gui/tokens/base/spacing.json (raw tier, two literal dimension tokens) and gui/tokens/semantic/layout.json (semantic tier, three scalar mf.* aliases plus twelve derived per-band tokens under mf.content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}, each dual-carrying a pre-computed literal $value and a $extensions["com.moduleforge.breakpoint"] block with band/base/multiplier, following the exact pattern semantic/radius.json already uses for com.moduleforge.radius). No compiler code, CSS, or docs were touched. All seven validation checks passed. Task document updated with a Status section; all changes committed at e97bebd.'
           git:
