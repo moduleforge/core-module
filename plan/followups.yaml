@@ -54,3 +54,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Pre-existing, untouched: a stale cross-reference in the compiler header — "Why three separate Style Dictionary instances" note ends with "flagged to the manager in the task-002 report," referring to a PRIOR plan''s task 002 (primitive audit), now ambiguous next to this plan''s task 002. Not safely rewordable without knowing which plan it should name.'
+    - title: 'The mf.text-body collision documented in the '
+      id: uzKR
+      date: "2026-08-06"
+      tags:
+        - type:ambiguity
+        - plan/phase:spacing-token-contract
+        - priority:unspecified
+        - effort:unspecified
+      text: 'The mf.text-body collision documented in the compiler header (color-role tier vs typography-scale tier, worked around by the three-instance split) is still latent. New sources introduce no new collision (verified: appear only in the first instance, count exactly +15) but the underlying source-level hazard is unchanged and unowned.'
