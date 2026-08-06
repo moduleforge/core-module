@@ -15,7 +15,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/gui-spacing-tokens-01-001
-            commit: []
+            commit:
+                - e97bebd
             merge: null
         - number: 2
           slug: emit-spacing-tokens-and-container-utility
