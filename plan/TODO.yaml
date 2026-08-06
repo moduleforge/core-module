@@ -76,7 +76,7 @@ phases:
           slug: document-per-band-override-for-style-packages
           title: Document Per Band Override For Style Packages
           path: phase-02-contract-documentation/002-document-per-band-override-for-style-packages.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Extended gui/tokens/STYLE-PACKAGE-CONTRACT.md at four prescribed insertion points (Hard rules, Emission rules, Token-contract versioning, Security posture) plus the build-convention directory layout, documenting the new per-breakpoint-band override capability for --mf-content-margins-{lr,tb} and its 12 per-band forms alongside the single-scalar --mf-max-content-width. Stated explicitly, as a standalone sentence in Emission rules, that a derived per-band step is deliberately settable here unlike radius. Added a worked sm-band span example (40rem-48rem). Bumped documented contract version narrative to 1.1.0/MINOR, cross-checked against token-contract-version.ts. Extended security posture for the new <length>-typed tokens. Removed two stray </content>/</invoke> artifact lines at file end. Regenerated tokens/dist/tokens.css and cross-checked all 15 documented settable names against the emitted bundle. All 12 validation checks passed.
           git:
