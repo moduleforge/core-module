@@ -1,0 +1,152 @@
+{
+  "$description": "Semantic layout tier (mode-independent). --mf-max-content-width is a single scalar governing the max width page content grows to. --mf-content-margins-lr / --mf-content-margins-tb are the base inputs for the per-band content-margin ladders; each band derives from its axis's base via a compiler-baked multiplier. DTCG has no calc primitive, so each derived token carries BOTH the pre-computed literal $value (so the compiled default matches the design exactly) AND the band + multiplier in $extensions, letting task 002 emit calc(var(--mf-content-margins-<axis>) * k) so a runtime base override cascades to every band — the same dual-carry pattern semantic/radius.json uses for com.moduleforge.radius. See tokens/README.md and plan/notes/token-shape-decision.md.",
+  "mf": {
+    "max-content-width": { "$type": "dimension", "$value": "{spacing.max-content-width}", "$description": "Max width page content grows to. Single scalar, no bands." },
+    "content-margins-lr": { "$type": "dimension", "$value": "{spacing.content-margin-base}", "$description": "Base input for the inline-axis content-margin ladder. Rescales all six bands." },
+    "content-margins-tb": { "$type": "dimension", "$value": "{spacing.content-margin-base}", "$description": "Base input for the block-axis content-margin ladder. Rescales all six bands." },
+    "content-margins-lr-base": {
+      "$type": "dimension",
+      "$value": "1rem",
+      "$description": "Inline content margin at the base band (< --breakpoint-sm). Derived: content-margin-base * 1.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "base",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1
+        }
+      }
+    },
+    "content-margins-lr-sm": {
+      "$type": "dimension",
+      "$value": "1.5rem",
+      "$description": "Inline content margin at the sm band (>= --breakpoint-sm). Derived: content-margin-base * 1.5.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "sm",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1.5
+        }
+      }
+    },
+    "content-margins-lr-md": {
+      "$type": "dimension",
+      "$value": "1.5rem",
+      "$description": "Inline content margin at the md band (>= --breakpoint-md). Derived: content-margin-base * 1.5.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "md",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1.5
+        }
+      }
+    },
+    "content-margins-lr-lg": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Inline content margin at the lg band (>= --breakpoint-lg). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "lg",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    },
+    "content-margins-lr-xl": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Inline content margin at the xl band (>= --breakpoint-xl). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "xl",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    },
+    "content-margins-lr-2xl": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Inline content margin at the 2xl band (>= --breakpoint-2xl). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "2xl",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    },
+    "content-margins-tb-base": {
+      "$type": "dimension",
+      "$value": "1.5rem",
+      "$description": "Block content margin at the base band (< --breakpoint-sm). Derived: content-margin-base * 1.5.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "base",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1.5
+        }
+      }
+    },
+    "content-margins-tb-sm": {
+      "$type": "dimension",
+      "$value": "1.5rem",
+      "$description": "Block content margin at the sm band (>= --breakpoint-sm). Derived: content-margin-base * 1.5.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "sm",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1.5
+        }
+      }
+    },
+    "content-margins-tb-md": {
+      "$type": "dimension",
+      "$value": "1.5rem",
+      "$description": "Block content margin at the md band (>= --breakpoint-md). Derived: content-margin-base * 1.5.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "md",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 1.5
+        }
+      }
+    },
+    "content-margins-tb-lg": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Block content margin at the lg band (>= --breakpoint-lg). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "lg",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    },
+    "content-margins-tb-xl": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Block content margin at the xl band (>= --breakpoint-xl). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "xl",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    },
+    "content-margins-tb-2xl": {
+      "$type": "dimension",
+      "$value": "2rem",
+      "$description": "Block content margin at the 2xl band (>= --breakpoint-2xl). Derived: content-margin-base * 2.",
+      "$extensions": {
+        "com.moduleforge.breakpoint": {
+          "band": "2xl",
+          "base": "{spacing.content-margin-base}",
+          "multiplier": 2
+        }
+      }
+    }
+  }
+}
