@@ -118,5 +118,6 @@ phases:
           tier: sonnet-med
           git:
             branch: plan/gui-spacing-tokens-03-002
-            commit: []
+            commit:
+                - 69c95f2
             merge: null
