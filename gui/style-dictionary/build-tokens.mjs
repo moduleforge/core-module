@@ -192,12 +192,17 @@ function radiusMultiplierOf(tokens, name) {
 }
 
 async function main() {
-  const colorLightTokens = (
+  // Mode-independent tokens (radius, spacing/layout) plus the LIGHT color set. Light is the
+  // baseline mode, so this one instance backs both `:root` and the light-scoped re-assertion;
+  // the mode-independent members are filtered back out before the scoped selectors are rendered.
+  const lightAndModeIndependentTokens = (
     await resolveTokens([
       'tokens/base/color.json',
       'tokens/base/radius.json',
+      'tokens/base/spacing.json',
       'tokens/semantic/color.light.json',
       'tokens/semantic/radius.json',
+      'tokens/semantic/layout.json',
       'tokens/component/overrides.json',
     ])
   )
@@ -225,12 +230,14 @@ async function main() {
     .filter(isSemanticToken)
     .sort(byName);
 
-  const lightTokens = [...colorLightTokens, ...typographyTokens].sort(byName);
+  const lightTokens = [...lightAndModeIndependentTokens, ...typographyTokens].sort(byName);
 
   // Sanity check: every dark color role must also exist as a light color role (same `--mf-*`
   // contract, mode-appropriate value) — guards against a future token-source edit silently
   // dropping or renaming a role in one mode file but not the other.
-  const lightColorNames = new Set(colorLightTokens.filter((t) => t.$type === 'color').map((t) => t.name));
+  const lightColorNames = new Set(
+    lightAndModeIndependentTokens.filter((t) => t.$type === 'color').map((t) => t.name),
+  );
   for (const t of colorDarkTokens) {
     if (!lightColorNames.has(t.name)) {
       throw new Error(
@@ -257,9 +264,10 @@ async function main() {
   ];
 
   // Light COLOR-only defaults: used for the scoped light re-assertion and for the
-  // inverse-inside-dark flip. Mode-independent tokens (typography, radius, font families) are
-  // NOT re-emitted in scoped selectors — they live once in :root and inherit down unchanged.
-  const lightColorTokens = colorLightTokens.filter((t) => t.$type === 'color').sort(byName);
+  // inverse-inside-dark flip. Mode-independent tokens (typography, radius, spacing/layout, font
+  // families) are NOT re-emitted in scoped selectors — they live once in :root and inherit down
+  // unchanged; this `$type === 'color'` filter is what keeps them out.
+  const lightColorTokens = lightAndModeIndependentTokens.filter((t) => t.$type === 'color').sort(byName);
 
   const declList = (tokens) => tokens.map((t) => `  --${t.name}-default: ${formatValue(t)};`).join('\n');
 
