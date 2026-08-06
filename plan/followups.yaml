@@ -99,3 +99,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'app-mftodo/gui/src/tasks/TaskListContainer.tsx, TaskDetailContainer.tsx, and TaskEditorContainer.tsx hardcode mx-auto max-w-2xl p-6 across eight call sites, and mod-core/gui/src/ProfileEditor.tsx hardcodes p-6 max-w-xl. These should consume @moduleforge/core-gui''s container utility (or max-w-content) via the @moduleforge/core-gui/tokens.css export, so page width and gutters become brand-overridable instead of per-component literals. This mirrors the existing adoption-gap follow-on already recorded for mod-tags, mod-tasks, mod-contacts, mod-users, and app-mfdemo. Note the concrete blocker an implementer will hit immediately: --mf-max-content-width defaults to 80rem while these pages currently sit at max-w-2xl (42rem), so adoption is not a mechanical substitution — it needs a per-app --mf-max-content-width override or a narrower wrapper, and is a visible layout change either way.'
+    - title: Narrow-measure content width token
+      id: XKY2
+      date: "2026-08-06"
+      tags:
+        - type:enhancement
+        - plan/phase:contract-documentation
+        - priority:unspecified
+        - effort:unspecified
+      text: --mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. The obvious extensions are a second role (--mf-max-content-width-narrow) or a container-narrow utility emitted alongside container by gui/style-dictionary/build-tokens.mjs. gui/tokens/CONTRACT.md records this as an accepted open limitation; this item is the tracked follow-up for closing it. Deliberately not designed here — the right shape depends on what downstream adoption actually needs.
