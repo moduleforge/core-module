@@ -215,3 +215,82 @@ architectural_impact: true
 - After adding the `--container-content` `@theme inline` key.
 - After emitting the `@utility container` block and confirming validation step 8's Tailwind compile.
 - After updating the compiler header comment.
+
+## Status
+
+**Outcome: succeeded.** Implemented 2026-08-06 on branch `plan/gui-spacing-tokens-01-002`.
+
+### Affected source files
+
+- `gui/style-dictionary/build-tokens.mjs` — the only file changed. `git status` is otherwise clean;
+  no new tracked files. `gui/tokens/dist/tokens.css` and `gui/dist/index.css` are both regenerated
+  build products and both gitignored (`gui/.gitignore` lines 7 and 2), so neither is committed.
+
+### What was implemented
+
+1. `tokens/base/spacing.json` and `tokens/semantic/layout.json` joined the **first** Style
+   Dictionary instance only. The dark and typography instances are untouched. The existing generic
+   `propertyBlocks` / `rootBlock` machinery picked up all 15 new tokens with no new code, and the
+   existing `$type === 'color'` filters kept them out of every scoped selector — all three
+   confirmed against the emitted bundle rather than assumed.
+2. A new `LAYOUT_THEME_MAP` (mirroring `COLOR_THEME_MAP` / `FONT_THEME_MAP` / `RADIUS_THEME_MAP`)
+   appends the single `--container-content` key to `@theme inline`.
+3. A new `containerUtilityBlock()` renders the `@utility container` block after `@theme inline`,
+   preceded by an explanatory block comment in the file's existing voice covering both behavior
+   changes. Band list and multipliers are read from `$extensions["com.moduleforge.breakpoint"]`;
+   `BAND_ORDER` is the ordering authority only, and a band the sources name but it does not throws.
+4. The compiler header comment gained item 4 for the `@utility container` block, stating both
+   consequences; items 1–3 were touched only to add "layout"/"container" to their enumerations.
+
+### Validation summary — all 10 checks passed
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | `bun run build:tokens` exits 0, light-token count +15 | passed — 79 → **94** |
+| 2 | `@property --mf-max-content-width-default` (`<length>`, `80rem`) + 14 more | passed |
+| 3 | `:root` carries all 15 new `-default` declarations | passed |
+| 4 | New tokens absent from all 4 scoped `data-mf-theme` / `.dark` blocks | passed |
+| 5 | `@theme inline` gained exactly one line; no existing line changed | passed |
+| 6 | `@utility container` shape + 5 `@variant` blocks in order `sm,md,lg,xl,2xl` | passed |
+| 7 | Every per-band declaration has the exact three-level shape and source multiplier | passed |
+| 8 | `bun run build:css` exits 0; probe compile confirms (a)–(d) | passed |
+| 9 | `bun run typecheck` and `bun run test` | passed — 53 tests, 0 fail |
+| 10 | `git status` shows only `gui/style-dictionary/build-tokens.mjs` | passed |
+
+Checks 2–7 were additionally asserted mechanically, including a byte-comparison proving the rest of
+the bundle is identical to the pre-task baseline — so no existing `@property` registration, `@theme`
+key, or scope selector changed. Check 8's four sub-assertions were scripted rather than eyeballed:
+exactly two `.container` rules; the built-in first (offset 7675) and the token-backed one second
+(offset 8011); the five `@variant`s compiled to `@media (width >= 40rem/48rem/64rem/80rem/96rem)`;
+and `.py-0` emitted after both, inside the same `@layer utilities`. The new helpers' nine
+failure paths were each exercised in isolation and confirmed to throw with their intended message.
+
+`bun install` was not needed — the worktree's `gui/node_modules` was already provisioned and healthy
+(the broken-symlink condition the `## Validation` preamble warns about did not apply here).
+
+### Decisions made
+
+- Renamed `colorLightTokens` to `lightAndModeIndependentTokens` (the optional rename the task
+  sanctions), updating all four use sites including the `lightColorNames` sanity check.
+- `BAND_ORDER` is declared as the *ordering authority only*. Which bands are emitted, and every
+  multiplier, come from the token sources; an ordering could not be derived from them because the
+  `com.moduleforge.breakpoint` extension carries no ordinal. A band present in the sources but
+  absent from `BAND_ORDER` throws rather than landing in an arbitrary position.
+- The unwrapped band is `BAND_ORDER[0]`, asserted present, rather than a second `'base'` literal.
+- Added four guard rails beyond the one the task named, all in the same fail-loudly spirit:
+  `requireToken` for the three scalars the block names outright, a duplicate-band check, an
+  empty-ladder check, and a both-axes-cover-the-same-bands check.
+
+### Notes for later phases
+
+`gui/dist/index.css` (the published bundle) **does** already contain a compiled `.container` rule —
+both before and after this task. `plan/notes/token-shape-decision.md`'s "Distribution gap" section
+and this task doc's validation-8 parenthetical both predict the class is purged; it is not, because
+Tailwind's candidate extractor picks up the identifier `container` from `const { container } =
+render(...)` in `gui/src/*.test.tsx`. Baseline `dist/index.css` had 6 `.container{` rules (the
+built-in, split by minification); it now has 12. This changes nothing about the design or this
+task's output — `tokens/dist/tokens.css` matches the note's specified shape exactly — but the
+distribution gap's *conclusion* still holds for a different reason: `dist/index.css` carries zero
+`@utility` at-rules, so a downstream consumer's own Tailwind pass still cannot define the utility
+from the published bundle, and the incidental `.container` rule that is there today depends on an
+unrelated test-file identifier.

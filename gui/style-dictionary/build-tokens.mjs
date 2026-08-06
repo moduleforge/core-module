@@ -317,10 +317,11 @@ function containerUtilityBlock(tokens) {
   }
 
   const declarations = (band, indent) =>
-    CONTAINER_AXES.map(
-      ([axis, property]) =>
-        `${indent}${property}: var(--mf-content-margins-${axis}-${band}, calc(var(--mf-content-margins-${axis}, var(--mf-content-margins-${axis}-default)) * ${ladders.get(axis).get(band)}));`,
-    ).join('\n');
+    CONTAINER_AXES.map(([axis, property]) => {
+      const baseLever = `var(--mf-content-margins-${axis}, var(--mf-content-margins-${axis}-default))`;
+      const derived = `calc(${baseLever} * ${ladders.get(axis).get(band)})`;
+      return `${indent}${property}: var(--mf-content-margins-${axis}-${band}, ${derived});`;
+    }).join('\n');
 
   return [
     '@utility container {',
