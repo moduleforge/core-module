@@ -83,7 +83,7 @@ phases:
             branch: plan/gui-spacing-tokens-02-002
             commit:
                 - 950f268
-            merge: null
+            merge: "3048113"
         - number: 3
           slug: record-deferred-token-followups
           title: Record Deferred Token Followups
