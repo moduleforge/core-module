@@ -40,7 +40,7 @@ phases:
             branch: plan/gui-spacing-tokens-01-003
             commit:
                 - 421bc66
-            merge: null
+            merge: e454f60
         - number: 4
           slug: export-token-source-css
           title: Export Token Source Css
