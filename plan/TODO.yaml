@@ -26,6 +26,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: bump-token-contract-version
+          title: Bump Token Contract Version
+          path: phase-01-spacing-token-contract/003-bump-token-contract-version.md
+          done: false
+          tier: haiku-med
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
