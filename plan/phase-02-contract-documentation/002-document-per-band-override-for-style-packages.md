@@ -150,3 +150,60 @@ architectural_impact: true
 - After the override-bundle lever documentation and the radius-divergence statement.
 - After the emission-rules and illustrative-fragment updates.
 - After the versioning and security-posture updates.
+
+## Status
+
+**Outcome:** succeeded. Date: 2026-08-06.
+
+`gui/tokens/STYLE-PACKAGE-CONTRACT.md` was extended in place, at the four insertion points named in
+`## References`, with no new top-level sections:
+
+- **Section 1 ("Compiled `--mf-*` override bundle"), after the existing "Hard rules" list**: added a
+  "The layout-token lever family — a second axis" block enumerating the two base-scale levers, the
+  twelve per-band levers, and `--mf-max-content-width`; stated the radius divergence inline and
+  pointed to the fuller statement in Emission rules; added a "Band-span semantics" paragraph with the
+  worked `sm`-band (`40rem`–`48rem`) example, cross-checked against the measured breakpoint table in
+  `plan/notes/tailwind-container-mechanics.md`.
+- **"Emission rules" section, in the existing "Mode-independent overrides live once in `:root`"
+  bullet**: extended the token list with the layout family, and added a dedicated bold sentence
+  stating the radius-rule divergence explicitly (derived per-band forms *are* settable for content
+  margins, unlike radius) — placed inside Emission rules per the task's discoverability requirement.
+  Updated the illustrative `dist/style.css` `:root` fragment to show one base-lever
+  (`--mf-content-margins-lr`) and one per-band override (`--mf-content-margins-lr-lg`); no layout
+  token was added to any `data-mf-theme` scope selector.
+- **"Token-contract versioning" section**: added a "Current value: `1.1.0`" paragraph naming the MINOR
+  bump and the `MF_TOKEN_CONTRACT_VERSION` constant (`gui/src/lib/token-contract-version.ts`);
+  cross-read the two and confirmed they agree (both say `1.1.0` / MINOR, no removed/renamed/revalued
+  roles). Added a confirming sentence after the MAJOR/MINOR/PATCH table stating both fallback
+  directions hold for this bump; the table itself was left unchanged, per the task's own "otherwise
+  leave it untouched" instruction.
+- **"Security posture" section, after the `@property` typing paragraph**: added a "Content margins
+  under the same posture" paragraph naming `<length>` for all fifteen new tokens, stating in as many
+  words that the new breakpoint-band axis adds surface but not a new trust boundary, and noting that
+  `<length>` admits a `clamp()`/`vw` fluid value as a feature inside the typed contract.
+- **Build-convention directory layout**: added an optional `layout.json` line, matching the
+  `radius.json` / `typography.json` annotation style.
+- Removed the two stray trailing `</content>` / `</invoke>` lines at the end of the file.
+
+**Reality check against the emitted bundle.** Ran `bun install` then `bun run build:tokens` in `gui/`
+(dependencies were not present in this worktree provisioning) and cross-read `gui/tokens/dist/tokens.css`.
+All 15 settable names match exactly what is documented: `--mf-max-content-width`,
+`--mf-content-margins-{lr,tb}`, and `--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` (12), each
+registered `<length>` via a `-default` `@property` block, each referenced from the `@utility
+container` block via the documented `var(band-lever, calc(var(base-lever, var(base-default)) *
+multiplier))` precedence chain, and none re-emitted in any `data-mf-theme` scope selector. No
+discrepancy found; no report-worthy divergence between the plan notes / task doc and what actually
+shipped.
+
+**Link check.** All relative links resolve, including the `../../docs/mf-standards/…` links — the
+`docs/mf-standards` submodule was not checked out in this worktree by default (`git submodule status`
+showed a leading `-`); it was initialized with `git submodule update --init docs/mf-standards` purely
+to verify link resolution, and no file under it was edited. `git status` confirms it introduced no
+tracked change (the submodule already pointed at the recorded commit; the checkout is local-only
+worktree state, and `git status` shows exactly the one modified file,
+`gui/tokens/STYLE-PACKAGE-CONTRACT.md`).
+
+**Assumptions applied:** both `## Assumptions` entries held as stated — Phase 1 (including task
+`003`'s `1.1.0` constant bump) had landed, and no in-repo style package needed rebuilding.
+
+**Validation:** all 12 checks passed; see the structured report for the full list.
