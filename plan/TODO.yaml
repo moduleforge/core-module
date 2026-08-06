@@ -60,3 +60,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: document-per-band-override-for-style-packages
+          title: Document Per Band Override For Style Packages
+          path: phase-02-contract-documentation/002-document-per-band-override-for-style-packages.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
