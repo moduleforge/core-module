@@ -5,7 +5,17 @@ phases:
     - number: 1
       slug: spacing-token-contract
       title: Spacing Token Contract
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-spacing-token-sources
+          title: Add Spacing Token Sources
+          path: phase-01-spacing-token-contract/001-add-spacing-token-sources.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
