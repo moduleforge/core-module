@@ -128,6 +128,13 @@ const RADIUS_THEME_MAP = [
   ['mf-radius-xl', '--radius-xl'],
 ];
 
+/** Tailwind v4's `--container-*` namespace backs the `max-w-*` utilities, so this single key
+ * yields a `max-w-content` utility — a cheap adoption affordance for a consumer that wants the
+ * width token without adopting the whole `@utility container` block below. */
+const LAYOUT_THEME_MAP = [
+  ['mf-max-content-width', '--container-content'],
+];
+
 /** Strips the component-override tier's inert `$example` illustration group (recursively, by
  * key name) before tokens are flattened, so `component/overrides.json` can be included in the
  * source list today (contributing zero real tokens, since it is intentionally empty per its own
@@ -261,6 +268,7 @@ async function main() {
       const multiplier = radiusMultiplierOf(lightTokens, mfName);
       return `  ${twVar}: calc(var(--mf-radius, var(--mf-radius-default)) * ${multiplier});`;
     }),
+    ...LAYOUT_THEME_MAP.map(([mfName, twVar]) => `  ${twVar}: var(--${mfName}, var(--${mfName}-default));`),
   ];
 
   // Light COLOR-only defaults: used for the scoped light re-assertion and for the
