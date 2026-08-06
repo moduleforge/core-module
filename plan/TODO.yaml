@@ -51,7 +51,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/gui-spacing-tokens-01-004
-            commit: []
+            commit:
+                - "3293577"
             merge: null
     - number: 2
       slug: contract-documentation
