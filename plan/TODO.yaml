@@ -30,7 +30,7 @@ phases:
             branch: plan/gui-spacing-tokens-01-002
             commit:
                 - e03855a
-            merge: null
+            merge: 4619fa3
         - number: 3
           slug: bump-token-contract-version
           title: Bump Token Contract Version
