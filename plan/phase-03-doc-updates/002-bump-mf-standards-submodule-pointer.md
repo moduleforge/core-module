@@ -117,3 +117,51 @@ architectural_impact: true
 - [`plan/overview.md`](../overview.md), "This is one half of a federated plan" — the cross-repository
   relationship and the direction of dependency.
 - `gui/tokens/CONTRACT.md` — the shipped contract the architecture doc is checked against.
+
+## Status
+
+Implementation outcome: **succeeded** (2026-08-06).
+
+**Environment note.** This execution ran under an explicit dispatcher override: rather than
+`git fetch origin` against the submodule's configured remote (`git@github.com:moduleforge/docs-mf-standards.git`,
+which is unreachable/unrelated in this playground), the target commit was fetched from the local
+sibling checkout at `/Users/zane/playground/moduleforge/docs-mf-standards` via
+`git fetch /Users/zane/playground/moduleforge/docs-mf-standards main`, run from inside
+`docs/mf-standards`. No remote config or `.gitmodules` was touched.
+
+- Requirement 1: confirmed. Before this task ran, `docs/mf-standards` was uninitialized in this
+  worktree (`git submodule status` reported a `-` prefix); ran `git submodule update --init
+  docs/mf-standards`, which checked out the expected prior pin
+  `1ab046e0b1f710497dcf81013bf9ab8fea3b479f`, matching the task doc's expected current pin exactly.
+- Requirement 2 (adapted per override): fetched `main` from the local sibling checkout; `FETCH_HEAD`
+  resolved to `e96646d6e70421e394d8b13da666d1b1e956b448`, matching the sibling repo's `main` tip
+  (verified independently via `git -C /Users/zane/playground/moduleforge/docs-mf-standards rev-parse
+  main`). `git log --oneline FETCH_HEAD -- architecture/gui-design-tokens.md` showed
+  `e96646d`'s ancestry includes `1828449` ("add spacing and container-width tokens section") and
+  `f7346a1` ("fix directional cross-ref and version self-contradiction"), confirming the target is
+  the branch tip, not a mid-history commit.
+- Requirement 3: verified. `architecture/gui-design-tokens.md` at `e96646d` contains a "## Spacing
+  and container-width tokens" section describing `--mf-max-content-width`,
+  `--mf-content-margins-lr` / `-tb` and their per-band override levers, and the `@utility container`
+  integration mechanism.
+- Requirement 4: moved the submodule pointer to `e96646d6e70421e394d8b13da666d1b1e956b448` and
+  staged only `docs/mf-standards`. `git diff --cached` shows exactly one `Subproject commit` line
+  change.
+- Requirement 5: `git submodule status` reports the new SHA with no `+`/`-`/`U` prefix.
+- Requirement 6: enumerated all mod-core-side markdown links into `docs/mf-standards/` (README.md,
+  AGENTS.md, gui/README.md, model/README.md, gui/tokens/STYLE-PACKAGE-CONTRACT.md, and several
+  plan/*.md files) and confirmed every distinct target path
+  (`manifest-spec.md`, `building-applications.md`, `building-modules.md`, `architecture.md`,
+  `architecture/api-response-design.md`, `architecture/gui-design-tokens.md`,
+  `architecture/db-considerations.md`, `architecture/authorization-design.md`) exists at the new
+  pin, including the linked anchors (`#first-time-setup`, `#cross-module-gui-dependencies`). No
+  broken links found.
+
+Validation: all seven checks in `## Validation` passed, including `gui/tokens/CONTRACT.md`
+cross-check (requirement 4 of Validation) — the sibling doc's token role names
+(`--mf-max-content-width`, `--mf-content-margins-{lr,tb}`, per-band levers) and precedence
+description (per-band lever > base lever > baked default) match `CONTRACT.md`'s "Spacing and
+container width" section with no contradiction found. `cd gui && bun run test` (53 pass, 0 fail)
+and `cd gui && bun run typecheck` (clean) both pass.
+
+Affected files: `docs/mf-standards` (gitlink only; no content edited) and this task document.
