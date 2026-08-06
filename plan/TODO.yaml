@@ -49,6 +49,7 @@ phases:
           path: phase-01-spacing-token-contract/004-export-token-source-css.md
           done: false
           tier: sonnet-high
+          digest: 'Extended gui/package.json''s build script with a build:tokens-css step that copies the compiler-emitted tokens/dist/tokens.css into dist/tokens.css, and added a ./tokens.css export alongside the existing ./styles.css export. Documented both exports in gui/README.md. Verified end-to-end: built dist/tokens.css is byte-identical to the compiler''s own output, contains @theme inline and @utility container, resolves via Node exports resolution, and yields the expected .container/.max-w-content/.bg-primary rules when fed into a real Tailwind v4 build. Full build, test, and typecheck pass; dist/index.css unaffected; no downstream consumer touched.'
           git:
             branch: plan/gui-spacing-tokens-01-004
             commit:
