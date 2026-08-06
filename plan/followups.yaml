@@ -36,3 +36,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Factual correction needed in plan/notes/token-shape-decision.md and this task doc''s validation-8 parenthetical: both claim dist/index.css will not contain a compiled .container rule because mod-core''s own source never uses the class. That''s wrong — baseline dist/index.css already had 6 .container{ rules (built-in, minification-split) and now has 12, because Tailwind''s candidate extractor picks up the bare identifier `container` from `const { container } = render(...)` in gui/src/FieldError.test.tsx and gui/src/ErrorBanner.test.tsx. dist/index.css still carries zero @utility at-rules (verified), so a downstream consumer''s own Tailwind pass genuinely cannot define the utility from the published bundle; the .container rule that IS there today is incidental and could change. Relevant to Phase 2 doc authors and to docs-mf-standards phase 4, which reads notes/token-shape-decision.md as source — the ''it gets purged'' claim should not be repeated.'
+    - title: 'Renaming decision worth a second look: colorL'
+      id: yA2l
+      date: "2026-08-06"
+      tags:
+        - type:ambiguity
+        - plan/phase:spacing-token-contract
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Renaming decision worth a second look: colorLightTokens -> lightAndModeIndependentTokens was optional per the task doc but accounts for a visible share of the diff. Trivially revertible if a reviewer wants a minimal diff.'
