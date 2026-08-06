@@ -18,7 +18,7 @@ phases:
             branch: plan/gui-spacing-tokens-01-001
             commit:
                 - e97bebd
-            merge: null
+            merge: 78bb789
         - number: 2
           slug: emit-spacing-tokens-and-container-utility
           title: Emit Spacing Tokens And Container Utility
