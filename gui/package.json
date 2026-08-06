@@ -10,15 +10,17 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./styles.css": "./dist/index.css"
+    "./styles.css": "./dist/index.css",
+    "./tokens.css": "./dist/tokens.css"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "bun run build:tokens && tsup && bun run build:css",
+    "build": "bun run build:tokens && tsup && bun run build:css && bun run build:tokens-css",
     "build:tokens": "node style-dictionary/build-tokens.mjs",
     "build:css": "tailwindcss -i .ladle/styles.css -o dist/index.css --minify",
+    "build:tokens-css": "mkdir -p dist && cp tokens/dist/tokens.css dist/tokens.css",
     "typecheck": "tsc --noEmit",
     "test": "bun test --pass-with-no-tests",
     "clean": "rm -rf dist build tokens/dist .yalc yalc.lock",
