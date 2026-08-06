@@ -274,6 +274,11 @@ function contentMarginLadder(tokens, axis) {
         `Token "--${token.name}" names breakpoint band "${ext.band}", which is outside the known ascending band order (${BAND_ORDER.join(', ')}). Add it to BAND_ORDER, in its correct ascending position, before adding it to the token sources.`,
       );
     }
+    if (token.name !== `${prefix}${ext.band}`) {
+      throw new Error(
+        `Token "--${token.name}" declares com.moduleforge.breakpoint band "${ext.band}", which does not match the band suffix in its own name (expected "--${prefix}${ext.band}"); the token's name and its declared band extension have diverged.`,
+      );
+    }
     if (multiplierByBand.has(ext.band)) {
       throw new Error(`Two --mf-content-margins-${axis}-* tokens both claim breakpoint band "${ext.band}"`);
     }
