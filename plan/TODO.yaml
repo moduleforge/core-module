@@ -58,6 +58,7 @@ phases:
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
+      diff_base: 0543ec5fc4ba6046b87671fef8ef946f4ab69bea
       tasks:
         - number: 1
           slug: document-spacing-tokens-in-contract
