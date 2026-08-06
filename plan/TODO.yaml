@@ -111,7 +111,7 @@ phases:
             branch: plan/gui-spacing-tokens-03-001
             commit:
                 - 20d2591
-            merge: null
+            merge: ed526e8
         - number: 2
           slug: bump-mf-standards-submodule-pointer
           title: Bump Mf Standards Submodule Pointer
