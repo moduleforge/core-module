@@ -49,4 +49,14 @@ phases:
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
-      tasks: []
+      tasks:
+        - number: 1
+          slug: document-spacing-tokens-in-contract
+          title: Document Spacing Tokens In Contract
+          path: phase-02-contract-documentation/001-document-spacing-tokens-in-contract.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
