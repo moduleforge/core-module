@@ -80,7 +80,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/gui-spacing-tokens-02-002
-            commit: []
+            commit:
+                - 950f268
             merge: null
         - number: 3
           slug: record-deferred-token-followups
