@@ -45,3 +45,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Renaming decision worth a second look: colorLightTokens -> lightAndModeIndependentTokens was optional per the task doc but accounts for a visible share of the diff. Trivially revertible if a reviewer wants a minimal diff.'
+    - title: 'Pre-existing, untouched: a stale cross-refere'
+      id: KJF0
+      date: "2026-08-06"
+      tags:
+        - type:ambiguity
+        - plan/phase:spacing-token-contract
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Pre-existing, untouched: a stale cross-reference in the compiler header — "Why three separate Style Dictionary instances" note ends with "flagged to the manager in the task-002 report," referring to a PRIOR plan''s task 002 (primitive audit), now ambiguous next to this plan''s task 002. Not safely rewordable without knowing which plan it should name.'
