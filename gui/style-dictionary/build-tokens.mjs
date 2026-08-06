@@ -135,6 +135,26 @@ const LAYOUT_THEME_MAP = [
   ['mf-max-content-width', '--container-content'],
 ];
 
+/** Ascending Tailwind breakpoint band order. This list is the ORDERING authority only — *which*
+ * bands are emitted, and every multiplier, are read from the token sources'
+ * `com.moduleforge.breakpoint` extensions, never restated here. Order is load-bearing and cannot
+ * be derived from the sources: every band is min-width, so at any viewport the LAST matching
+ * declaration wins, and emitting in source order or by the `byName` comparator (which sorts
+ * `2xl` first) would silently invert the ladder. `base` is the unprefixed, below-`sm` band; its
+ * declarations are emitted unwrapped, outside any `@variant`. A band the sources name but this
+ * list does not throws, rather than landing in an arbitrary position. */
+const BAND_ORDER = ['base', 'sm', 'md', 'lg', 'xl', '2xl'];
+
+/** The content-margin ladder's two axes: the `--mf-content-margins-<axis>` token-name segment and
+ * the CSS property the `@utility container` block declares it on. `padding-*` rather than
+ * `margin-*` because Tailwind's preflight sets `box-sizing: border-box`, which puts the gutter
+ * inside `--mf-max-content-width` and keeps it from fighting the `margin-inline: auto` centering
+ * at narrow viewports. */
+const CONTAINER_AXES = [
+  ['lr', 'padding-inline'],
+  ['tb', 'padding-block'],
+];
+
 /** Strips the component-override tier's inert `$example` illustration group (recursively, by
  * key name) before tokens are flattened, so `component/overrides.json` can be included in the
  * source list today (contributing zero real tokens, since it is intentionally empty per its own
@@ -196,6 +216,98 @@ function radiusMultiplierOf(tokens, name) {
     throw new Error(`Expected a com.moduleforge.radius multiplier extension on token "${name}"`);
   }
   return ext.multiplier;
+}
+
+/** Asserts that a token the emitted CSS names outright exists in the resolved set, so a renamed
+ * or dropped source token fails the build rather than emitting a `var()` chain whose baked
+ * default is never declared anywhere. */
+function requireToken(tokens, name) {
+  if (!tokens.some((t) => t.name === name)) {
+    throw new Error(`Expected a token named "--${name}" in the resolved token set`);
+  }
+}
+
+/** Reads one content-margin axis's per-band multiplier ladder out of the resolved tokens'
+ * `com.moduleforge.breakpoint` extensions, as a `band -> multiplier` map. Follows
+ * `radiusMultiplierOf`'s precedent: a token source missing or malforming the extension throws
+ * with a clear message, so the build fails loudly instead of emitting silently-wrong CSS. The
+ * band list and the multipliers both come from the sources — neither is restated here.
+ * @param {{name: string, $extensions?: Record<string, any>}[]} tokens
+ * @param {string} axis
+ * @returns {Map<string, number>} */
+function contentMarginLadder(tokens, axis) {
+  const prefix = `mf-content-margins-${axis}-`;
+  /** @type {Map<string, number>} */
+  const multiplierByBand = new Map();
+  for (const token of tokens) {
+    if (!token.name.startsWith(prefix)) continue;
+    const ext = token.$extensions?.['com.moduleforge.breakpoint'];
+    if (!ext || typeof ext.band !== 'string' || typeof ext.multiplier !== 'number') {
+      throw new Error(
+        `Expected a com.moduleforge.breakpoint { band, multiplier } extension on token "--${token.name}"`,
+      );
+    }
+    if (!BAND_ORDER.includes(ext.band)) {
+      throw new Error(
+        `Token "--${token.name}" names breakpoint band "${ext.band}", which is outside the known ascending band order (${BAND_ORDER.join(', ')}). Add it to BAND_ORDER, in its correct ascending position, before adding it to the token sources.`,
+      );
+    }
+    if (multiplierByBand.has(ext.band)) {
+      throw new Error(`Two --mf-content-margins-${axis}-* tokens both claim breakpoint band "${ext.band}"`);
+    }
+    multiplierByBand.set(ext.band, ext.multiplier);
+  }
+  if (multiplierByBand.size === 0) {
+    throw new Error(`Found no --mf-content-margins-${axis}-<band> tokens; the ${axis} content-margin ladder is empty.`);
+  }
+  return multiplierByBand;
+}
+
+/** Renders the compiled `@utility container` block: Tailwind's container idiom wired to the
+ * layout tokens, with the per-band gutter ladder read from the token sources. Each per-band
+ * declaration is `var(<per-band lever>, calc(<base lever> * <k>))` — the outer `var()` takes the
+ * per-band lever and the `calc()` is only its FALLBACK, which is what lets a style package's
+ * explicit per-band override win for that band alone while the base lever
+ * `--mf-content-margins-<axis>` still rescales every band that carries no explicit override. */
+function containerUtilityBlock(tokens) {
+  requireToken(tokens, 'mf-max-content-width');
+  for (const [axis] of CONTAINER_AXES) requireToken(tokens, `mf-content-margins-${axis}`);
+
+  const ladders = new Map(CONTAINER_AXES.map(([axis]) => [axis, contentMarginLadder(tokens, axis)]));
+  const bands = BAND_ORDER.filter((band) => [...ladders.values()].some((ladder) => ladder.has(band)));
+
+  // Both axes must cover the same bands, so every emitted band carries a complete declaration set.
+  for (const [axis, ladder] of ladders) {
+    for (const band of bands) {
+      if (!ladder.has(band)) {
+        throw new Error(
+          `The --mf-content-margins-${axis} ladder has no "${band}" band but another axis does; the content-margin axes must cover the same bands.`,
+        );
+      }
+    }
+  }
+
+  const [baseBand, ...variantBands] = bands;
+  if (baseBand !== BAND_ORDER[0]) {
+    throw new Error(
+      `The content-margin ladder is missing its "${BAND_ORDER[0]}" band. That band's declarations are emitted unwrapped, outside any @variant, so it cannot be omitted.`,
+    );
+  }
+
+  const declarations = (band, indent) =>
+    CONTAINER_AXES.map(
+      ([axis, property]) =>
+        `${indent}${property}: var(--mf-content-margins-${axis}-${band}, calc(var(--mf-content-margins-${axis}, var(--mf-content-margins-${axis}-default)) * ${ladders.get(axis).get(band)}));`,
+    ).join('\n');
+
+  return [
+    '@utility container {',
+    '  margin-inline: auto;',
+    '  max-width: var(--mf-max-content-width, var(--mf-max-content-width-default));',
+    declarations(baseBand, '  '),
+    ...variantBands.map((band) => `  @variant ${band} {\n${declarations(band, '    ')}\n  }`),
+    '}',
+  ].join('\n');
 }
 
 async function main() {
@@ -279,6 +391,8 @@ async function main() {
 
   const declList = (tokens) => tokens.map((t) => `  --${t.name}-default: ${formatValue(t)};`).join('\n');
 
+  const containerBlock = containerUtilityBlock(lightTokens);
+
   const rootBlock = declList(lightTokens);
   const lightColorBlock = declList(lightColorTokens);
   const darkColorBlock = declList(colorDarkTokens);
@@ -296,6 +410,25 @@ ${propertyBlocks}
 @theme inline {
 ${themeLines.join('\n')}
 }
+
+/* Tailwind's container idiom, wired to the layout tokens. \`@variant <band>\` rather than a
+   literal \`@media\` so the breakpoint VALUES resolve against whatever \`--breakpoint-*\` theme the
+   CONSUMING build has — only the band names are baked in here. Bands are min-width and emitted in
+   ascending order, so at any viewport the last matching declaration wins; a per-band
+   \`--mf-content-margins-<axis>-<band>\` override therefore governs its band's span, from that
+   breakpoint up to the next declared one, rather than every width above it.
+
+   Two deliberate behavior changes for anyone already using \`.container\`:
+     - \`@utility container\` EXTENDS Tailwind's built-in \`.container\`; it does not replace it.
+       Tailwind emits the built-in rule first and this one second, and media queries add no
+       specificity, so the unconditional \`max-width\` below overrides the built-in's entire
+       per-breakpoint max-width ladder (40rem through 96rem). That is intended —
+       \`--mf-max-content-width\` takes ownership of the container's width — but it is a behavior
+       change for a consumer already relying on that ladder.
+     - \`.container\` gains \`padding-block\`, which Tailwind's built-in never had. Also intended: it
+       is what \`--mf-content-margins-tb\` is for. Ordinary utilities (\`py-0\`, \`py-8\`) are emitted
+       after the container rules and still win, so the escape hatch is intact. */
+${containerBlock}
 
 /* Light is the baseline: the full default set (colors + mode-independent typography/radius),
    active whenever data-mf-theme is absent. */
