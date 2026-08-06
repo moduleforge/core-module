@@ -94,3 +94,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: bump-mf-standards-submodule-pointer
+          title: Bump Mf Standards Submodule Pointer
+          path: phase-03-doc-updates/002-bump-mf-standards-submodule-pointer.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
