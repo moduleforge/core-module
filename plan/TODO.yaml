@@ -108,7 +108,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/gui-spacing-tokens-03-001
-            commit: []
+            commit:
+                - 20d2591
             merge: null
         - number: 2
           slug: bump-mf-standards-submodule-pointer
