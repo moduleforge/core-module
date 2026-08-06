@@ -6,3 +6,7 @@ phases:
       slug: spacing-token-contract
       title: Spacing Token Contract
       tasks: []
+    - number: 2
+      slug: contract-documentation
+      title: Contract Documentation
+      tasks: []
