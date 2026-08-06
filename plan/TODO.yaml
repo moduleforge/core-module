@@ -116,6 +116,7 @@ phases:
           path: phase-03-doc-updates/002-bump-mf-standards-submodule-pointer.md
           done: false
           tier: sonnet-med
+          digest: Bumped the docs/mf-standards submodule pointer from 1ab046e0b1f710497dcf81013bf9ab8fea3b479f to e96646d6e70421e394d8b13da666d1b1e956b448, the main tip of the sibling docs-mf-standards project's completed gui-spacing-tokens federated-plan work, fetched from the local sibling checkout. Verified before pinning that the target commit's architecture/gui-design-tokens.md contains the new Spacing and container-width tokens section and does not contradict gui/tokens/CONTRACT.md. Confirmed no mod-core-side inbound markdown link into docs/mf-standards/ broke. bun run test and typecheck remain green.
           git:
             branch: plan/gui-spacing-tokens-03-002
             commit:
