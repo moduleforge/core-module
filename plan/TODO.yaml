@@ -54,7 +54,7 @@ phases:
             branch: plan/gui-spacing-tokens-01-004
             commit:
                 - "3293577"
-            merge: null
+            merge: 314c5a6
     - number: 2
       slug: contract-documentation
       title: Contract Documentation
