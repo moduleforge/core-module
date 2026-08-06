@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: spacing-token-contract
       title: Spacing Token Contract
+      diff_base: 6dc583d02d7a70e8250f08848a28aa72e72fe32d
       tasks:
         - number: 1
           slug: add-spacing-token-sources
