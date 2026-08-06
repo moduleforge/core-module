@@ -106,6 +106,7 @@ phases:
           path: phase-03-doc-updates/001-update-architecture-docs.md
           done: false
           tier: sonnet-high
+          digest: 'Added a new ### gui/ design tokens subsection to AGENTS.md, pointing at gui/tokens/, the Style Dictionary compiler, both package stylesheet exports, and both contract docs. Judged gui/README.md and root README.md to need no edits. Verified the submodule pointer was still at pre-plan SHA (task 002''s job), then read the sibling doc''s actual merged content directly from docs-mf-standards''s own local checkout (main @ e96646d) and cross-checked its token-shape account, precedence chain, and @utility container integration against CONTRACT.md and a freshly regenerated tokens/dist/tokens.css: byte-for-byte match, no drift.'
           git:
             branch: plan/gui-spacing-tokens-03-001
             commit:
