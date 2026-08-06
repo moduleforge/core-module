@@ -108,3 +108,12 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: --mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. The obvious extensions are a second role (--mf-max-content-width-narrow) or a container-narrow utility emitted alongside container by gui/style-dictionary/build-tokens.mjs. gui/tokens/CONTRACT.md records this as an accepted open limitation; this item is the tracked follow-up for closing it. Deliberately not designed here — the right shape depends on what downstream adoption actually needs.
+    - title: Sibling doc discrepancy in docs-mf-standards'
+      id: ilUE
+      date: "2026-08-06"
+      tags:
+        - type:ambiguity
+        - plan/phase:doc-updates
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Sibling doc discrepancy in docs-mf-standards'' architecture/gui-design-tokens.md (that project''s plan is already finalized/closed, so this needs filing as a fresh followup there, not a mod-core followup): its Three-tier token architecture section''s summary sentence ("the current semantic surface enumerates 35 color roles, one radius lever ... and the typography families/scale above") was not updated to acknowledge the new spacing/container-width category, even though the doc''s own later Spacing and container-width tokens section documents that category thoroughly and accurately. A reader who stops at the early summary sentence would undercount the semantic surface.'
