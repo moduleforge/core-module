@@ -33,7 +33,7 @@ phases:
           slug: bump-token-contract-version
           title: Bump Token Contract Version
           path: phase-01-spacing-token-contract/003-bump-token-contract-version.md
-          done: false
+          done: true
           tier: haiku-med
           digest: 'Bumped MF_TOKEN_CONTRACT_VERSION from 1.0.0 to 1.1.0 to reflect the addition of spacing/container-width token roles. Updated the constant''s doc comment to describe the new surface (--mf-max-content-width, --mf-content-margins-lr/tb, and their per-breakpoint-band overrides) and to explicitly state why this is a MINOR bump: new roles only, with no existing roles removed, renamed, or revalued. All validation checks passed - typecheck, 53 unit tests, and verification that no stale hardcoded version references remain in the codebase.'
           git:
