@@ -90,6 +90,7 @@ phases:
           path: phase-02-contract-documentation/003-record-deferred-token-followups.md
           done: false
           tier: sonnet-med
+          digest: Verified all file paths named in the three deferred-item descriptions exist (app-mftodo's three container files, mod-core's ProfileEditor.tsx, all gui/tokens/* references), confirmed the eight mx-auto max-w-2xl p-6 call sites across app-mftodo's three container files matches the task doc's count exactly, and confirmed item 3's text stays consistent with gui/tokens/CONTRACT.md's new Known limitation paragraph (added by the concurrently-running task 001, cross-checked after it landed). Drafted final, ready-to-file content for all three followup items (Per-component radius override levers; Adopt spacing tokens in downstream GUIs; Narrow-measure content width token), each with type:enhancement and the plan/phase:contract-documentation provenance tag. The manager filed all three via followups_add directly (ids 7nrP, AkGw, XKY2) since this task's dispatch tier lacked the followups_add tool; the task's substantive verification and drafting work is otherwise complete.
           git:
             branch: plan/gui-spacing-tokens-02-003
             commit:
