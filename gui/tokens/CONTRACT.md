@@ -37,9 +37,10 @@ sparse** and can never leave a token undefined.
 A style package that sets `--mf-x-default` is **outside the contract** and its behavior is
 undefined (it fights the compiled bundle and breaks mode/scope switching). Supply `--mf-x` only.
 
-**Divergence for spacing/container-width per-band levers.** The rule above ("derived steps are
-internal") holds for radius but not for the new `--mf-content-margins-{lr,tb}-<band>` per-band
-tokens: those derived-shape names **are** style-package-settable, by design — see
+**Divergence for spacing/container-width per-band levers.** The general rule that a compiler-derived
+form is style-package-internal (see [Radius](#radius), below) holds for radius but not for the new
+`--mf-content-margins-{lr,tb}-<band>` per-band tokens: those derived-shape names **are**
+style-package-settable, by design — see
 [Spacing and container width](#spacing-and-container-width). Only their `-default` twins
 (`--mf-content-margins-{lr,tb}-<band>-default`) are compiler-internal, as usual.
 

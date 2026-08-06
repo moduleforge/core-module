@@ -48,7 +48,7 @@ Hard rules, all inherited from CONTRACT.md's settable-vs-internal table:
   package neither re-declares nor overrides them.
 - **Scoped exactly like mod-core's `-default` sets.** The bundle mirrors mod-core's scope selectors
   so brand and mode compose through the one attribute (per CONTRACT.md's "runtime brand selection"
-  case). See [Emission rules](#emission-rules-what-the-override-bundle-must-look-like).
+  case). See [Emission rules](#emission-rules--what-the-override-bundle-must-look-like).
 
 **The layout-token lever family — a second axis.** Every token above this point in the contract is a
 single scalar per mode/scope; the content-margin tokens (contract `1.1.0`) add a second axis —
@@ -61,7 +61,7 @@ breakpoint band — on top of the ordinary style-package-override axis:
   replaces the derived value for that band alone; the base lever still governs every other band.
   **This diverges from the radius rule**: for radius the derived `--mf-radius-{sm,md,lg,xl}` steps
   are never settable, but for content margins a per-band derived step is exactly the intended escape
-  hatch (see [Emission rules](#emission-rules-what-the-override-bundle-must-look-like) for the
+  hatch (see [Emission rules](#emission-rules--what-the-override-bundle-must-look-like) for the
   explicit statement of this divergence).
 - `--mf-max-content-width` is an ordinary single scalar with no second axis, exactly like every
   color/typography role.
