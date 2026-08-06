@@ -71,7 +71,7 @@ phases:
             branch: plan/gui-spacing-tokens-02-001
             commit:
                 - 6af006e
-            merge: null
+            merge: 8c26596
         - number: 2
           slug: document-per-band-override-for-style-packages
           title: Document Per Band Override For Style Packages
