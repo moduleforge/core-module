@@ -191,3 +191,54 @@ architectural_impact: true
 - After the `CONTRACT.md` Tailwind container integration subsection and the two behavior-change
   statements.
 - After the `README.md` source/tiering updates.
+
+## Status
+
+**Outcome:** succeeded — 2026-08-06.
+
+`bun install` and `bun run build:tokens` were run in `gui/` (dependencies were not yet installed in
+this worktree) to regenerate `gui/tokens/dist/tokens.css` as the source of truth, per the task's
+own instruction; `dist/` remains gitignored and produced no tracked changes.
+
+`gui/tokens/CONTRACT.md` changes:
+- New `### Spacing and container width` subsection under "The fixed `--mf-*` surface", with
+  `#### Resolution expression`, `#### Band-span semantics`, `#### Settable vs. internal — a
+  divergence from radius`, `#### Fluid values are expressible`, and `#### Known limitation
+  (accepted, still open)` sub-subsections. All 15 settable role names are spelled out literally
+  (not only via `{...}` brace notation) so they are individually greppable.
+- New `### Tailwind container integration` subsection under "Where the contract is enforced",
+  covering `@variant <band>`, `--container-content` / `max-w-content`, the "extends not replaces"
+  behavior change (built-in max-width ladder overridden), and the `padding-block` addition —
+  each as its own bullet.
+- A short divergence note added directly beneath the `### Settable vs. internal` table, cross-
+  referencing the new section (per-band levers are settable, unlike radius's derived steps).
+- The "Only color roles are re-emitted in scoped selectors" sentence under "Emission shape" extended
+  to name the new mode-independent spacing/container-width roles.
+- The stray trailing `</content>` artifact line removed from the end of the file.
+
+`gui/tokens/README.md` changes:
+- `base/spacing.json` and `semantic/layout.json` added to the File layout tree (one-line
+  descriptions matching the existing entries' style).
+- The Tiering convention table's `semantic/` row extended to note `layout.json` is also
+  mode-independent, alongside `radius.json`.
+- A `**Spacing and container width:**` enumeration line added beside the existing `**Radius:**` /
+  `**Typography families:**` / `**Type scale:**` lines (three scalar roles, twelve per-band roles,
+  base values).
+- A `**Spacing: dual-carry preserved.**` paragraph documenting the `$value` +
+  `$extensions["com.moduleforge.breakpoint"]` dual-carry pattern, cross-referencing `### Radius:
+  calc preserved`.
+- A `**Spacing: multiplier ladder.**` table plus notes on the `px-4 sm:px-6 lg:px-8` idiom parallel
+  and on every band being declared even where its value repeats the band below.
+
+**Validation:** all 10 checks in `## Validation` passed — see the structured report for command-level
+detail. In particular, every one of the 15 settable names and their `-default` twins were confirmed
+present in the regenerated `gui/tokens/dist/tokens.css` (check 7), and `git status` shows exactly
+`gui/tokens/CONTRACT.md` and `gui/tokens/README.md` modified (check 10).
+
+**Assumptions applied:** both `## Assumptions` bullets held — Phase 1 had already landed on the plan
+branch, `dist/tokens.css` regenerated cleanly, and `dist/` produced no git changes.
+
+**Files touched (repo-relative):**
+- `gui/tokens/CONTRACT.md`
+- `gui/tokens/README.md`
+- `plan/phase-02-contract-documentation/001-document-spacing-tokens-in-contract.md` (this file)
