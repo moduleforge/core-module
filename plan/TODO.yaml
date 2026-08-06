@@ -70,3 +70,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: record-deferred-token-followups
+          title: Record Deferred Token Followups
+          path: phase-02-contract-documentation/003-record-deferred-token-followups.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
