@@ -4,13 +4,13 @@
  * generated CSS bundle at `mod-core/gui/tokens/dist/tokens.css`.
  *
  * The bundle carries:
- *   1. `@property` typed declarations for every semantic/typography/radius token whose
+ *   1. `@property` typed declarations for every semantic/typography/radius/layout token whose
  *      DTCG `$type` maps to a CSS syntax component (color, dimension, number, fontWeight).
  *      Registered on the token's baked-default custom property (`--mf-x-default`), never on
  *      the bare `--mf-x` — see the "Why register on -default, not on the bare var" note below.
- *   2. A Tailwind v4 `@theme inline` block mapping Tailwind's color/font/radius theme keys to
- *      the fallback-chained semantic vars (`var(--mf-x, var(--mf-x-default))`), so existing cva
- *      utility classes (`bg-primary`, etc.) resolve through the semantic contract.
+ *   2. A Tailwind v4 `@theme inline` block mapping Tailwind's color/font/radius/container theme
+ *      keys to the fallback-chained semantic vars (`var(--mf-x, var(--mf-x-default))`), so
+ *      existing cva utility classes (`bg-primary`, etc.) resolve through the semantic contract.
  *   3. Baked-default declarations (`--mf-x-default`) for every semantic token, emitted as
  *      mode/scope variable sets keyed on the unified `data-mf-theme` scoping attribute (see
  *      `tokens/CONTRACT.md` for the full contract):
@@ -24,10 +24,32 @@
  *          surrounding mode: in a light context it resolves to the dark color set; nested under
  *          a dark scope (`[data-mf-theme="dark"] [data-mf-theme="inverse"]`, `.dark …`) it
  *          resolves to the light color set via the higher-specificity compound selector.
- *      Radius/typography/font-family tokens are mode-independent, so only colors are re-emitted
- *      in the scoped selectors; the mode-independent tokens live once in `:root` and inherit
- *      down unchanged. Sourced from `tokens/semantic/color.light.json` and
+ *      Radius/typography/font-family/layout tokens are mode-independent, so only colors are
+ *      re-emitted in the scoped selectors; the mode-independent tokens live once in `:root` and
+ *      inherit down unchanged. Sourced from `tokens/semantic/color.light.json` and
  *      `tokens/semantic/color.dark.json` respectively.
+ *   4. An `@utility container` block (emitted after the `@theme inline` block) wiring the
+ *      `tokens/semantic/layout.json` roles into Tailwind's container idiom: `margin-inline: auto`,
+ *      a `max-width` from `--mf-max-content-width`, and a per-breakpoint-band gutter ladder on
+ *      both axes. Each per-band declaration is
+ *      `var(--mf-content-margins-<axis>-<band>, calc(var(--mf-content-margins-<axis>, …) * k))`,
+ *      so a style package's explicit per-band override wins for that band alone while the base
+ *      lever still rescales every band that carries no override. Bands are spelled `@variant
+ *      <band>`, not a literal `@media`, so only the band NAMES are baked in here and the values
+ *      resolve against the consuming build's own `--breakpoint-*` theme. The band list and every
+ *      multiplier are read from the sources' `$extensions["com.moduleforge.breakpoint"]`.
+ *
+ *      Two deliberate behavior changes follow for any consumer already using `.container`, and
+ *      are restated in the emitted CSS so a reader of the bundle is not surprised:
+ *        - `@utility container` EXTENDS Tailwind's built-in `.container`; it does not replace it.
+ *          Tailwind emits the built-in rule first and this one second, and media queries add no
+ *          specificity, so this block's unconditional `max-width` overrides the built-in's entire
+ *          per-breakpoint max-width ladder (40rem through 96rem), rendering it inert. That is
+ *          intended — `--mf-max-content-width` takes ownership of the container's width.
+ *        - `.container` gains `padding-block`, which Tailwind's built-in container never had.
+ *          Also intended: it is exactly what `--mf-content-margins-tb` is for. Ordinary utilities
+ *          (`py-0`, `py-8`) are emitted after both container rules and still win, so the escape
+ *          hatch is intact.
  *
  * Regenerate with `npm run build:tokens` (or `bun run build:tokens`) after editing any file
  * under `tokens/`. This script produces no manual post-edits and is deterministic: token lists
