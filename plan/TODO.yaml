@@ -68,7 +68,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/gui-spacing-tokens-02-001
-            commit: []
+            commit:
+                - 6af006e
             merge: null
         - number: 2
           slug: document-per-band-override-for-style-packages
