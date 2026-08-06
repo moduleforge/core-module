@@ -15,7 +15,7 @@ Three tiers plus a typography tier (GitHub Primer / Radix / MD3 converged patter
 | Tier | Directory | Role |
 |------|-----------|------|
 | **Raw / base** | `base/` | Literal values — oklch color primitives, the base radius, font stacks, and the size/weight/line-height/tracking ramps. **Never referenced directly by components.** |
-| **Semantic / purpose** | `semantic/` | The `--mf-*` roles components consume. Every value is a DTCG alias into the raw tier. Named for purpose and mapped onto MD3 color-role vocabulary. Split into `color.light.json` + `color.dark.json` mode sets; `radius.json` is mode-independent. |
+| **Semantic / purpose** | `semantic/` | The `--mf-*` roles components consume. Every value is a DTCG alias into the raw tier. Named for purpose and mapped onto MD3 color-role vocabulary. Split into `color.light.json` + `color.dark.json` mode sets; `radius.json` is mode-independent. `layout.json` (the spacing / container-width roles) is also mode-independent, joining `radius.json` in that respect. |
 | **Typography** | `typography/` | Semantic font families (`families.json`) and the type scale as tokens (`scale.json`), aliasing the raw font ramps. Mode-independent. |
 | **Component-override** | `component/` | Sparse escape-hatch namespace (`mf.component.<component>.<property>`). Intentionally empty at this stage — establishes the convention only. |
 
@@ -27,10 +27,12 @@ tokens/
     color.json          neutral ramp + functional hues (red/amber/blue/green/purple) + alpha whites
     radius.json         --radius base (0.625rem)
     font.json           family stacks + size/weight/line-height/tracking ramps
+    spacing.json        spacing.content-margin-base (1rem) + spacing.max-content-width (80rem)
   semantic/
     color.light.json    --mf-* color roles, LIGHT set (aliases into base)
     color.dark.json     --mf-* color roles, DARK set (same paths, dark values)
     radius.json         --mf-radius + sm/md/lg/xl derived steps
+    layout.json         --mf-max-content-width + --mf-content-margins-{lr,tb} + per-band steps
   typography/
     families.json       --mf-font-sans / -mono / -heading
     scale.json          --mf-text-h1..h6 / -body / -body-sm / -label (size/line-height/weight/tracking)
@@ -90,6 +92,37 @@ task beyond ensuring the source carries the default values (it does).
 
 **Type scale:** `--mf-text-h1`…`--mf-text-h6`, `--mf-text-body`, `--mf-text-body-sm`,
 `--mf-text-label` — each with `size` / `line-height` / `weight` / `tracking` sub-tokens.
+
+**Spacing and container width:** three scalar roles — `--mf-max-content-width`,
+`--mf-content-margins-lr`, `--mf-content-margins-tb` — plus twelve per-band levers,
+`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` (six bands × two axes). Base values: both
+axis base inputs are `1rem` (`spacing.content-margin-base`); `--mf-max-content-width` defaults to
+`80rem` (`spacing.max-content-width`). Mode-independent, like radius and typography.
+
+**Spacing: dual-carry preserved.** DTCG has no calc primitive, so each derived per-band token in
+`semantic/layout.json` carries **both** a pre-computed literal `$value` (so the baked `@property`
+initial-value is exact) **and** its band + multiplier under
+`$extensions["com.moduleforge.breakpoint"]` (so the compiler can emit
+`calc(var(--mf-content-margins-lr, …) * k)` and a runtime base override cascades to every band).
+This deliberately parallels `semantic/radius.json`'s `$extensions["com.moduleforge.radius"]`
+pattern — see [Radius: calc preserved](#radius-calc-preserved) below.
+
+**Spacing: multiplier ladder.**
+
+| Band | `lr` multiplier | `lr` value | `tb` multiplier | `tb` value |
+|------|------------------|------------|------------------|------------|
+| `base` | 1 | `1rem` | 1.5 | `1.5rem` |
+| `sm` | 1.5 | `1.5rem` | 1.5 | `1.5rem` |
+| `md` | 1.5 | `1.5rem` | 1.5 | `1.5rem` |
+| `lg` | 2 | `2rem` | 2 | `2rem` |
+| `xl` | 2 | `2rem` | 2 | `2rem` |
+| `2xl` | 2 | `2rem` | 2 | `2rem` |
+
+The inline (`lr`) ladder deliberately reproduces the ubiquitous `px-4 sm:px-6 lg:px-8`
+shadcn/Tailwind app-shell idiom, so the default render is unsurprising. Every band is declared even
+where its value repeats the band below it (e.g. `sm` and `md` share `1.5rem` on both axes), so every
+band still has its own independent override lever rather than silently inheriting from the band
+below.
 
 ## Material (MD3) compatibility by naming, not runtime dependency
 
