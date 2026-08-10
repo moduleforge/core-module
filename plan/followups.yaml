@@ -119,16 +119,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: make lint / shadow-db-lint.sh only exercises goose up, never down, for any migration — task doc assumed it also validates Down; verified manually instead. Possible follow-up if down-migration regressions should be caught in CI.
-    - title: Five test-fake Querier implementations (servi
-      id: MxLw
-      date: "2026-08-10"
-      tags:
-        - type:ambiguity
-        - plan/phase:durable-field-key
-        - plan/slug:catalog-readiness
-        - priority:unspecified
-        - effort:unspecified
-      text: Five test-fake Querier implementations (service/mock_test.go mockQuerier, display/registry_test.go stubQuerier, entity/resolver_test.go resolverStubQuerier, types/types_test.go stubQuerier, httpapi/apps_test.go appsFakeQuerier) are missing GetFieldCryptoKey/InsertFieldCryptoKeyIfAbsent, breaking go vet ./... (hence make lint) across the whole api module. This predates this task (task 001 added the two methods to db.Querier without updating these fakes) and blocks this task's make lint validation bullet. Recommend a small follow-up task adding the two trivial stub methods to each of the five fakes.
     - title: 'Sandbox-only note: a native non-Docker Postgr'
       id: iuHr
       date: "2026-08-10"
