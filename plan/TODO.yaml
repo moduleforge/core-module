@@ -42,7 +42,7 @@ phases:
             branch: plan/catalog-readiness-01-003
             commit:
                 - e5feda6
-            merge: null
+            merge: 5521dc650c094ca824e2cbd4030b245cf63208a6
     - number: 2
       slug: doc-updates
       title: Documentation Updates
