@@ -59,4 +59,4 @@ phases:
             branch: plan/catalog-readiness-02-001
             commit:
                 - 187b68e
-            merge: null
+            merge: 0e922d29d77a9460cc17917adaef135d60d3aa3e
