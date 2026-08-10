@@ -25,6 +25,7 @@ phases:
           path: phase-01-durable-field-key/002-implement-auto-generate-cipher.md
           done: false
           tier: sonnet-high
+          digest: 'Implemented NewFromEnvOrGenerate in api/internal/fieldcrypto/fieldcrypto.go per the task doc''s design: shared fromHexKey helper, narrow FieldKeyQuerier interface, fromPersistedOrGenerated implementing fetch-or-generate-and-persist with correct pgx.ErrNoRows race-loss handling. Re-exported through api/fieldcrypto facade. Wired moduleforge.module.yaml''s cipher service entry. Originally blocked by a pre-existing querier-fake conformance gap from task 001 (now fixed and merged separately); after rebasing onto the fix, all validation checks pass including module-wide make lint.'
           git:
             branch: plan/catalog-readiness-01-002
             commit:
