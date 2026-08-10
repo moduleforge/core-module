@@ -146,3 +146,49 @@ architectural_impact: true
 - After writing the migration file and confirming `make verify` accepts it.
 - After writing the query file and running `sqlc generate`, before moving on
   to validate the full `model/` build.
+
+## Status
+
+Implementation outcome: **succeeded**. Date: 2026-08-10.
+
+- Added `model/migrations/0017_field_crypto_keys.sql` (goose Up/Down,
+  `CREATE TABLE field_crypto_keys` with the `id = 1` CHECK and the
+  `octet_length(key_bytes) = 32` CHECK, matching the doc comment style of
+  `model/migrations/0015_apps.sql` / `0002_types.sql`).
+- Added `model/queries/field_crypto_keys.sql` (`GetFieldCryptoKey`,
+  `InsertFieldCryptoKeyIfAbsent`).
+- Ran `cd model && sqlc generate` (sqlc v1.31.1, matching the assumption
+  above); diff is exactly the new migration, the new query file, and the
+  sqlc-regenerated `model/db/field_crypto_keys.sql.go` (new file),
+  `model/db/models.go` (+`FieldCryptoKey` struct), and
+  `model/db/querier.go` (+2 interface methods) — no other generated file
+  touched.
+- Validation:
+  - `cd model && make verify` — passed.
+  - `cd model && make lint` — passed (applies `0001`-`0017`+`0099` to an
+    ephemeral Postgres via Docker cleanly). `make lint`'s
+    `shadow-db-lint.sh` only runs `goose ... up`, not a down/up round
+    trip, so the Down-block reversal named in this task's Validation
+    section is not actually exercised by `make lint` as it exists today
+    (flagged below). I separately verified the Down block manually: `up-to
+    16` → `up-by-one` (applies `0017`) → `down` (reverses `0017`) against
+    a throwaway container — reversal is clean.
+  - `git diff --stat` (staged) shows exactly the 5 expected files (2 new
+    source files, 3 sqlc-regenerated files) — no hand-edits elsewhere.
+  - `grep -n "field_crypto_keys" model/db/querier.go` — **produces no
+    match** (exit 1) because sqlc emits PascalCase Go identifiers
+    (`GetFieldCryptoKey`, `InsertFieldCryptoKeyIfAbsent`), never the
+    literal snake_case table name, for every table in this file (true of
+    every existing entry too, e.g. `legal_entities` → `GetLegalEntityByEntityID`).
+    A case-adjusted check (`grep -n -i "FieldCryptoKey"
+    model/db/querier.go`) confirms both methods are present in the
+    `Querier` interface, satisfying the check's evident intent. Flagged
+    for the manager below since the literal command in this task's
+    Validation section cannot pass as written.
+  - `cd api && go build ./...` — passed (local `replace` on `core-model`
+    picks up the regenerated `model/db/` package immediately).
+- Assumptions from `## Assumptions` held: sqlc v1.31.1 regeneration was
+  deterministic with no manual reconciliation needed; table named
+  `field_crypto_keys` (plural) per convention.
+- No follow-up work needed for `002-implement-auto-generate-cipher.md`
+  beyond what it already anticipates in this task's `## Purpose and scope`.
