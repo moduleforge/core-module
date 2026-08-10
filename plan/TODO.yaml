@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: durable-field-key
       title: Durable Field-Encryption Key Bootstrap
+      diff_base: 09b823826dfa06782d93a7f4bf458cf5b2c06055
       tasks:
         - number: 1
           slug: add-field-crypto-keys-table
