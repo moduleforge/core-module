@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: implement-auto-generate-cipher
+          title: Implement Auto-Generate Cipher
+          path: phase-01-durable-field-key/002-implement-auto-generate-cipher.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
