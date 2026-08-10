@@ -13,6 +13,7 @@ phases:
           path: phase-01-durable-field-key/001-add-field-crypto-keys-table.md
           done: false
           tier: sonnet-med
+          digest: Added the field_crypto_keys migration and its sqlc query pair, then regenerated model/db/ via sqlc generate exactly as specified. All Validation checks pass except the literal grep pattern (sqlc emits PascalCase, not snake_case — verified via case-insensitive grep instead). make verify, make lint, and go build all pass. Also hand-verified the goose Down block reverses cleanly.
           git:
             branch: plan/catalog-readiness-01-001
             commit:
