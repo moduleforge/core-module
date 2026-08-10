@@ -58,6 +58,9 @@ func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntit
 func (s *stubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
 	return coredb.GetEntityByUUIDRow{}, nil
 }
+func (s *stubQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
+	return nil, nil
+}
 func (s *stubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
@@ -75,6 +78,9 @@ func (s *stubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb.Type, e
 }
 func (s *stubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.InsertAppRow, error) {
 	return coredb.InsertAppRow{}, nil
+}
+func (s *stubQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, _ []byte) ([]byte, error) {
+	return nil, nil
 }
 func (s *stubQuerier) ListApps(_ context.Context) ([]coredb.ListAppsRow, error) {
 	return nil, nil
