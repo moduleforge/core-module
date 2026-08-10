@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: durable-field-key
       title: Durable Field-Encryption Key Bootstrap
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-field-crypto-keys-table
+          title: Add Field Crypto Keys Table
+          path: phase-01-durable-field-key/001-add-field-crypto-keys-table.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
