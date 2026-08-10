@@ -18,7 +18,7 @@ phases:
             branch: plan/catalog-readiness-01-001
             commit:
                 - b1f2ece
-            merge: null
+            merge: 044a9edd39dfcf4b84ddb80116e278bfc07bd5d3
         - number: 2
           slug: implement-auto-generate-cipher
           title: Implement Auto-Generate Cipher
