@@ -30,7 +30,7 @@ phases:
             branch: plan/catalog-readiness-01-002
             commit:
                 - 33f4e87
-            merge: null
+            merge: 59c9372b028306291ad2a4b82b8a72030a7373e4
         - number: 3
           slug: test-race-and-corruption-paths
           title: Test Race And Corruption Paths
