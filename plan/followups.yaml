@@ -159,3 +159,13 @@ items:
         - plan/phase:phase-01-durable-field-key
         - plan/slug:catalog-readiness
       text: '[Surfaced by phase-01 escalated security review lens, suggestion severity, low confidence] api/internal/fieldcrypto/fieldcrypto.go''s fromPersistedOrGenerated never explicitly zeroes the randomly generated candidate key or persisted-key byte slices after they''re consumed by NewFromKey — they remain reachable in memory until GC''s normal schedule rather than being scrubbed immediately after use. Optional hardening only: consider zeroing candidate (and persisted-key slices) via a defer after consumption by NewFromKey. Go''s GC/escape-analysis semantics mean this is best-effort, not a guarantee — reviewer explicitly scored this a suggestion, not a blocking finding.'
+    - title: The docs/mf-standards submodule's architectur
+      id: UncB
+      date: "2026-08-10"
+      tags:
+        - type:ambiguity
+        - plan/phase:doc-updates
+        - plan/slug:catalog-readiness
+        - priority:unspecified
+        - effort:unspecified
+      text: The docs/mf-standards submodule's architecture.md/manifest-spec.md likely need an equivalent update for the new convention, per plan/overview.md's own Deferred and flagged section — requires a separate dispatch against that repository; out of this task's scope.
