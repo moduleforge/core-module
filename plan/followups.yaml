@@ -109,3 +109,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: Task doc's Validation grep pattern (snake_case) never matches sqlc's PascalCase output — pre-existing task-doc-template inaccuracy, not an implementation defect, worth correcting in future templates.
+    - title: 'make lint / shadow-db-lint.sh only exercises '
+      id: GzQ5
+      date: "2026-08-10"
+      tags:
+        - type:ambiguity
+        - plan/phase:durable-field-key
+        - plan/slug:catalog-readiness
+        - priority:unspecified
+        - effort:unspecified
+      text: make lint / shadow-db-lint.sh only exercises goose up, never down, for any migration — task doc assumed it also validates Down; verified manually instead. Possible follow-up if down-migration regressions should be caught in CI.
