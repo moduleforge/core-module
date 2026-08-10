@@ -15,7 +15,8 @@ phases:
           tier: sonnet-med
           git:
             branch: plan/catalog-readiness-01-001
-            commit: []
+            commit:
+                - b1f2ece
             merge: null
         - number: 2
           slug: implement-auto-generate-cipher
