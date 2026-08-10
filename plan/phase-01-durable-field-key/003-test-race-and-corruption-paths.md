@@ -183,3 +183,60 @@ No standard skill covers this; follow the [`## Procedure`](#procedure) below.
 3. Run the Validation commands; fix and re-run until green (or cleanly
    skipped, for the integration tier, if prerequisites are unavailable).
 4. Commit both new test files together as this task's change.
+
+## Status
+
+**Outcome:** succeeded. Date: 2026-08-10.
+
+- `api/internal/fieldcrypto/generate_test.go` — new file, 7 unit tests (one
+  table-driven with 2 subtests) against a hand-written `fakeFieldKeyQuerier`
+  (2 methods), covering every branch in Requirement 1: env-wins/DB-untouched,
+  env-invalid/DB-untouched, absent+generate+persist, absent+lost-race
+  (asserted via decrypt-with-a-`NewFromKey(winnerKey)`-built reference
+  Cipher, proving the returned Cipher used the winner's key and not its own
+  candidate), corrupt persisted-key length (16 and 40 bytes, table-driven),
+  absent-check read error (wraps via `errors.Is`), and insert-error-for-other-
+  reason (asserts no re-fetch). Per the Procedure's step 1, I manually
+  broke and restored (via a scratch backup, diffed identical afterward) two
+  of the fail-loudly guards in `fieldcrypto.go` — the env-var short-circuit
+  and the no-second-`Get`-on-genuine-insert-failure invariant — and confirmed
+  the corresponding tests actually fail without them, before leaving the
+  source unmodified.
+- `api/internal/fieldcrypto/generate_integration_test.go` — new file
+  (`//go:build integration`), following `grant_table_integration_test.go`'s
+  `TestMain`/prerequisite-check/host-resolution/shadow-DB-reset pattern
+  against a dedicated `core_field_key_verify_dev` shadow DB. Three tests:
+  real fetch-then-refetch round trip, a real 8-goroutine concurrent race
+  against `coredb.New(pool)` (asserting exactly one persisted row and that
+  every goroutine's Cipher decrypts correctly against a reference Cipher
+  built from that row's actual `key_bytes`), and a raw-SQL proof that the
+  `octet_length(key_bytes) = 32` CHECK genuinely rejects a 16-byte key
+  (asserted via the Postgres `23514` check_violation SQLSTATE, not just a
+  generic error).
+- All validation commands passed, including a full real run of the
+  integration suite (not just the skip path) — see Assumptions note below on
+  the one environment-specific wrinkle encountered getting there.
+
+### Assumption/environment note for the manager
+
+This sandbox's `localhost:5432` is occupied by a native (non-Docker)
+Postgres process that owns the loopback-specific bind, which shadows the
+`users-module-postgres` container's published port for both `127.0.0.1` and
+`::1` — so `CORE_DEV_PG_HOST=localhost` (and the code's own `localhost`-first
+`resolvePostgresHost` preference) resolves to the wrong server here and
+fails with "role \"users\" does not exist" during the shadow-DB reset. This
+is a pre-existing, environment-specific condition: the **already-landed**
+`api/authz/setup/grant_table_integration_test.go` precedent fails
+identically in this same sandbox for the identical reason, confirming it is
+not something this task's new code introduced. Worked around for validation
+purposes only (no source change) by pointing `CORE_DEV_PG_HOST` at the host
+machine's LAN IP instead of `localhost`, which reaches the container's
+actual published port; all three new integration tests then passed cleanly,
+repeatedly, and under `-race`. Separately confirmed the skip-not-fail
+contract itself (Validation's last integration bullet) by re-running with
+`docker` removed from `PATH`: exits 0 as "ok", not a failure. No code change
+made for either point — recorded here per this task's own Assumptions
+about environment variability, and flagged for the manager as a
+sandbox/CI-environment characteristic (native Postgres on `:5432`) that a
+future integration-test run in a differently-shaped environment (e.g. CI)
+may or may not encounter.
