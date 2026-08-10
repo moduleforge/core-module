@@ -52,7 +52,7 @@ phases:
           slug: update-architecture-docs
           title: Update Architecture Docs
           path: phase-02-doc-updates/001-update-architecture-docs.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Updated AGENTS.md's fieldcrypto/ row and model/migrations row to document the new field_crypto_keys table (migration 0017) and fieldcrypto.NewFromEnvOrGenerate auto-generate-and-persist capability, verified against real Phase 1 source rather than plan intent alone. Confirmed no in-repo doc has stale boot-failure claims. docs/mf-standards submodule untouched. All validation checks passed; committed at 187b68e.
           git:
