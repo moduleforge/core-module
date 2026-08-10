@@ -26,3 +26,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: test-race-and-corruption-paths
+          title: Test Race And Corruption Paths
+          path: phase-01-durable-field-key/003-test-race-and-corruption-paths.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
