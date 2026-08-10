@@ -129,3 +129,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: Five test-fake Querier implementations (service/mock_test.go mockQuerier, display/registry_test.go stubQuerier, entity/resolver_test.go resolverStubQuerier, types/types_test.go stubQuerier, httpapi/apps_test.go appsFakeQuerier) are missing GetFieldCryptoKey/InsertFieldCryptoKeyIfAbsent, breaking go vet ./... (hence make lint) across the whole api module. This predates this task (task 001 added the two methods to db.Querier without updating these fakes) and blocks this task's make lint validation bullet. Recommend a small follow-up task adding the two trivial stub methods to each of the five fakes.
+    - title: 'Sandbox-only note: a native non-Docker Postgr'
+      id: iuHr
+      date: "2026-08-10"
+      tags:
+        - type:ambiguity
+        - plan/phase:durable-field-key
+        - plan/slug:catalog-readiness
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
