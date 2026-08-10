@@ -222,3 +222,63 @@ architectural_impact: true
   `internal/fieldcrypto` test suite still passes.
 - After Requirement 2 (façade re-export) compiles.
 - After Requirement 3 (manifest update), before running full Validation.
+
+## Status
+
+Implementation outcome: **validation failed** (blocked on an out-of-scope,
+pre-existing defect — see below). Date: 2026-08-10.
+
+- Implemented all three Requirements exactly as specified:
+  - `api/internal/fieldcrypto/fieldcrypto.go` — factored `NewFromEnv`'s
+    decode/validate logic into `fromHexKey`; added the `FieldKeyQuerier`
+    interface, `NewFromEnvOrGenerate`, and `fromPersistedOrGenerated`
+    verbatim per the task doc's code blocks; updated the package doc
+    comment's "Key management" discussion to describe the new
+    auto-generate-and-persist path.
+  - `api/fieldcrypto/fieldcrypto.go` — added the `FieldKeyQuerier` alias and
+    `NewFromEnvOrGenerate` wrapper.
+  - `moduleforge.module.yaml` — updated the `cipher` service entry's
+    `constructor` to `fieldcrypto.NewFromEnvOrGenerate` with
+    `args: [context, queries:coredb]`, matching `typeResolver`'s pattern,
+    plus the doc comment naming migration `0017` (confirmed present at
+    `model/migrations/0017_field_crypto_keys.sql`).
+- Validation:
+  - `cd api && go build ./...` — **passed**.
+  - `cd api && make lint` (go vet + gofmt) — **failed**, but not because of
+    anything this task changed. `gofmt -l .` is clean. `go vet ./...`
+    fails in five unrelated packages (`service`, `display`, `entity`,
+    `types`, `httpapi`) whose test-only fake `Querier` implementations
+    (`mockQuerier`, `stubQuerier`, `resolverStubQuerier`, `appsFakeQuerier`)
+    don't implement the two methods
+    (`GetFieldCryptoKey`/`InsertFieldCryptoKeyIfAbsent`) that task
+    `001-add-field-crypto-keys-table.md` added to `db.Querier`. **Verified
+    pre-existing**: `git stash`-ing every edit this task made and re-running
+    `make lint` reproduces the identical failure list, confirming task 001
+    left this gap and this task's diff neither causes nor worsens it.
+    Scoped checks confirm this task's own code is clean:
+    `go vet ./internal/fieldcrypto/... ./fieldcrypto/...` passes with no
+    output.
+  - `cd api && go test ./internal/fieldcrypto/... ./fieldcrypto/...` —
+    **passed** (`ok  .../internal/fieldcrypto`; `fieldcrypto` façade package
+    has no test files, as before). Every pre-existing subtest of
+    `TestNewFromEnv_Errors` still passes unmodified.
+  - `grep -n "NewFromEnvOrGenerate" api/fieldcrypto/fieldcrypto.go
+    api/internal/fieldcrypto/fieldcrypto.go moduleforge.module.yaml` —
+    **passed**; the symbol appears in all three files.
+  - Manual read-through — **confirmed**: both `NewFromEnv` and
+    `NewFromEnvOrGenerate`'s env-var branch call `fromHexKey`; no
+    duplicated decode/validate logic.
+- Assumptions from `## Assumptions` held as stated; no deviation.
+- **Flagged for the manager**: five test-fake `Querier` implementations
+  across `service/mock_test.go`, `display/registry_test.go`,
+  `entity/resolver_test.go`, `types/types_test.go`, and `httpapi/apps_test.go`
+  are missing `GetFieldCryptoKey`/`InsertFieldCryptoKeyIfAbsent`, breaking
+  `cd api && go vet ./...` (and therefore `make lint`) module-wide. This
+  predates this task (confirmed via `git stash`) and is outside this task's
+  Requirements — fixing it means editing five files across five unrelated
+  packages, past both the same-diff and single-file drift carve-outs this
+  procedure allows a task agent to self-fix. Recommend a small follow-up
+  task (chained to or amending
+  [`001-add-field-crypto-keys-table.md`](./001-add-field-crypto-keys-table.md))
+  that adds the two stub methods (mirroring the existing method style in
+  each fake) to all five fakes.
