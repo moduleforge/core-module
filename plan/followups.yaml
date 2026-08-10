@@ -99,3 +99,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: --mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. The obvious extensions are a second role (--mf-max-content-width-narrow) or a container-narrow utility emitted alongside container by gui/style-dictionary/build-tokens.mjs. gui/tokens/CONTRACT.md records this as an accepted open limitation; this item is the tracked follow-up for closing it. Deliberately not designed here — the right shape depends on what downstream adoption actually needs.
+    - title: Task doc's Validation grep pattern (snake_cas
+      id: NF5p
+      date: "2026-08-10"
+      tags:
+        - type:ambiguity
+        - plan/phase:durable-field-key
+        - plan/slug:catalog-readiness
+        - priority:unspecified
+        - effort:unspecified
+      text: Task doc's Validation grep pattern (snake_case) never matches sqlc's PascalCase output — pre-existing task-doc-template inaccuracy, not an implementation defect, worth correcting in future templates.
