@@ -56,5 +56,6 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/catalog-readiness-02-001
-            commit: []
+            commit:
+                - 187b68e
             merge: null
