@@ -37,6 +37,7 @@ phases:
           path: phase-01-durable-field-key/003-test-race-and-corruption-paths.md
           done: false
           tier: sonnet-high
+          digest: 'Added generate_test.go (unit, fake-Querier-based, full branch coverage) and generate_integration_test.go (real Postgres: fetch/persist round trip, 8-goroutine concurrent race proving the DB-level uniqueness constraint, and a raw-SQL proof the octet_length=32 CHECK rejects a corrupt key). All unit and integration validation passed including a real non-skipped integration run.'
           git:
             branch: plan/catalog-readiness-01-003
             commit:
