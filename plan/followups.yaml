@@ -139,3 +139,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
+    - title: Task 001 grep validation unsatisfiable
+      id: nXOo
+      date: "2026-08-10"
+      tags:
+        - type:bug
+        - priority:unspecified
+        - effort:unspecified
+        - plan/phase:phase-01-durable-field-key
+        - plan/slug:catalog-readiness
+      text: '[Surfaced by phase-01 correctness review lens] plan/phase-01-durable-field-key/001-add-field-crypto-keys-table.md''s Validation section names a literal `grep -n "field_crypto_keys" model/db/querier.go` check that can never pass — sqlc emits PascalCase Go identifiers (GetFieldCryptoKey/InsertFieldCryptoKeyIfAbsent), never the literal snake_case table name, for any table in this file. Already self-diagnosed and worked around by the task-001 implementer (case-insensitive grep substituted, documented in that task doc''s own Status section) — not a defect in the shipped code. Worth correcting the Validation wording itself (e.g. to `grep -n -i "FieldCryptoKey" model/db/querier.go`) for future accuracy if this task-doc pattern is reused.'
