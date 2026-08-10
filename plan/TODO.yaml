@@ -27,7 +27,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/catalog-readiness-01-002
-            commit: []
+            commit:
+                - 33f4e87
             merge: null
         - number: 3
           slug: test-race-and-corruption-paths
