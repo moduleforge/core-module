@@ -102,13 +102,3 @@ items:
         - plan/phase:phase-01-durable-field-key
         - plan/slug:catalog-readiness
       text: '[Surfaced by phase-01 escalated security review lens, suggestion severity, low confidence] api/internal/fieldcrypto/fieldcrypto.go''s fromPersistedOrGenerated never explicitly zeroes the randomly generated candidate key or persisted-key byte slices after they''re consumed by NewFromKey — they remain reachable in memory until GC''s normal schedule rather than being scrubbed immediately after use. Optional hardening only: consider zeroing candidate (and persisted-key slices) via a defer after consumption by NewFromKey. Go''s GC/escape-analysis semantics mean this is best-effort, not a guarantee — reviewer explicitly scored this a suggestion, not a blocking finding.'
-    - title: The docs/mf-standards submodule's architectur
-      id: UncB
-      date: "2026-08-10"
-      tags:
-        - type:ambiguity
-        - plan/phase:doc-updates
-        - plan/slug:catalog-readiness
-        - priority:unspecified
-        - effort:unspecified
-      text: 'The docs-mf-standards submodule''s architecture.md/manifest-spec.md doc update this item asked for has already been authored upstream: docs-mf-standards commit 865719a ("docs: document the secret-durability-bootstrap convention (mod-core/mod-users)") adds architecture/secret-durability-design.md and updates architecture.md and manifest-spec.md exactly as requested. Remaining work is narrower than originally scoped: bump mod-core''s docs/mf-standards submodule pointer (currently pinned to e96646d) to pick up 865719a. Blocked, not merely mechanical: the submodule''s configured remote is git@github.com:moduleforge/docs-mf-standards.git, whose actual GitHub main tip is cd4bca4 (verified via git ls-remote) — commit 865719a and its descendants exist only in the local playground checkout at /Users/zane/playground/moduleforge/docs-mf-standards (local main at 0f7c683) and were never pushed to GitHub. Bumping the submodule for real (i.e. in a way that resolves for anyone else cloning mod-core) requires first pushing docs-mf-standards''s local main to GitHub — an external side effect requiring explicit authorization, not something to do unilaterally. Needs a decision: push docs-mf-standards to GitHub, or treat the local-only history as canonical some other way.'
