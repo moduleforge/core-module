@@ -38,6 +38,12 @@ type Entity struct {
 	OwnerID           pgtype.Int8        `json:"owner_id"`
 }
 
+type FieldCryptoKey struct {
+	ID        int16              `json:"id"`
+	KeyBytes  []byte             `json:"key_bytes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type LegalEntity struct {
 	EntityID int64 `json:"entity_id"`
 }

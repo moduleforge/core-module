@@ -8,6 +8,18 @@
 // (e.g. re-encrypt on read when the active key differs from the key that
 // produced the stored blob).
 //
+// CORE_FIELD_KEY_HEX, when set, always wins: NewFromEnv and
+// NewFromEnvOrGenerate both read it via the same fromHexKey helper, so
+// behavior is identical whichever constructor a caller uses. When the env
+// var is unset, NewFromEnvOrGenerate falls back to a durably persisted key,
+// fetching one if it already exists or generating and persisting one on
+// first boot. Concurrent first-boot callers converge on the same key via a
+// DB-level uniqueness constraint (ON CONFLICT DO NOTHING), not a
+// read-then-write race. A persisted key that fails validation (wrong
+// length) is a fail-loudly error, never silently regenerated — regenerating
+// over an existing key would make data already encrypted under the old key
+// unrecoverable.
+//
 // # Authenticated additional data
 //
 // No AAD is bound to ciphertext at this time. This means a ciphertext blob
@@ -16,6 +28,7 @@
 package fieldcrypto
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -23,6 +36,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -46,11 +61,83 @@ func NewFromEnv() (*Cipher, error) {
 	if !ok {
 		return nil, fmt.Errorf("fieldcrypto: env var %s is not set", envKeyName)
 	}
+	return fromHexKey(hexKey)
+}
+
+// fromHexKey decodes hexKey and builds a Cipher from it. Shared by NewFromEnv
+// and NewFromEnvOrGenerate's env-var branch so both run the identical
+// decode-and-validate code path.
+func fromHexKey(hexKey string) (*Cipher, error) {
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
 		return nil, fmt.Errorf("fieldcrypto: %s is not valid hex: %w", envKeyName, err)
 	}
 	return NewFromKey(key)
+}
+
+// FieldKeyQuerier is the minimal persistence contract
+// NewFromEnvOrGenerate needs. Satisfied structurally by *coredb.Queries
+// (github.com/moduleforge/core-model/db) — the same object every other
+// mod-core service constructs via coredb.New(pool) — so this package
+// does not need to import core-model/db at all; callers (and the
+// moduleforge.module.yaml queries:coredb arg-source) pass it directly.
+type FieldKeyQuerier interface {
+	GetFieldCryptoKey(ctx context.Context) ([]byte, error)
+	InsertFieldCryptoKeyIfAbsent(ctx context.Context, keyBytes []byte) ([]byte, error)
+}
+
+// NewFromEnvOrGenerate reads CORE_FIELD_KEY_HEX if set — identical
+// behavior to NewFromEnv in every respect, including on invalid values.
+// Only when the env var is entirely unset does it fall back to q: fetch
+// the persisted key if one exists, or generate and durably persist a new
+// one. Concurrent first-boot callers are safe: the persistence layer
+// guarantees (via a DB-level uniqueness constraint, not a read-then-write
+// race) that every caller converges on the same key. A persisted key
+// that fails validation (wrong length) is a fail-loudly error, never
+// silently regenerated — regenerating over an existing key would make
+// data already encrypted under the old key unrecoverable.
+func NewFromEnvOrGenerate(ctx context.Context, q FieldKeyQuerier) (*Cipher, error) {
+	if hexKey, ok := os.LookupEnv(envKeyName); ok {
+		return fromHexKey(hexKey)
+	}
+	return fromPersistedOrGenerated(ctx, q)
+}
+
+// fromPersistedOrGenerated fetches the persisted field-crypto key, or
+// generates and persists a new one if none exists yet.
+func fromPersistedOrGenerated(ctx context.Context, q FieldKeyQuerier) (*Cipher, error) {
+	key, err := q.GetFieldCryptoKey(ctx)
+	switch {
+	case err == nil:
+		// NewFromKey fails loudly (wrong length) rather than regenerating.
+		return NewFromKey(key)
+	case errors.Is(err, pgx.ErrNoRows):
+		// fall through to generate-and-persist
+	default:
+		return nil, fmt.Errorf("fieldcrypto: read persisted key: %w", err)
+	}
+
+	candidate := make([]byte, keySize)
+	if _, rerr := rand.Read(candidate); rerr != nil {
+		return nil, fmt.Errorf("fieldcrypto: generate key: %w", rerr)
+	}
+
+	inserted, err := q.InsertFieldCryptoKeyIfAbsent(ctx, candidate)
+	switch {
+	case err == nil:
+		// We won the race; the DB echoes back exactly what we inserted.
+		return NewFromKey(inserted)
+	case errors.Is(err, pgx.ErrNoRows):
+		// ON CONFLICT DO NOTHING skipped our row: another caller won the
+		// race between our SELECT and our INSERT. Adopt their key.
+		winner, rerr := q.GetFieldCryptoKey(ctx)
+		if rerr != nil {
+			return nil, fmt.Errorf("fieldcrypto: re-fetch key after lost race: %w", rerr)
+		}
+		return NewFromKey(winner)
+	default:
+		return nil, fmt.Errorf("fieldcrypto: persist generated key: %w", err)
+	}
 }
 
 // NewFromKey builds a Cipher from a raw 32-byte key. Useful in tests.

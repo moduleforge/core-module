@@ -38,12 +38,19 @@ provides:
       constructor: entity.NewResolver
       args: []
 
-    # cipher loads the AES-256-GCM field encryption key from CORE_FIELD_KEY_HEX.
+    # cipher loads the AES-256-GCM field encryption key from
+    # CORE_FIELD_KEY_HEX, or — when unset — fetches-or-generates a durable
+    # key from the field_crypto_keys table (added in migration 0017; see
+    # api/internal/fieldcrypto.NewFromEnvOrGenerate). CORE_FIELD_KEY_HEX set
+    # explicitly always wins, identical to the prior NewFromEnv-only
+    # behavior.
     - name: cipher
       type: "*fieldcrypto.Cipher"
-      constructor: fieldcrypto.NewFromEnv
+      constructor: fieldcrypto.NewFromEnvOrGenerate
       returnsError: true
-      args: []
+      args:
+        - context
+        - queries:coredb
 
     # coreServices is the aggregate of all entity service implementations.
     - name: coreServices

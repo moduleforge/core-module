@@ -243,6 +243,9 @@ func (q *appsFakeQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (
 func (q *appsFakeQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
 	return coredb.GetEntityByIDRow{}, nil
 }
+func (q *appsFakeQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
+	return nil, nil
+}
 
 // GetEntityByUUID backs entity.Resolver.Resolve, which AppsHandler now calls
 // (via loadAppByUUIDParam) to authorize against the bare entity id before
@@ -278,6 +281,9 @@ func (q *appsFakeQuerier) GetServiceAccountByEntityID(_ context.Context, _ int64
 }
 func (q *appsFakeQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Type, error) {
 	return coredb.Type{}, nil
+}
+func (q *appsFakeQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, _ []byte) ([]byte, error) {
+	return nil, nil
 }
 func (q *appsFakeQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) { return nil, nil }
 func (q *appsFakeQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error  { return nil }

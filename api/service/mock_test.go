@@ -389,6 +389,10 @@ func (m *mockQuerier) GetEntityByID(_ context.Context, id int64) (coredb.GetEnti
 	return coredb.GetEntityByIDRow{}, pgx.ErrNoRows
 }
 
+func (m *mockQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
+	return nil, pgx.ErrNoRows
+}
+
 func (m *mockQuerier) GetLegalEntityByEntityID(_ context.Context, entityID int64) (int64, error) {
 	if id, ok := m.legalEntities[entityID]; ok {
 		return id, nil
@@ -441,6 +445,10 @@ func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (
 		UpdatedAt: now,
 	}
 	return coredb.InsertAppRow{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
+}
+
+func (m *mockQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, keyBytes []byte) ([]byte, error) {
+	return keyBytes, nil
 }
 
 func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {

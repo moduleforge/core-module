@@ -23,6 +23,7 @@ type Querier interface {
 	GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error)
 	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
+	GetFieldCryptoKey(ctx context.Context) ([]byte, error)
 	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error)
 	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (GetNaturalPersonByEntityIDRow, error)
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
@@ -34,6 +35,7 @@ type Querier interface {
 	// (corporation, natural_person, service_account) already follows. Only the
 	// apps-table-specific operations are defined here.
 	InsertApp(ctx context.Context, arg InsertAppParams) (InsertAppRow, error)
+	InsertFieldCryptoKeyIfAbsent(ctx context.Context, keyBytes []byte) ([]byte, error)
 	ListAllTypes(ctx context.Context) ([]Type, error)
 	ListApps(ctx context.Context) ([]ListAppsRow, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error

@@ -58,6 +58,9 @@ func (s *resolverStubQuerier) GetCorporationByEntityID(_ context.Context, _ int6
 func (s *resolverStubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
 	return coredb.GetEntityByIDRow{}, nil
 }
+func (s *resolverStubQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
+	return nil, nil
+}
 func (s *resolverStubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
@@ -75,6 +78,9 @@ func (s *resolverStubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb
 }
 func (s *resolverStubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.InsertAppRow, error) {
 	return coredb.InsertAppRow{}, nil
+}
+func (s *resolverStubQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, _ []byte) ([]byte, error) {
+	return nil, nil
 }
 func (s *resolverStubQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
 	return nil, nil
