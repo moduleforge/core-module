@@ -159,13 +159,3 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: The docs/mf-standards submodule's architecture.md/manifest-spec.md likely need an equivalent update for the new convention, per plan/overview.md's own Deferred and flagged section — requires a separate dispatch against that repository; out of this task's scope.
-    - title: Manifest key-swap needs owner sign-off
-      id: DYb4
-      date: "2026-08-10"
-      tags:
-        - type:ambiguity
-        - priority:unspecified
-        - effort:unspecified
-        - plan/phase:durable-field-key
-        - plan/slug:catalog-readiness
-      text: catalog-readiness Phase 1 changed moduleforge.module.yaml's cipher service constructor unconditionally (fieldcrypto.NewFromEnv -> fieldcrypto.NewFromEnvOrGenerate), so every ModuleForge app composing mod-core picks up auto-generate-and-persist by default the next time it regenerates its composition root against an updated mod-core version pin -- not just app-mftodo. CORE_FIELD_KEY_HEX set explicitly still always wins (identical behavior to today), but an app that previously relied on the hard-fail as a "did the operator forget to set this" safety net will instead boot with a silently auto-generated key once it updates its pin. Worth the module owner's (or the user's) explicit sign-off, since no manifest-level per-app opt-out/opt-in mechanism exists today short of continuing to set the env var.
