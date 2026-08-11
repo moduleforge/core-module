@@ -10,3 +10,7 @@ phases:
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
       tasks: []
+    - number: 3
+      slug: rotate-on-read
+      title: Re-Encrypt-On-Read Call Sites
+      tasks: []
