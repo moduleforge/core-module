@@ -64,8 +64,8 @@
  * path. Style Dictionary's token flattener stops descending as soon as it finds `$value` on an
  * object, so the four typography sub-tokens are silently dropped with no warning or error. This
  * is a latent naming collision between the color-role tier and the typography-scale tier in the
- * task-001 token sources (both legitimately use the name "text-body" for their own concern) —
- * flagged to the manager in the task-002 report, not fixed by editing the token sources here.
+ * token sources (both legitimately use the name "text-body" for their own concern). This is a
+ * known, unresolved naming hazard in the token sources themselves — not fixed by anything here.
  * Keeping the color/radius tier and the typography tier in separate Style Dictionary instances
  * (only combined afterwards, as plain JS arrays, once each side's references are already
  * resolved) avoids the collision entirely without touching the committed token sources.
