@@ -238,9 +238,12 @@ why `app-mftodo/gui/src/styles.css` hand-mirrors mod-core's entire `@theme inlin
 comment warning that it must be re-copied whenever mod-core's drifts.
 
 An `@utility container` block has the same problem, only worse: it is not merely a mapping a consumer
-can re-copy, it is a utility definition that only exists if the consumer's own Tailwind pass sees it,
-and `dist/index.css` will not contain a compiled `.container` rule at all (mod-core's own source
-never uses the class, so Tailwind purges it).
+can re-copy, it is a utility definition that only exists if the consumer's own Tailwind pass sees it.
+`dist/index.css` contains `.container` rules (12, up from a baseline of 6) from Tailwind's candidate
+extractor picking up the bare identifier `container` in test destructuring (`const { container } = render(...)`)
+rather than from any real usage of the `.container` class in mod-core's own source. However, `dist/index.css`
+still carries zero `@utility` at-rules, so a downstream consumer cannot use this published bundle to
+define the `container` utility in their own Tailwind pass.
 
 **Therefore the new tokens are not reachable downstream unless mod-core also publishes its
 Tailwind-*source* token CSS as a consumable export.** The fix is small — have `gui`'s build copy
