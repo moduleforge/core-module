@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: WriteActionRequired hot-path unconfirmed
-      id: b2nA
-      date: "2026-07-19"
-      tags:
-        - type:optimization
-        - priority:unspecified
-        - effort:unspecified
-        - plan/phase:action-required-and-conflict
-      text: 'Phase-1 efficiency review (apiresp-action-required plan): isAppRelativePath''s net/url.Parse call allocates more than strictly necessary for a scheme/host-only check. Not a regression (all-new code), and no caller of WriteActionRequired exists anywhere in mod-core yet, so real per-request call frequency is undetermined. Worth a quick look once a consuming module (e.g. mod-users Wave-1) wires in real call sites -- if genuinely hot, consider a lighter string-based check instead of full url.Parse.'
     - title: fieldcrypto lacks key-rotation support
       id: iQt1
       date: "2026-08-03"
