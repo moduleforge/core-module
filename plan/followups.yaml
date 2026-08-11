@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: 'Task worktree''s node_modules was not present '
-      id: 0xGl
-      date: "2026-07-18"
-      tags:
-        - type:bug
-        - priority:unspecified
-        - effort:unspecified
-        - plan/phase:gui-test-infrastructure
-      text: '[phase-01-gui-test-infrastructure/002-add-initial-component-and-lib-tests.md] Task worktree''s node_modules was not present at task start even though gui/bun.lock already contained the required devDependencies from task 001 (dependencies_installed was reported as ''none'' since only the repo root lacks a lockfile — create-worktree.sh''s dependency-install detection apparently only checks root-level lockfiles, not nested gui/bun.lock). The task agent ran `bun install` inside gui/ to materialize node_modules (no lockfile/manifest changes resulted) rather than halting. Worth a process note for future plan executions in monorepo-style layouts with a nested-only lockfile: prepare-task-worktree''s dependency detection doesn''t descend into subdirectories, so every task worktree touching gui/ will need its own `bun install` step.'
     - title: WriteActionRequired hot-path unconfirmed
       id: b2nA
       date: "2026-07-19"
