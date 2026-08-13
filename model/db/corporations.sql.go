@@ -111,3 +111,28 @@ func (q *Queries) UpdateCorporation(ctx context.Context, arg UpdateCorporationPa
 	)
 	return err
 }
+
+const updateCorporationEINBlob = `-- name: UpdateCorporationEINBlob :execrows
+UPDATE corporations
+SET ein = $1
+WHERE entity_id = $2 AND ein = $3
+`
+
+type UpdateCorporationEINBlobParams struct {
+	NewEin   []byte `json:"new_ein"`
+	EntityID int64  `json:"entity_id"`
+	OldEin   []byte `json:"old_ein"`
+}
+
+// Re-encrypt-on-read write-back: replaces the stored ein blob with a
+// freshly re-encrypted one. The old-ein predicate is a compare-and-swap
+// guard, not a lookup condition: it ensures the write only lands if the
+// stored blob is still the one that was read, so a concurrent writer's
+// change is never clobbered.
+func (q *Queries) UpdateCorporationEINBlob(ctx context.Context, arg UpdateCorporationEINBlobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateCorporationEINBlob, arg.NewEin, arg.EntityID, arg.OldEin)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

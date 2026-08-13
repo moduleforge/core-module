@@ -389,10 +389,6 @@ func (m *mockQuerier) GetEntityByID(_ context.Context, id int64) (coredb.GetEnti
 	return coredb.GetEntityByIDRow{}, pgx.ErrNoRows
 }
 
-func (m *mockQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
-	return nil, pgx.ErrNoRows
-}
-
 func (m *mockQuerier) GetLegalEntityByEntityID(_ context.Context, entityID int64) (int64, error) {
 	if id, ok := m.legalEntities[entityID]; ok {
 		return id, nil
@@ -447,8 +443,12 @@ func (m *mockQuerier) InsertApp(_ context.Context, arg coredb.InsertAppParams) (
 	return coredb.InsertAppRow{ID: arg.ID, Slug: arg.Slug, Name: arg.Name}, nil
 }
 
-func (m *mockQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, keyBytes []byte) ([]byte, error) {
-	return keyBytes, nil
+func (m *mockQuerier) InsertActiveFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
+}
+
+func (m *mockQuerier) InsertInitialFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
 }
 
 func (m *mockQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) {
@@ -471,6 +471,26 @@ func (m *mockQuerier) ListApps(_ context.Context) ([]coredb.ListAppsRow, error) 
 		})
 	}
 	return out, nil
+}
+
+func (m *mockQuerier) ListFieldCryptoKeyMetadata(_ context.Context) ([]coredb.ListFieldCryptoKeyMetadataRow, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.FieldCryptoKey, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
+	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
+}
+
+func (m *mockQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
+	return 0, nil
+}
+
+func (m *mockQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
+	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil
 }
 
 func (m *mockQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error {
@@ -499,6 +519,10 @@ func (m *mockQuerier) UpdateCorporation(_ context.Context, arg coredb.UpdateCorp
 	return nil
 }
 
+func (m *mockQuerier) UpdateCorporationEINBlob(_ context.Context, _ coredb.UpdateCorporationEINBlobParams) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockQuerier) UpdateNaturalPerson(_ context.Context, arg coredb.UpdateNaturalPersonParams) error {
 	if m.updateNaturalPersonErr != nil {
 		return m.updateNaturalPersonErr
@@ -513,6 +537,10 @@ func (m *mockQuerier) UpdateNaturalPerson(_ context.Context, arg coredb.UpdateNa
 		m.naturalPersons[arg.EntityID] = np
 	}
 	return nil
+}
+
+func (m *mockQuerier) UpdateNaturalPersonSSNBlob(_ context.Context, _ coredb.UpdateNaturalPersonSSNBlobParams) (int64, error) {
+	return 0, nil
 }
 
 // seedNaturalPerson inserts a fully formed entity → legal_entity → natural_person

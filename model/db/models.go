@@ -39,9 +39,13 @@ type Entity struct {
 }
 
 type FieldCryptoKey struct {
-	ID        int16              `json:"id"`
-	KeyBytes  []byte             `json:"key_bytes"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Version          int32              `json:"version"`
+	KeyBytes         []byte             `json:"key_bytes"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	RetiredAt        *time.Time         `json:"retired_at"`
+	DecryptableUntil *time.Time         `json:"decryptable_until"`
+	CompromisedAt    *time.Time         `json:"compromised_at"`
 }
 
 type LegalEntity struct {
