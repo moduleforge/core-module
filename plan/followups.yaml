@@ -84,3 +84,13 @@ items:
         - plan/phase:phase-01-durable-field-key
         - plan/slug:catalog-readiness
       text: '[Surfaced by phase-01 escalated security review lens, suggestion severity, low confidence] api/internal/fieldcrypto/fieldcrypto.go''s fromPersistedOrGenerated never explicitly zeroes the randomly generated candidate key or persisted-key byte slices after they''re consumed by NewFromKey — they remain reachable in memory until GC''s normal schedule rather than being scrubbed immediately after use. Optional hardening only: consider zeroing candidate (and persisted-key slices) via a defer after consumption by NewFromKey. Go''s GC/escape-analysis semantics mean this is best-effort, not a guarantee — reviewer explicitly scored this a suggestion, not a blocking finding.'
+    - title: Task 002's coredb adapter must return freshly
+      id: MEqf
+      date: "2026-08-13"
+      tags:
+        - type:ambiguity
+        - plan/phase:versioned-cipher
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: Task 002's coredb adapter must return freshly allocated KeyBytes it does not retain — the Cipher now zeroes key material a KeyStore hands it once AEADs are built (followup MnvB). A store that caches/reuses a returned slice would hand back zeros on its next call. Documented on the KeyStore interface, covered by TestKeyMaterialZeroedAfterLoad, backstopped by all-zero-key rejection — but 002's implementer needs to know explicitly.
