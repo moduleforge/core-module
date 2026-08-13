@@ -15,7 +15,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/fieldcrypto-key-rotation-01-001
-            commit: []
+            commit:
+                - 080f065
             merge: null
         - number: 2
           slug: add-blob-rotation-write-back-queries
