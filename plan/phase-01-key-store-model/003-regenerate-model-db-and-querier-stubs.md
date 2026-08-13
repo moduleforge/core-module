@@ -61,7 +61,11 @@ being merged first. No standard skill covers this work.
 - `cd api && make lint` passes (`go vet ./...` plus the `gofmt` check).
 - `git status` shows `model/db/` changes staged and committed — the generated code is not left
   untracked or reverted.
-- `grep -rn "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" api/ model/db/` returns nothing.
+- `grep -rn "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" model/db/` returns nothing, and
+  `grep -rln "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" api/ | grep -v internal/fieldcrypto`
+  returns nothing — scoped to exclude `api/internal/fieldcrypto`, which declares its own, separate
+  `FieldKeyQuerier` interface using the same method names and is deliberately left alone per
+  Requirement 6 (Phase 2 replaces it).
 - `grep -rn "ListFieldCryptoKeyMetadata" model/db/` shows a generated row type carrying no
   `KeyBytes` field.
 - `grep -rln "coredb.Querier = " api/` still returns six files, each of which compiles.
