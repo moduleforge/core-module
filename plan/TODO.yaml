@@ -63,7 +63,17 @@ phases:
     - number: 3
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
-      tasks: []
+      tasks:
+        - number: 1
+          slug: rotating-cipher-helper
+          title: Rotating Cipher Write-Back Helper
+          path: phase-03-rotate-on-read/001-rotating-cipher-helper.md
+          done: false
+          tier: opus-med
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 4
       slug: admin-rotation-api
       title: Admin Key-Rotation API
