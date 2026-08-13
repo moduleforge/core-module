@@ -18,7 +18,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-01-001
             commit:
                 - 080f065
-            merge: null
+            merge: fc97d19
         - number: 2
           slug: add-blob-rotation-write-back-queries
           title: Add Blob Rotation Write-Back Queries
