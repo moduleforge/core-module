@@ -54,6 +54,7 @@ phases:
           path: phase-02-versioned-cipher/001-multi-key-cipher-core.md
           done: false
           tier: opus-high
+          digest: 'Rewrote api/internal/fieldcrypto as a reloadable multi-key cipher: immutable keySet behind atomic.Pointer, mutex-collapsed reload, version(4)||nonce(12)||ciphertext||tag(16) blob format with version bound as AAD. Encrypt/Decrypt/DecryptWithRotation/Reload take ctx; BlobVersion is package-level. NewFromKey (store-less) and NewFromEnvOrGenerate (guarded bootstrap, lost-race adoption, CORE_FIELD_KEY_HEX first-boot seed, fail-loudly on later mismatch) replace NewFromEnv, which is gone from both packages. Inline security review (review_focus) found the diff a net security improvement (AAD binding, key zeroing, boundary validation, reload rate limit); two hardening gaps fixed in-diff (all-zero key rejection), three suggestion-level findings recorded, none blocking. cd api && make build/test/lint, go test -race, go vet -tags integration, and a real-Postgres integration run (6/6 tests) all pass.'
           git:
             branch: plan/fieldcrypto-key-rotation-02-001
             commit:
