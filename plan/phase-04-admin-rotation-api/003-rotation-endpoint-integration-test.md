@@ -1,0 +1,77 @@
+# Rotation Endpoint Concurrency Integration Test
+
+## Purpose and scope
+
+Prove against a real Postgres database that the rotation endpoint's concurrency claim holds: two
+simultaneous rotations produce one 201 and one 409, and the table never holds two active keys. The
+whole safety argument for skipping `pg_advisory_xact_lock` rests on the partial unique index and the
+row-lock re-evaluation behavior actually behaving as designed, which only a real database can
+demonstrate.
+
+Files this task owns:
+
+- A new build-tagged integration test under `api/httpapi/` (e.g.
+  `api/httpapi/field_crypto_keys_integration_test.go`).
+
+Depends on [`001-field-crypto-key-handler.md`](./001-field-crypto-key-handler.md). No standard skill
+covers this work.
+
+## Requirements
+
+1. **Follow the existing integration-test convention** — an `integration` build tag and a real
+   database reached through the standard `DATABASE_URL` — matching
+   `api/authz/setup/grant_table_integration_test.go` and
+   `api/internal/fieldcrypto/generate_integration_test.go` rather than inventing a new harness.
+2. **The headline case: two simultaneous rotations.** Fire two rotation requests concurrently against
+   the same handler and database and assert:
+   - exactly one returns 201 and exactly one returns 409 — never two 201s, never two 409s, never a
+     500;
+   - after both complete, `SELECT count(*) FROM field_crypto_keys WHERE retired_at IS NULL` is
+     exactly 1;
+   - the version count increased by exactly one (the loser's `INSERT` never ran).
+3. **Cover the sequential happy path too**, as the baseline the concurrency case is contrasted
+   against: a single rotation returns 201, retires the previously-active version with the expected
+   `decryptable_until`, and creates a new active version.
+4. **Cover the unique-`key_bytes` rejection.** Rotate with an explicit `key_hex` equal to a key
+   already on file and assert a 409 rather than a 500 — this is the guard that stops an operator
+   re-introducing a key previously retired as compromised.
+5. **Cover the compromised rotation's effect on the row**, end to end: `compromised: true` stamps
+   `compromised_at` on the retired row and leaves `decryptable_until` NULL, and the same request
+   carrying `grace_period_days` is rejected with 400 before any transaction runs.
+6. **Leave the database clean and the test idempotent.** Key rows accumulate and the one-active-key
+   invariant makes a careless second run fail confusingly; delete or roll back everything the test
+   creates so a repeat run passes.
+7. **Do not weaken the default test path.** With the build tag absent, `cd api && make test` must
+   behave exactly as before — no new required environment variable and no skipped-test noise.
+
+## Validation
+
+- `cd api && make test` passes unchanged (the new file is excluded by its build tag).
+- `cd api && go vet -tags integration ./httpapi/...` compiles the new test.
+- `cd api && go test -tags integration ./httpapi/...` passes against a real database. If no database
+  is available in the execution environment, say so explicitly in the task report rather than
+  reporting a pass — a compiled-but-never-run integration test does not satisfy this task.
+- The concurrency case is genuinely concurrent (goroutines released together, not run in sequence);
+  a reviewer should be able to see the synchronization in the test body.
+- Running the integration suite twice in a row against the same database passes both times.
+- `cd api && make lint` passes.
+- `git diff --stat` shows exactly one new file.
+
+## Assumptions
+
+- Task 001 has landed and the handler is constructible in-process against a real pool, in the style
+  the existing httpapi tests already use for their fakes — substituting a real `txhelper.DB` and a
+  real `coredb.Querier` for the fakes.
+- An `authz.Authorizer` test double that grants wildcard `manage` is available or trivially written;
+  this test is about concurrency and persistence, not about the authorization gate, which task 001's
+  unit tests already cover.
+
+## References
+
+- [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#phase-task-requirements) —
+  Phase 3 requirement 7, the concurrency claim named explicitly as a test requirement.
+- [`../notes/key-store-schema-design.md`](../notes/key-store-schema-design.md#rotation-transaction) —
+  why two concurrent rotations resolve safely without extra locking, and why the failure mode is "one
+  wins, the other errors and is retried" rather than two active keys.
+- [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#routes) — the status mapping the
+  409 and 400 assertions are checking.
