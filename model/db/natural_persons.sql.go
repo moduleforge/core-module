@@ -111,3 +111,28 @@ func (q *Queries) UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPers
 	)
 	return err
 }
+
+const updateNaturalPersonSSNBlob = `-- name: UpdateNaturalPersonSSNBlob :execrows
+UPDATE natural_persons
+SET ssn = $1
+WHERE entity_id = $2 AND ssn = $3
+`
+
+type UpdateNaturalPersonSSNBlobParams struct {
+	NewSsn   []byte `json:"new_ssn"`
+	EntityID int64  `json:"entity_id"`
+	OldSsn   []byte `json:"old_ssn"`
+}
+
+// Re-encrypt-on-read write-back: replaces the stored ssn blob with a
+// freshly re-encrypted one. The old-ssn predicate is a compare-and-swap
+// guard, not a lookup condition: it ensures the write only lands if the
+// stored blob is still the one that was read, so a concurrent writer's
+// change is never clobbered.
+func (q *Queries) UpdateNaturalPersonSSNBlob(ctx context.Context, arg UpdateNaturalPersonSSNBlobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateNaturalPersonSSNBlob, arg.NewSsn, arg.EntityID, arg.OldSsn)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
