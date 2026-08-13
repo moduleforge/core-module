@@ -23,7 +23,7 @@ Planning is **complete**. All four open decisions are settled and recorded in `p
 design is specified to the level of concrete DDL, SQL, Go signatures, route tables, and status
 mappings, and the task documents consume that design rather than re-deriving it.
 
-Five phases are registered with ten tasks between them. No phase has begun. Phase 1 begins first and
+Five phases are registered with twelve tasks between them. No phase has begun. Phase 1 begins first and
 has no pre-conditions beyond a working `sqlc` (v1.28.0, pinned in `model/Makefile`) and Docker for
 `cd model && make lint`'s ephemeral shadow Postgres. Phases 3 and 4 each carry an integration task
 that needs a real Postgres reachable through `DATABASE_URL`.
