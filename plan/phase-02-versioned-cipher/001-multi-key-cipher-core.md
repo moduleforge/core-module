@@ -176,3 +176,55 @@ architectural_impact: true
 - After the constructors and bootstrap race handling are complete and `generate_test.go` passes.
 - After the package doc rewrite.
 - After the façade placeholder and the mechanical `ctx` threading make `cd api && make build` pass.
+
+## Status
+
+**succeeded** — 2026-08-13.
+
+### Validation
+
+| Check | Result |
+| --- | --- |
+| `cd api && make build` | passed |
+| `cd api && make test` | passed (all 12 packages) |
+| `cd api && make lint` | passed (`go vet ./...`, `gofmt -l .` empty) |
+| `cd api && go test -race ./internal/fieldcrypto/...` | passed, including the concurrent-across-`Reload` exercise |
+| `cd api && go vet -tags integration ./internal/fieldcrypto/...` | passed |
+| Integration suite against a real database | **passed** — `CORE_DEV_PG_HOST=<lan-ip> go test -tags=integration -p 1 ./internal/fieldcrypto/...` against the shared `users-module-postgres` container, migrations applied from scratch by `goose` |
+| `grep -rn "func NewFromEnv(" api/` | no matches |
+| `grep -rn "core-model/db\|coredb" api/internal/fieldcrypto/` | no matches |
+| `grep -n "out of scope" api/internal/fieldcrypto/fieldcrypto.go` | no matches |
+| Blob ≥ 32 bytes, prefix decodes to the active version | asserted by `TestEncryptBlobLayout` |
+| `moduleforge.module.yaml` unchanged | confirmed — not in the diff |
+
+### Affected source files
+
+- `api/internal/fieldcrypto/fieldcrypto.go` — rewritten: package doc, wire format, `KeyRecord`,
+  `KeyStore`, `keyEntry`, `keySet`, `Cipher`, `Rotation`, `Encrypt`/`Decrypt`/`DecryptWithRotation`/
+  `Reload`/`BlobVersion`, reload and staleness machinery, key-set boundary validation.
+- `api/internal/fieldcrypto/generate.go` — new: `NewFromKey`, `NewFromEnvOrGenerate`, bootstrap and
+  lost-race handling, `CORE_FIELD_KEY_HEX` seed decoding and the first-boot-only precedence check.
+- `api/internal/fieldcrypto/fieldcrypto_test.go`, `generate_test.go`,
+  `generate_integration_test.go` — reworked.
+- `api/internal/fieldcrypto/export_test.go` — new, test-only: overrides the reload TTL and rate-limit
+  interval so the staleness paths are exercised without production-sized waits.
+- `api/fieldcrypto/fieldcrypto.go` — minimal placeholder for task 002: `NewFromEnv` deleted, the
+  `FieldKeyQuerier` alias dropped, `KeyRecord`/`KeyStore` aliases added, `NewFromEnvOrGenerate` now a
+  `KeyStore` pass-through.
+- `api/service/{profile,corporation,natural_person,legal_entity}.go` and
+  `api/service/{corporation_test,tax_id_test,mock_test}.go` — mechanical `ctx` threading only.
+
+### Notes for the manager
+
+- **Followup `MnvB` (zero key byte slices) was implemented.** Key material is wiped once the AEADs
+  are built: the store's `KeyRecord.KeyBytes`, the generated bootstrap candidate, and the decoded
+  `CORE_FIELD_KEY_HEX` bytes. `keyEntry` retains no key bytes at all. The ownership rule this
+  depends on is documented on `KeyStore` and covered by `TestKeyMaterialZeroedAfterLoad`; **task 002's
+  `coredb` adapter must return freshly allocated slices it does not retain.**
+- The integration test's `KeyStore` is hand-written over raw pgx SQL rather than over `coredb`,
+  because the `grep -rn "core-model/db\|coredb" api/internal/fieldcrypto/` acceptance check covers
+  test files too. It carries the same filter and the same two insert guards as
+  `ListUsableFieldCryptoKeys` / `InsertInitialFieldCryptoKey`.
+- Two security hardening checks were added beyond the stated requirements, both rejecting an
+  all-zero AES key (from the key store and from `CORE_FIELD_KEY_HEX`). This changed
+  `api/service/mock_test.go`'s `testCipher`, which built its cipher from `make([]byte, 32)`.

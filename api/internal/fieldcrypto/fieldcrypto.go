@@ -77,6 +77,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -85,6 +86,9 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// zeroKey is the all-zero comparison target newKeyEntry rejects against.
+var zeroKey [keySize]byte
 
 const (
 	// envKeyName is the first-boot bootstrap seed variable.
@@ -492,6 +496,16 @@ func buildKeySet(records []KeyRecord, loadedAt time.Time) (*keySet, error) {
 func newKeyEntry(rec KeyRecord) (*keyEntry, error) {
 	if len(rec.KeyBytes) != keySize {
 		return nil, fmt.Errorf("fieldcrypto: key version %d must be %d bytes, got %d", rec.Version, keySize, len(rec.KeyBytes))
+	}
+	// An all-zero key is never generated material (probability 2^-256); it is
+	// what a zeroed or half-scanned buffer looks like — including a KeyStore
+	// that violated the ownership rule above by handing back a slice this
+	// package had already wiped. Without this guard that mistake would be
+	// silent, and the process would go on encrypting under a key the key table
+	// has never held. Constant-time because the comparison touches secret
+	// material, even though the value compared against is public.
+	if subtle.ConstantTimeCompare(rec.KeyBytes, zeroKey[:]) == 1 {
+		return nil, fmt.Errorf("fieldcrypto: key version %d is all zero bytes, which is corrupt rather than key material", rec.Version)
 	}
 	block, err := aes.NewCipher(rec.KeyBytes)
 	if err != nil {

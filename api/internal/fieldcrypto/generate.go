@@ -147,11 +147,20 @@ func envSeedKey() ([]byte, error) {
 	}
 	key, err := hex.DecodeString(hexKey)
 	if err != nil {
+		// A failed decode still returns the prefix it managed to decode.
+		zeroBytes(key)
 		return nil, fmt.Errorf("fieldcrypto: %s is not valid hex: %w", envKeyName, err)
 	}
 	if len(key) != keySize {
 		zeroBytes(key)
 		return nil, fmt.Errorf("fieldcrypto: %s must decode to %d bytes, got %d", envKeyName, keySize, len(key))
+	}
+	// Rejected here, before the value can reach the bootstrap insert: an
+	// all-zero key would otherwise be persisted as version 1 and only then be
+	// refused by newKeyEntry, leaving a permanently unusable row behind.
+	if subtle.ConstantTimeCompare(key, zeroKey[:]) == 1 {
+		zeroBytes(key)
+		return nil, fmt.Errorf("fieldcrypto: %s is all zero bytes, which is not usable key material", envKeyName)
 	}
 	return key, nil
 }

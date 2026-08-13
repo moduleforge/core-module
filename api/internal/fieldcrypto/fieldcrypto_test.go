@@ -690,6 +690,9 @@ func TestStorelessCipherNeverRotates(t *testing.T) {
 	if _, err := fieldcrypto.NewFromKey(make([]byte, 31)); err == nil {
 		t.Error("NewFromKey accepted a 31-byte key")
 	}
+	if _, err := fieldcrypto.NewFromKey(make([]byte, 32)); err == nil {
+		t.Error("NewFromKey accepted an all-zero key, which is corrupt material rather than a key")
+	}
 }
 
 // ---------------------------------------------------------------------------

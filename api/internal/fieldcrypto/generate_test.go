@@ -449,6 +449,7 @@ func TestNewFromEnvOrGenerate_EnvUnusable(t *testing.T) {
 		{name: "31 bytes", value: "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"},
 		{name: "empty", value: ""},
 		{name: "odd length", value: validHexKey + "0"},
+		{name: "all zero bytes", value: strings.Repeat("0", 64)},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -507,6 +508,15 @@ func TestNewFromEnvOrGenerate_RejectsMalformedKeySet(t *testing.T) {
 			name:    "key material of the wrong length",
 			records: []fieldcrypto.KeyRecord{corrupt},
 			wantIn:  "32 bytes",
+		},
+		{
+			// What a wiped or half-scanned buffer looks like — including a
+			// store that handed back a slice the Cipher had already zeroed.
+			// Silently adopting it would mean encrypting under a key the key
+			// table has never held.
+			name:    "all-zero key material",
+			records: []fieldcrypto.KeyRecord{{Version: 1, KeyBytes: make([]byte, 32)}},
+			wantIn:  "all zero bytes",
 		},
 	}
 	for _, tc := range tests {

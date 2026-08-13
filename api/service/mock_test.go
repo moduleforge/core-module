@@ -18,10 +18,16 @@ import (
 )
 
 // testCipher returns a deterministic Cipher suitable for unit tests.
-// Uses a 32-byte zero key — never use in production.
+// Uses a fixed 32-byte key — never use in production. The key is not all
+// zeroes: fieldcrypto rejects an all-zero key as corrupt material rather than
+// a key, since that is what a wiped or half-scanned buffer looks like.
 func testCipher(t *testing.T) *fieldcrypto.Cipher {
 	t.Helper()
-	c, err := fieldcrypto.NewFromKey(make([]byte, 32))
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
+	}
+	c, err := fieldcrypto.NewFromKey(key)
 	if err != nil {
 		t.Fatalf("testCipher: %v", err)
 	}
