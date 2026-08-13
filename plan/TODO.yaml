@@ -14,3 +14,7 @@ phases:
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
       tasks: []
+    - number: 4
+      slug: admin-rotation-api
+      title: Admin Key-Rotation API
+      tasks: []
