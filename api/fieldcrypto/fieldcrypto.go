@@ -1,7 +1,8 @@
-// Package fieldcrypto re-exports the internal AES-256-GCM cipher for use by
-// callers outside core-api (e.g. the users-module main package). The
-// implementation lives in internal/fieldcrypto to keep the cipher internals
-// package-private; this façade exports only what callers need.
+// Package fieldcrypto re-exports the internal versioned AES-256-GCM field
+// cipher for use by callers outside core-api (e.g. the users-module main
+// package). The implementation lives in internal/fieldcrypto to keep the
+// cipher internals package-private; this façade exports only what callers
+// need.
 package fieldcrypto
 
 import (
@@ -13,23 +14,20 @@ import (
 // Cipher is the exported type alias for fieldcrypto.Cipher.
 type Cipher = fieldcrypto.Cipher
 
-// FieldKeyQuerier is the exported type alias for fieldcrypto.FieldKeyQuerier.
-type FieldKeyQuerier = fieldcrypto.FieldKeyQuerier
+// KeyRecord is the exported type alias for fieldcrypto.KeyRecord.
+type KeyRecord = fieldcrypto.KeyRecord
 
-// NewFromEnv reads CORE_FIELD_KEY_HEX and constructs a Cipher.
-// Returns an error if the env var is missing, not valid hex, or not 32 bytes.
-func NewFromEnv() (*Cipher, error) {
-	return fieldcrypto.NewFromEnv()
-}
+// KeyStore is the exported type alias for fieldcrypto.KeyStore.
+type KeyStore = fieldcrypto.KeyStore
 
-// NewFromKey constructs a Cipher from a raw 32-byte key. Useful in tests.
+// NewFromKey constructs a store-less Cipher from a raw 32-byte key. Useful in
+// tests.
 func NewFromKey(key []byte) (*Cipher, error) {
 	return fieldcrypto.NewFromKey(key)
 }
 
-// NewFromEnvOrGenerate reads CORE_FIELD_KEY_HEX if set — identical behavior
-// to NewFromEnv. When unset, it fetches the durably persisted field-crypto
-// key via q, or generates and persists a new one on first boot.
-func NewFromEnvOrGenerate(ctx context.Context, q FieldKeyQuerier) (*Cipher, error) {
-	return fieldcrypto.NewFromEnvOrGenerate(ctx, q)
+// NewFromEnvOrGenerate constructs the process's Cipher from the key store,
+// bootstrapping the first key when the key table is empty.
+func NewFromEnvOrGenerate(ctx context.Context, store KeyStore) (*Cipher, error) {
+	return fieldcrypto.NewFromEnvOrGenerate(ctx, store)
 }
