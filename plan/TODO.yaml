@@ -50,6 +50,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: facade-key-store-adapter
+          title: Facade Key Store Adapter
+          path: phase-02-versioned-cipher/002-facade-key-store-adapter.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 3
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
