@@ -37,6 +37,7 @@ phases:
           path: phase-01-key-store-model/003-regenerate-model-db-and-querier-stubs.md
           done: false
           tier: sonnet-med
+          digest: Regenerated model/db/ via sqlc generate (v1.31.1) against the schema/queries merged from tasks 001/002; the generated FieldCryptoKey struct and per-query row/reuse shapes match the design exactly, including the corrected three-full-row-query requirement. Updated all six api/-side coredb.Querier test-stub implementations to drop the two deleted key methods and add the nine new ones as no-op stubs. model/db/, api build, api test, and api lint all pass. api/internal/fieldcrypto left alone per Requirement 6; still builds under default tags but now fails under -tags integration as predicted, recorded as expected breakage for Phase 2 to repair.
           git:
             branch: plan/fieldcrypto-key-rotation-01-003
             commit:
