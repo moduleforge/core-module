@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: key-store-model
       title: Multi-Key Storage Model Layer
+      diff_base: 2c2b6a2aa411cd73b4d1b76e55be9eb67144167c
       tasks:
         - number: 1
           slug: replace-field-crypto-keys-schema
