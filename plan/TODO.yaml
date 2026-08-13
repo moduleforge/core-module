@@ -13,6 +13,7 @@ phases:
           path: phase-01-key-store-model/001-replace-field-crypto-keys-schema.md
           done: false
           tier: sonnet-high
+          digest: 'Replaced mod-core''s single-row field_crypto_keys table with the versioned, multi-key design specified in plan/notes/key-store-schema-design.md: version GENERATED ALWAYS AS IDENTITY primary key, key_bytes with length CHECK and UNIQUE constraint, retired_at/decryptable_until/compromised_at lifecycle columns, two named CHECK constraints, the field_crypto_keys_one_active partial unique index, and an updated_at trigger — reproduced verbatim from the design note, in place in 0017 with no 0018. Rewrote model/queries/field_crypto_keys.sql with the seven specified queries. Updated blob-format comments in 0010/0011 to version||nonce||ciphertext||tag. Both make verify and make lint pass; manual Postgres sanity run confirmed the one-active invariant, rotation transaction ordering, and retired-only-flags CHECK. Two task-doc/design-note internal inconsistencies surfaced rather than silently resolved (see flagged_for_manager).'
           git:
             branch: plan/fieldcrypto-key-rotation-01-001
             commit:
