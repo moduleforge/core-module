@@ -26,6 +26,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: regenerate-model-db-and-querier-stubs
+          title: Regenerate Model DB And Update Querier Stubs
+          path: phase-01-key-store-model/003-regenerate-model-db-and-querier-stubs.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
