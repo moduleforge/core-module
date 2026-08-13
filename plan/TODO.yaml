@@ -5,7 +5,17 @@ phases:
     - number: 1
       slug: key-store-model
       title: Multi-Key Storage Model Layer
-      tasks: []
+      tasks:
+        - number: 1
+          slug: replace-field-crypto-keys-schema
+          title: Replace Field Crypto Keys Schema And Queries
+          path: phase-01-key-store-model/001-replace-field-crypto-keys-schema.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
