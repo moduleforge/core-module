@@ -26,11 +26,14 @@ being merged first. No standard skill covers this work.
    `RetiredAt`/`DecryptableUntil`/`CompromisedAt` as `*time.Time` (the nullable-`timestamptz`
    override in `model/sqlc.yaml`). Report any deviation rather than working around it — Phase 2's
    adapter and Phase 4's handler are both written against this shape.
-3. **Confirm the five key-material-bearing queries reuse `FieldCryptoKey`** rather than emitting
-   per-query `...Row` structs, and that `ListFieldCryptoKeyMetadata` emits its own distinct row type
-   with **no** `KeyBytes` field. If sqlc emitted a `...Row` type for a query that should have reused
-   the model struct, fix the query's column list in `model/queries/field_crypto_keys.sql` and
-   regenerate.
+3. **Confirm the three full-row queries — `ListUsableFieldCryptoKeys`, `InsertInitialFieldCryptoKey`,
+   and `InsertActiveFieldCryptoKey` — reuse `FieldCryptoKey`** rather than emitting per-query `...Row`
+   structs (`RetireActiveFieldCryptoKey`, `MarkFieldCryptoKeyCompromised`, and
+   `SetFieldCryptoKeyDecryptableUntil` correctly emit narrow `...Row` types, since they use narrow
+   `RETURNING` clauses — that is expected, not a defect), and that `ListFieldCryptoKeyMetadata` emits
+   its own distinct row type with **no** `KeyBytes` field. If sqlc emitted a `...Row` type for one of
+   the three full-row queries instead of reusing the model struct, fix the query's column list in
+   `model/queries/field_crypto_keys.sql` and regenerate.
 4. **Update every in-repo `coredb.Querier` implementation.** There are **six**, not the four the
    design notes estimated — find them fresh with
    `grep -rn "coredb.Querier = " api/` rather than trusting any list:
