@@ -46,6 +46,7 @@ phases:
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
+      diff_base: d9a6106c8994c39b3a716a5e10a677908134d392
       tasks:
         - number: 1
           slug: multi-key-cipher-core
