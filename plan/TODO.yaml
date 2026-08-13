@@ -39,7 +39,17 @@ phases:
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
-      tasks: []
+      tasks:
+        - number: 1
+          slug: multi-key-cipher-core
+          title: Multi-Key Versioned Cipher Core
+          path: phase-02-versioned-cipher/001-multi-key-cipher-core.md
+          done: false
+          tier: opus-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 3
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
