@@ -118,3 +118,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: rotation-endpoint-integration-test
+          title: Rotation Endpoint Concurrency Integration Test
+          path: phase-04-admin-rotation-api/003-rotation-endpoint-integration-test.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
