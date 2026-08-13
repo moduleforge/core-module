@@ -61,4 +61,29 @@ $$ LANGUAGE plpgsql;
 -- +goose StatementEnd
 ```
 
-Migrations are forward-only; no `-- +goose Down` sections are provided.
+Most migrations are forward-only, but a `-- +goose Down` section is provided where a clean rollback
+is safe and cheap (e.g. dropping a table or trigger the same migration created).
+
+## Resetting after an in-place migration edit
+
+goose stores no per-migration checksum, so it detects a migration file's identity purely by version
+number and filename — editing an already-applied migration's *body* in place (rather than adding a
+new migration) is invisible to `goose status`: a database that already applied the old version of the
+file will report "no pending migrations" and silently keep running against the old schema shape.
+
+When a migration is edited in place (as `0017_field_crypto_keys.sql` was, replacing the single-row
+`field_crypto_keys` table with the versioned multi-key design), any developer or CI database that
+already applied the prior `0017` must be reset before picking up the new shape. Two options:
+
+```sh
+cd model
+# Down section is 'DROP TABLE IF EXISTS field_crypto_keys' in both the old
+# and new file, so rolling back past 17 with the edited file already in
+# place is correct.
+goose -dir migrations postgres "$DATABASE_URL" down-to 16
+goose -dir migrations postgres "$DATABASE_URL" up
+```
+
+or recreate the database wholesale — the more likely choice here, since the encrypted-blob wire
+format change (`nonce || ciphertext || tag` → `version || nonce || ciphertext || tag`) requires
+regenerating existing data anyway.
