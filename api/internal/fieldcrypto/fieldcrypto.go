@@ -120,9 +120,9 @@ const (
 )
 
 // KeyRecord is fieldcrypto's own view of one field_crypto_keys row. It
-// deliberately names no coredb type: keeping this package model-free is what
-// lets the api/fieldcrypto façade absorb that dependency and keeps the module
-// manifest's cipher service block unchanged.
+// deliberately names no generated sqlc row type: keeping this package
+// model-free is what lets the api/fieldcrypto façade absorb that dependency
+// and keeps the module manifest's cipher service block unchanged.
 //
 // RetiredAt == nil identifies the single active key. DecryptableUntil bounds a
 // retired key's decrypt grace window (nil means no expiry) and CompromisedAt
