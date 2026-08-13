@@ -25,7 +25,8 @@ phases:
           tier: sonnet-med
           git:
             branch: plan/fieldcrypto-key-rotation-01-002
-            commit: []
+            commit:
+                - 856aa80
             merge: null
         - number: 3
           slug: regenerate-model-db-and-querier-stubs
