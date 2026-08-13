@@ -28,7 +28,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-01-002
             commit:
                 - 856aa80
-            merge: null
+            merge: 3e56a1b
         - number: 3
           slug: regenerate-model-db-and-querier-stubs
           title: Regenerate Model DB And Update Querier Stubs
