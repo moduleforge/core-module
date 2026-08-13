@@ -108,3 +108,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: manifest-and-openapi-routes
+          title: Manifest And OpenAPI Route Entries
+          path: phase-04-admin-rotation-api/002-manifest-and-openapi-routes.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
