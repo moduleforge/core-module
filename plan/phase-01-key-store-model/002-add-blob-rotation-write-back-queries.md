@@ -76,3 +76,19 @@ files, different tables — and the two may run concurrently. No standard skill 
   — obstacle 2, why the existing update queries cannot serve this purpose.
 - [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#cas-returning-zero-rows--resolving-schema-open-question-6)
   — how Phase 3 consumes the affected-row count.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-13
+- **Validation summary:** `cd model && make verify` (`goose validate` + `sqlc compile`) passed;
+  both new `-- name:` lines are present exactly once each; both new queries use `:execrows`; both
+  mention the old-blob column in their `WHERE` clause; `git diff --stat` shows exactly the two
+  intended files changed (10 insertions each, additive only); `UpdateNaturalPerson` and
+  `UpdateCorporation` are unchanged (confirmed via `git diff` on both files).
+- **Affected source files:**
+  - `model/queries/natural_persons.sql` — added `UpdateNaturalPersonSSNBlob :execrows`.
+  - `model/queries/corporations.sql` — added `UpdateCorporationEINBlob :execrows`.
+- **Assumptions relied on:** both from `## Assumptions` — `entity_id` is the natural key both read
+  paths already have in hand, and the encrypted column names (`natural_persons.ssn`,
+  `corporations.ein`) were confirmed against the existing query files rather than assumed.
