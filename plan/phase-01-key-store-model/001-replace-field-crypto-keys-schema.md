@@ -140,3 +140,60 @@ architectural_impact: true
 - After the `0017` rewrite passes `make lint`.
 - After the seven queries pass `make verify`.
 - After the `0010`/`0011` comment edits and the `model/README.md` note.
+
+## Status
+
+**Outcome:** succeeded (with two flagged, unresolved contradictions between `## Requirements` and
+`## Validation` / the referenced design note — see below). Date: 2026-08-13.
+
+**Validation summary:**
+
+- `cd model && make verify` — passed.
+- `cd model && make lint` — passed (all 18 migrations applied cleanly to an ephemeral shadow
+  Postgres).
+- `grep -n "id = 1" model/migrations/0017_field_crypto_keys.sql` — **matched** (line 19, inside the
+  required verbatim comment block: `-- replaces the id = 1 CHECK the previous single-row shape of
+  this table`). This is a direct conflict between Requirement 1 ("Reproduce that DDL and its comment
+  block as written") and this Validation line; the comment text quoting the old constraint is part of
+  the verbatim design-record prose the requirement explicitly asks to preserve. Resolved in favor of
+  Requirement 1 (verbatim reproduction) rather than editing the design-record comment to force the
+  grep to pass — flagged for the manager/planner to reconcile (either narrow the grep pattern, e.g.
+  to `CHECK (id = 1)`, or accept the prose match as expected).
+- `grep -rn "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" model/queries/` — passed (no matches).
+- `grep -c "^-- name:" model/queries/field_crypto_keys.sql` — passed (`7`).
+- `grep -n "key_bytes" model/queries/field_crypto_keys.sql` inside `ListFieldCryptoKeyMetadata` —
+  passed (no occurrence).
+- `git diff --stat` against the task's start commit — passed (exactly five files: the three
+  migrations, the query file, `model/README.md`; nothing under `model/db/` or `api/` touched).
+- Manual sanity check against a throwaway Postgres 16 container: a second `INSERT` while a row has
+  `retired_at IS NULL` raises `duplicate key value violates unique constraint
+  "field_crypto_keys_one_active"`; the retire-then-insert rotation transaction, `MarkCompromised`, and
+  the `field_crypto_keys_retired_only_flags` CHECK (rejecting `compromised_at` on the still-active row)
+  all behaved as designed.
+
+**Fallback (Requirement 3) not needed:** the sqlc actually installed in this environment is v1.31.1
+(the Makefile/AGENTS.md pin of v1.28.0 is not what's on `PATH` here), and it compiled
+`GENERATED ALWAYS AS IDENTITY` without issue, so the `SERIAL` + `CHECK (version > 0)` fallback was not
+used.
+
+**Second flagged inconsistency (non-blocking):** the design note's "Query-authoring notes for the
+implementer" says to give "the five key-material-bearing queries the full column list ... so sqlc
+reuses the `FieldCryptoKey` model struct." Only three queries (`ListUsableFieldCryptoKeys`,
+`InsertInitialFieldCryptoKey`, `InsertActiveFieldCryptoKey`) actually carry the full column list;
+`RetireActiveFieldCryptoKey`, `MarkFieldCryptoKeyCompromised`, and `SetFieldCryptoKeyDecryptableUntil`
+have their own explicit, narrow `RETURNING` clauses spelled out both in this task doc's Requirement 5
+and in the design note's own "sqlc query surface" table (`RETURNING version`, `RETURNING version,
+compromised_at`, `RETURNING version, decryptable_until`, respectively). The specific per-query specs
+were treated as authoritative over the general summary sentence, since they are unambiguous, match the
+structured table, and `sqlc compile` succeeds either way.
+
+**Affected source files:**
+
+- `model/migrations/0017_field_crypto_keys.sql`
+- `model/migrations/0010_natural_persons.sql`
+- `model/migrations/0011_corporations.sql`
+- `model/queries/field_crypto_keys.sql`
+- `model/README.md`
+
+**Assumptions applied:** the task's stated assumption that no deployed database is running the
+current `0017` was relied on as given (no data-migration or backfill path was built).
