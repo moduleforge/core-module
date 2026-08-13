@@ -56,7 +56,8 @@ phases:
           tier: opus-high
           git:
             branch: plan/fieldcrypto-key-rotation-02-001
-            commit: []
+            commit:
+                - 0e0d058
             merge: null
         - number: 2
           slug: facade-key-store-adapter
