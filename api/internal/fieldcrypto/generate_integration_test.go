@@ -2,24 +2,35 @@
 
 package fieldcrypto_test
 
-// generate_integration_test.go exercises NewFromEnvOrGenerate against a real,
-// ephemeral Postgres database, proving the properties only a real DB-level
-// uniqueness constraint can actually demonstrate: that concurrent first-boot
-// callers converge on exactly one persisted key via the ON CONFLICT DO
-// NOTHING race documented in fieldcrypto.go, and that the
-// octet_length(key_bytes) = 32 CHECK constraint from
-// model/migrations/0017_field_crypto_keys.sql genuinely rejects a corrupt
-// key at the schema level.
+// generate_integration_test.go exercises the multi-key cipher against a real,
+// ephemeral Postgres database carrying the replacement field_crypto_keys
+// schema (model/migrations/0017_field_crypto_keys.sql), proving the properties
+// only a real database can demonstrate:
+//
+//   - concurrent first-boot callers converge on exactly one persisted key, now
+//     arbitrated by the field_crypto_keys_one_active partial unique index
+//     rather than the id = 1 singleton it replaced;
+//   - a rotation performed by one process is picked up by another through
+//     Reload, with the retired key still decrypting its old blobs and the new
+//     active key taking over encryption;
+//   - a retired key past decryptable_until stops being loaded at all;
+//   - the octet_length(key_bytes) = 32 CHECK and the one-active unique index
+//     genuinely reject the rows the application must never write.
+//
+// The KeyStore below is hand-written over a raw pgx pool rather than built on
+// the generated sqlc model package. That is deliberate and load-bearing:
+// api/internal/fieldcrypto must stay free of any generated-model dependency,
+// tests included, which is what lets the api/fieldcrypto façade own that
+// import and keeps the module manifest's cipher service block unchanged. The
+// SQL carries the same filter and the same two guards as
+// model/queries/field_crypto_keys.sql's ListUsableFieldCryptoKeys and
+// InsertInitialFieldCryptoKey.
 //
 // Structural precedent: api/authz/setup/grant_table_integration_test.go
 // establishes the TestMain / prerequisite-check / host-resolution /
 // shadow-DB-reset pattern this file follows, including its own load-bearing
 // adaptations (own-migrations-directory resolution via runtime.Caller, and
 // "localhost"-first Postgres host resolution verified by a real TCP dial).
-// This file reuses that same reasoning without hand-copying it verbatim
-// beyond what's needed for its own distinct shadow DB
-// (core_field_key_verify_dev, distinct from core_grant_verify_dev on the
-// same shared users-module-postgres container).
 //
 // Run with:
 //
@@ -28,8 +39,8 @@ package fieldcrypto_test
 //	  go test -tags=integration -p 1 -v ./internal/fieldcrypto/...
 //
 // The -p 1 flag matches the authz/setup convention: TestMain drops and
-// recreates the shadow database, so concurrent runs against the same
-// Postgres host would conflict.
+// recreates the shadow database, so concurrent runs against the same Postgres
+// host would conflict.
 
 import (
 	"context"
@@ -50,7 +61,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
-	coredb "github.com/moduleforge/core-model/db"
 )
 
 // ---------------------------------------------------------------------------
@@ -115,8 +125,7 @@ func TestMain(m *testing.M) {
 }
 
 // checkIntegrationPrerequisites verifies that docker and goose are available
-// and the shared Postgres container is running. Matches the structural
-// precedent's prerequisite check.
+// and the shared Postgres container is running.
 func checkIntegrationPrerequisites() error {
 	cmd := exec.Command("docker", "inspect", "--format={{.State.Running}}", pgContainerName)
 	out, err := cmd.Output()
@@ -137,8 +146,7 @@ func checkIntegrationPrerequisites() error {
 // tries, in order, "localhost" (published-port forwarding), the container's
 // Docker-network IP (docker inspect), and finally the historical hard-coded
 // sandbox IP used by the structural precedent tests — verifying each
-// candidate with an actual TCP dial before returning it (see the file-level
-// doc comment).
+// candidate with an actual TCP dial before returning it.
 func resolvePostgresHost() string {
 	if h := os.Getenv("CORE_DEV_PG_HOST"); h != "" {
 		return h
@@ -206,87 +214,214 @@ func resetCoreFieldKeyVerifyDB(pgHost string) error {
 
 // migrationsDir resolves mod-core's own model/migrations directory relative
 // to this source file's location, so the test does not depend on a
-// hand-typed absolute path tied to one machine's checkout layout. This file
-// lives at <repo>/api/internal/fieldcrypto/generate_integration_test.go;
-// migrations live at <repo>/model/migrations.
+// hand-typed absolute path tied to one machine's checkout layout.
 func migrationsDir() string {
 	_, thisFile, _, _ := runtime.Caller(0)
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "model", "migrations")
 }
 
 // ---------------------------------------------------------------------------
+// A KeyStore over raw SQL
+// ---------------------------------------------------------------------------
+
+// pgQuerier is satisfied by both *pgxpool.Pool and pgx.Tx.
+type pgQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// pgKeyStore implements fieldcrypto.KeyStore over raw SQL — hand-written
+// rather than generated, for the reason the file-level comment gives.
+type pgKeyStore struct{ db pgQuerier }
+
+// listUsableSQL carries the same filter as ListUsableFieldCryptoKeys: the
+// active key plus every retired key still inside its grace window.
+const listUsableSQL = `
+SELECT version, key_bytes, retired_at, decryptable_until, compromised_at
+FROM field_crypto_keys
+WHERE retired_at IS NULL OR decryptable_until IS NULL OR decryptable_until > now()
+ORDER BY version`
+
+// insertInitialSQL carries the same two guards as
+// InsertInitialFieldCryptoKey. The WHERE NOT EXISTS covers a committed
+// non-empty table; the untargeted ON CONFLICT DO NOTHING covers the
+// concurrent first-boot race against the one-active partial unique index.
+// Either way, no rows back means someone else established the key material.
+const insertInitialSQL = `
+INSERT INTO field_crypto_keys (key_bytes)
+SELECT $1::BYTEA
+WHERE NOT EXISTS (SELECT 1 FROM field_crypto_keys)
+ON CONFLICT DO NOTHING
+RETURNING version, key_bytes, retired_at, decryptable_until, compromised_at`
+
+func (s pgKeyStore) LoadUsableKeys(ctx context.Context) ([]fieldcrypto.KeyRecord, error) {
+	rows, err := s.db.Query(ctx, listUsableSQL)
+	if err != nil {
+		return nil, fmt.Errorf("list usable field crypto keys: %w", err)
+	}
+	defer rows.Close()
+
+	var records []fieldcrypto.KeyRecord
+	for rows.Next() {
+		rec, err := scanKeyRecord(rows)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list usable field crypto keys: %w", err)
+	}
+	return records, nil
+}
+
+func (s pgKeyStore) InsertInitialKey(ctx context.Context, keyBytes []byte) (fieldcrypto.KeyRecord, error) {
+	// pgx surfaces a zero-row :one query as pgx.ErrNoRows, which is exactly
+	// the signal the cipher's lost-race branch keys on.
+	return scanKeyRecord(s.db.QueryRow(ctx, insertInitialSQL, keyBytes))
+}
+
+// rowScanner is the common shape of pgx.Row and pgx.Rows.
+type rowScanner interface{ Scan(dest ...any) error }
+
+func scanKeyRecord(row rowScanner) (fieldcrypto.KeyRecord, error) {
+	var (
+		version int32
+		rec     fieldcrypto.KeyRecord
+	)
+	if err := row.Scan(&version, &rec.KeyBytes, &rec.RetiredAt, &rec.DecryptableUntil, &rec.CompromisedAt); err != nil {
+		return fieldcrypto.KeyRecord{}, err
+	}
+	if version <= 0 {
+		return fieldcrypto.KeyRecord{}, fmt.Errorf("corrupt field_crypto_keys row: version %d", version)
+	}
+	rec.Version = uint32(version)
+	return rec, nil
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-// truncateFieldCryptoKeys empties field_crypto_keys so each test starts
-// from a known "nothing persisted yet" state, independent of test order.
-func truncateFieldCryptoKeys(t *testing.T, ctx context.Context) {
+// resetKeys empties field_crypto_keys and restarts the identity sequence so
+// each test starts from a known "nothing persisted yet" state with predictable
+// version numbers, independent of test order.
+func resetKeys(t *testing.T, ctx context.Context) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, "TRUNCATE TABLE field_crypto_keys"); err != nil {
+	if _, err := pool.Exec(ctx, "TRUNCATE TABLE field_crypto_keys RESTART IDENTITY"); err != nil {
 		t.Fatalf("truncate field_crypto_keys: %v", err)
 	}
+}
+
+// rotate performs the rotation transaction the admin endpoint will own:
+// retire the active key (resolving its grace deadline and compromise flag
+// against the database clock), then insert the replacement — in that mandatory
+// order, since the one-active partial unique index is checked immediately.
+func rotate(t *testing.T, ctx context.Context, newKey []byte, graceDays *int32, compromised bool) {
+	t.Helper()
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin rotation: %v", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+
+	var retiredVersion int32
+	err = tx.QueryRow(ctx, `
+		UPDATE field_crypto_keys
+		SET retired_at = now(),
+		    decryptable_until = CASE WHEN $1::INT IS NULL THEN NULL ELSE now() + $1::INT * INTERVAL '1 day' END,
+		    compromised_at = CASE WHEN $2::BOOLEAN THEN now() ELSE NULL END
+		WHERE retired_at IS NULL
+		RETURNING version`, graceDays, compromised).Scan(&retiredVersion)
+	if err != nil {
+		t.Fatalf("retire active key: %v", err)
+	}
+
+	var newVersion int32
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO field_crypto_keys (key_bytes) VALUES ($1::BYTEA) RETURNING version`,
+		newKey).Scan(&newVersion); err != nil {
+		t.Fatalf("insert replacement key: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit rotation: %v", err)
+	}
+}
+
+func countKeys(t *testing.T, ctx context.Context) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM field_crypto_keys").Scan(&n); err != nil {
+		t.Fatalf("count rows: %v", err)
+	}
+	return n
+}
+
+func activeKeyBytes(t *testing.T, ctx context.Context) []byte {
+	t.Helper()
+	var key []byte
+	if err := pool.QueryRow(ctx, "SELECT key_bytes FROM field_crypto_keys WHERE retired_at IS NULL").Scan(&key); err != nil {
+		t.Fatalf("fetch active key_bytes: %v", err)
+	}
+	return key
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-// TestFieldKeyRealFetchOrGenerateRoundTrip proves the round trip through the
-// real table, not just the Go-level control flow: a first call against an
-// empty table generates and persists a key; a second call against the same
-// DB fetches that same persisted key back, rather than generating another.
-func TestFieldKeyRealFetchOrGenerateRoundTrip(t *testing.T) {
+// TestFieldKeyRealBootstrapRoundTrip proves the round trip through the real
+// table: a first call against an empty table generates and persists version 1,
+// and a second call against the same database adopts that persisted key rather
+// than generating another.
+func TestFieldKeyRealBootstrapRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	unsetEnv(t, "CORE_FIELD_KEY_HEX")
-	truncateFieldCryptoKeys(t, ctx)
+	resetKeys(t, ctx)
 
-	q := coredb.New(pool)
+	store := pgKeyStore{db: pool}
 
-	first, err := fieldcrypto.NewFromEnvOrGenerate(ctx, q)
+	first, err := fieldcrypto.NewFromEnvOrGenerate(ctx, store)
 	if err != nil {
 		t.Fatalf("first NewFromEnvOrGenerate: %v", err)
 	}
-
-	second, err := fieldcrypto.NewFromEnvOrGenerate(ctx, q)
+	second, err := fieldcrypto.NewFromEnvOrGenerate(ctx, store)
 	if err != nil {
 		t.Fatalf("second NewFromEnvOrGenerate: %v", err)
 	}
 
 	const plaintext = "round-trip-through-real-table"
-	blob, err := first.Encrypt(plaintext)
+	blob, err := first.Encrypt(ctx, plaintext)
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	got, err := second.Decrypt(blob)
+	if got := blobVersionOf(t, blob); got != 1 {
+		t.Errorf("bootstrapped blob carries version %d, want 1", got)
+	}
+	got, err := second.Decrypt(ctx, blob)
 	if err != nil {
-		t.Fatalf("second.Decrypt(first's blob): %v (second call did not fetch the same persisted key)", err)
+		t.Fatalf("second.Decrypt(first's blob): %v (the second call did not adopt the persisted key)", err)
 	}
 	if got != plaintext {
 		t.Errorf("second.Decrypt(first's blob) = %q, want %q", got, plaintext)
 	}
 
-	var rowCount int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM field_crypto_keys").Scan(&rowCount); err != nil {
-		t.Fatalf("count rows: %v", err)
-	}
-	if rowCount != 1 {
-		t.Errorf("field_crypto_keys row count = %d, want 1", rowCount)
+	if n := countKeys(t, ctx); n != 1 {
+		t.Errorf("field_crypto_keys row count = %d, want 1", n)
 	}
 }
 
-// TestFieldKeyRealConcurrentRace is the test that actually exercises the
-// DB-level uniqueness constraint under real concurrency: N goroutines call
-// NewFromEnvOrGenerate concurrently against independent *coredb.Queries
-// values sharing the same pool, against an empty field_crypto_keys table.
-// Every goroutine must succeed, exactly one row must exist afterward, and
-// every goroutine's returned Cipher must have converged on that one row's
-// key — not that Postgres serializes real concurrent writers (the unit
-// tests can only prove the Go-level control flow handles a *simulated* lost
-// race correctly).
+// TestFieldKeyRealConcurrentRace is the test that exercises the DB-level
+// convergence guarantee under real concurrency: N goroutines call
+// NewFromEnvOrGenerate against an empty table. Every goroutine must succeed,
+// exactly one row must exist afterward, and every returned Cipher must have
+// converged on that row's key. The arbiter is now the
+// field_crypto_keys_one_active partial unique index rather than the id = 1
+// singleton it replaced.
 func TestFieldKeyRealConcurrentRace(t *testing.T) {
 	ctx := context.Background()
 	unsetEnv(t, "CORE_FIELD_KEY_HEX")
-	truncateFieldCryptoKeys(t, ctx)
+	resetKeys(t, ctx)
 
 	const goroutines = 8
 	ciphers := make([]*fieldcrypto.Cipher, goroutines)
@@ -296,11 +431,7 @@ func TestFieldKeyRealConcurrentRace(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			// Independent *coredb.Queries value sharing the pool, per the
-			// requirement that this proves real concurrent writers converge,
-			// not just that one shared Queries value is reused.
-			q := coredb.New(pool)
-			c, err := fieldcrypto.NewFromEnvOrGenerate(ctx, q)
+			c, err := fieldcrypto.NewFromEnvOrGenerate(ctx, pgKeyStore{db: pool})
 			if err != nil {
 				t.Errorf("goroutine %d: NewFromEnvOrGenerate: %v", i, err)
 				return
@@ -315,75 +446,205 @@ func TestFieldKeyRealConcurrentRace(t *testing.T) {
 			t.Fatalf("goroutine %d did not produce a Cipher (see earlier error)", i)
 		}
 	}
-
-	var rowCount int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM field_crypto_keys").Scan(&rowCount); err != nil {
-		t.Fatalf("count rows: %v", err)
-	}
-	if rowCount != 1 {
-		t.Fatalf("field_crypto_keys row count after concurrent race = %d, want exactly 1", rowCount)
+	if n := countKeys(t, ctx); n != 1 {
+		t.Fatalf("field_crypto_keys row count after the concurrent race = %d, want exactly 1", n)
 	}
 
-	// Cross-check every goroutine's Cipher against the one persisted row's
-	// actual key_bytes: build a reference Cipher directly from the row and
-	// confirm every goroutine's Cipher round-trips against it.
-	var persistedKey []byte
-	if err := pool.QueryRow(ctx, "SELECT key_bytes FROM field_crypto_keys WHERE id = 1").Scan(&persistedKey); err != nil {
-		t.Fatalf("fetch persisted key_bytes: %v", err)
-	}
-	reference, err := fieldcrypto.NewFromKey(persistedKey)
-	if err != nil {
-		t.Fatalf("NewFromKey(persisted key_bytes): %v", err)
-	}
-
+	// Cross-check every goroutine's Cipher against the one persisted row.
+	persisted := activeKeyBytes(t, ctx)
 	for i, c := range ciphers {
 		plaintext := fmt.Sprintf("probe-from-goroutine-%d", i)
-		blob, err := c.Encrypt(plaintext)
+		blob, err := c.Encrypt(ctx, plaintext)
 		if err != nil {
 			t.Fatalf("goroutine %d cipher Encrypt: %v", i, err)
 		}
-		got, err := reference.Decrypt(blob)
+		got, err := openUnder(t, persisted, blob)
 		if err != nil {
-			t.Errorf("goroutine %d: reference.Decrypt(its blob): %v (its Cipher did not converge on the winning key)", i, err)
+			t.Errorf("goroutine %d: its Cipher did not converge on the winning key: %v", i, err)
 			continue
 		}
 		if got != plaintext {
-			t.Errorf("goroutine %d: reference.Decrypt(its blob) = %q, want %q", i, got, plaintext)
+			t.Errorf("goroutine %d: blob decrypts to %q, want %q", i, got, plaintext)
 		}
 	}
 }
 
-// TestFieldKeyRealCorruptionRejectedByCheckConstraint proves the DB-level
-// defense-in-depth guard from 001-add-field-crypto-keys-table.md actually
-// rejects a short key at the schema level, independent of the Go-level
-// length check NewFromEnvOrGenerate/NewFromKey also performs. A normal
-// insert path can never produce a corrupt row (the CHECK constraint rejects
-// it before it lands) — so this test proves the constraint directly, via a
-// raw INSERT attempting to bypass application-level validation entirely.
-func TestFieldKeyRealCorruptionRejectedByCheckConstraint(t *testing.T) {
+// TestFieldKeyRealRotationPickedUpByReload is the multi-key property the whole
+// plan exists for: a rotation committed by one actor is picked up by an
+// already-running cipher through Reload, the retired key keeps decrypting its
+// old blobs, and new writes move to the replacement version.
+func TestFieldKeyRealRotationPickedUpByReload(t *testing.T) {
 	ctx := context.Background()
-	truncateFieldCryptoKeys(t, context.Background())
+	unsetEnv(t, "CORE_FIELD_KEY_HEX")
+	resetKeys(t, ctx)
 
-	shortKey := make([]byte, 16) // one CHECK (octet_length = 32) short
-	_, err := pool.Exec(ctx, "INSERT INTO field_crypto_keys (id, key_bytes) VALUES (1, $1)", shortKey)
-	if err == nil {
-		t.Fatal("expected the octet_length(key_bytes) = 32 CHECK to reject a 16-byte key, but the insert succeeded")
+	c, err := fieldcrypto.NewFromEnvOrGenerate(ctx, pgKeyStore{db: pool})
+	if err != nil {
+		t.Fatalf("NewFromEnvOrGenerate: %v", err)
+	}
+	// Long TTL and rate limit: only the explicit Reload may refresh the set.
+	fieldcrypto.SetReloadTuningForTest(c, time.Hour, time.Hour)
+
+	const plaintext = "written-before-the-rotation"
+	oldBlob, err := c.Encrypt(ctx, plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt before rotation: %v", err)
 	}
 
+	graceDays := int32(30)
+	rotate(t, ctx, testKey(21), &graceDays, false)
+
+	if err := c.Reload(ctx); err != nil {
+		t.Fatalf("Reload after rotation: %v", err)
+	}
+
+	newBlob, err := c.Encrypt(ctx, plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt after rotation: %v", err)
+	}
+	if blobVersionOf(t, newBlob) != 2 {
+		t.Errorf("post-rotation Encrypt used version %d, want 2", blobVersionOf(t, newBlob))
+	}
+
+	got, rot, err := c.DecryptWithRotation(ctx, oldBlob)
+	if err != nil {
+		t.Fatalf("DecryptWithRotation of a pre-rotation blob: %v", err)
+	}
+	if got != plaintext {
+		t.Errorf("plaintext = %q, want %q", got, plaintext)
+	}
+	if !rot.Needed() || rot.FromVersion != 1 || rot.ToVersion != 2 {
+		t.Errorf("Rotation = %+v, want a needed 1→2 rotation", rot)
+	}
+	if rot.MustPersist {
+		t.Error("MustPersist is true after a standard rotation")
+	}
+}
+
+// TestFieldKeyRealCompromisedRotationMustPersist proves compromised_at reaches
+// the caller as policy rather than as a column: a blob written under a key
+// retired as compromised comes back with MustPersist set.
+func TestFieldKeyRealCompromisedRotationMustPersist(t *testing.T) {
+	ctx := context.Background()
+	unsetEnv(t, "CORE_FIELD_KEY_HEX")
+	resetKeys(t, ctx)
+
+	c, err := fieldcrypto.NewFromEnvOrGenerate(ctx, pgKeyStore{db: pool})
+	if err != nil {
+		t.Fatalf("NewFromEnvOrGenerate: %v", err)
+	}
+	fieldcrypto.SetReloadTuningForTest(c, time.Hour, time.Hour)
+
+	const plaintext = "written-under-a-leaked-key"
+	oldBlob, err := c.Encrypt(ctx, plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	// A compromised rotation leaves decryptable_until NULL: maximum
+	// opportunity to re-encrypt away from the leaked key.
+	rotate(t, ctx, testKey(22), nil, true)
+
+	if err := c.Reload(ctx); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
+	got, rot, err := c.DecryptWithRotation(ctx, oldBlob)
+	if err != nil {
+		t.Fatalf("DecryptWithRotation: %v", err)
+	}
+	if got != plaintext {
+		t.Errorf("plaintext = %q, want %q", got, plaintext)
+	}
+	if !rot.MustPersist {
+		t.Error("MustPersist is false for a blob written under a key retired as compromised")
+	}
+}
+
+// TestFieldKeyRealExpiredGraceWindowStopsDecrypting proves the SQL load filter
+// half of the grace-expiry design: once decryptable_until is in the past the
+// key is not loaded at all, so a blob still carrying its version fails loudly.
+func TestFieldKeyRealExpiredGraceWindowStopsDecrypting(t *testing.T) {
+	ctx := context.Background()
+	unsetEnv(t, "CORE_FIELD_KEY_HEX")
+	resetKeys(t, ctx)
+
+	c, err := fieldcrypto.NewFromEnvOrGenerate(ctx, pgKeyStore{db: pool})
+	if err != nil {
+		t.Fatalf("NewFromEnvOrGenerate: %v", err)
+	}
+
+	oldBlob, err := c.Encrypt(ctx, "written-before-the-window-closed")
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	graceDays := int32(30)
+	rotate(t, ctx, testKey(23), &graceDays, false)
+	// Back-date the retirement and its window so the deadline has already
+	// passed, rather than making the test wait one out. Both columns move:
+	// field_crypto_keys_grace_after_retirement forbids a deadline earlier
+	// than the retirement it belongs to.
+	if _, err := pool.Exec(ctx, `
+		UPDATE field_crypto_keys
+		SET retired_at = now() - INTERVAL '1 hour',
+		    decryptable_until = now() - INTERVAL '1 second'
+		WHERE version = 1`); err != nil {
+		t.Fatalf("expire the grace window: %v", err)
+	}
+
+	fresh, err := fieldcrypto.NewFromEnvOrGenerate(ctx, pgKeyStore{db: pool})
+	if err != nil {
+		t.Fatalf("NewFromEnvOrGenerate after expiry: %v", err)
+	}
+	fieldcrypto.SetReloadTuningForTest(fresh, time.Hour, time.Hour)
+
+	if got, err := fresh.Decrypt(ctx, oldBlob); err == nil {
+		t.Errorf("Decrypt of a blob under an expired key = %q, want an error", got)
+	}
+}
+
+// TestFieldKeyRealSchemaGuards proves the schema-level defenses reject rows
+// the application must never write, independent of the Go-level checks: a key
+// that is not 32 bytes, and a second active key.
+func TestFieldKeyRealSchemaGuards(t *testing.T) {
+	ctx := context.Background()
+	resetKeys(t, ctx)
+
+	t.Run("key length CHECK", func(t *testing.T) {
+		shortKey := make([]byte, 16) // one CHECK (octet_length = 32) short
+		_, err := pool.Exec(ctx, "INSERT INTO field_crypto_keys (key_bytes) VALUES ($1)", shortKey)
+		if err == nil {
+			t.Fatal("expected the octet_length(key_bytes) = 32 CHECK to reject a 16-byte key")
+		}
+		assertSQLState(t, err, "23514") // check_violation
+		if n := countKeys(t, ctx); n != 0 {
+			t.Errorf("rejected insert left %d rows behind", n)
+		}
+	})
+
+	t.Run("one-active unique index", func(t *testing.T) {
+		resetKeys(t, ctx)
+		if _, err := pool.Exec(ctx, "INSERT INTO field_crypto_keys (key_bytes) VALUES ($1)", testKey(31)); err != nil {
+			t.Fatalf("insert the first active key: %v", err)
+		}
+		_, err := pool.Exec(ctx, "INSERT INTO field_crypto_keys (key_bytes) VALUES ($1)", testKey(32))
+		if err == nil {
+			t.Fatal("expected field_crypto_keys_one_active to reject a second active key")
+		}
+		assertSQLState(t, err, "23505") // unique_violation
+		if n := countKeys(t, ctx); n != 1 {
+			t.Errorf("row count = %d, want 1", n)
+		}
+	})
+}
+
+func assertSQLState(t *testing.T, err error, want string) {
+	t.Helper()
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		t.Fatalf("expected a *pgconn.PgError, got: %v", err)
 	}
-	const checkViolationCode = "23514" // Postgres SQLSTATE for check_violation
-	if pgErr.Code != checkViolationCode {
-		t.Errorf("expected SQLSTATE %s (check_violation), got %s: %v", checkViolationCode, pgErr.Code, err)
-	}
-
-	var rowCount int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM field_crypto_keys").Scan(&rowCount); err != nil {
-		t.Fatalf("count rows: %v", err)
-	}
-	if rowCount != 0 {
-		t.Errorf("expected no row to have been persisted by the rejected insert, got row count %d", rowCount)
+	if pgErr.Code != want {
+		t.Errorf("expected SQLSTATE %s, got %s: %v", want, pgErr.Code, err)
 	}
 }

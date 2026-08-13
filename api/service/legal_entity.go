@@ -84,7 +84,7 @@ func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, ent
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID natural_person: %w", err)
 		}
-		val, err := s.cipher.Decrypt(np.Ssn)
+		val, err := s.cipher.Decrypt(ctx, np.Ssn)
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ssn: %w", err)
 		}
@@ -95,7 +95,7 @@ func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, ent
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID corporation: %w", err)
 		}
-		val, err := s.cipher.Decrypt(corp.Ein)
+		val, err := s.cipher.Decrypt(ctx, corp.Ein)
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ein: %w", err)
 		}

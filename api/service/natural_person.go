@@ -104,7 +104,7 @@ func (s *NaturalPersonService) createNaturalPersonInTx(
 	var ssnBlob []byte
 	ssnAudit := "unchanged"
 	if strings.TrimSpace(in.SSN) != "" {
-		blob, err := s.cipher.Encrypt(strings.TrimSpace(in.SSN))
+		blob, err := s.cipher.Encrypt(ctx, strings.TrimSpace(in.SSN))
 		if err != nil {
 			return coredb.CreateNaturalPersonRow{}, uuid.UUID{}, 0, fmt.Errorf("encrypt ssn: %w", err)
 		}
@@ -314,7 +314,7 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 				ssnParam = []byte{} // clear
 				ssnAudit = "cleared"
 			} else {
-				b, err := s.cipher.Encrypt(val)
+				b, err := s.cipher.Encrypt(ctx, val)
 				if err != nil {
 					return fmt.Errorf("encrypt ssn: %w", err)
 				}
@@ -357,5 +357,5 @@ func (s *NaturalPersonService) GetDecryptedSSN(ctx context.Context, q coredb.Que
 	if err != nil {
 		return "", fmt.Errorf("natural_person.GetDecryptedSSN: %w", err)
 	}
-	return s.cipher.Decrypt(np.Ssn)
+	return s.cipher.Decrypt(ctx, np.Ssn)
 }

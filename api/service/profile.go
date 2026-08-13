@@ -67,7 +67,7 @@ func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID in
 		}
 		profile.NaturalPerson = &np
 		if c != nil {
-			val, err := c.Decrypt(np.Ssn)
+			val, err := c.Decrypt(ctx, np.Ssn)
 			if err != nil {
 				return Profile{}, fmt.Errorf("resolve profile decrypt ssn: %w", err)
 			}
@@ -82,7 +82,7 @@ func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID in
 		}
 		profile.Corporation = &corp
 		if c != nil {
-			val, err := c.Decrypt(corp.Ein)
+			val, err := c.Decrypt(ctx, corp.Ein)
 			if err != nil {
 				return Profile{}, fmt.Errorf("resolve profile decrypt ein: %w", err)
 			}

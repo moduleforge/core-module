@@ -232,7 +232,7 @@ func TestCorporationService_GetByEntityUUID_AdminSeesEIN(t *testing.T) {
 	}
 
 	const plainEIN = "12-3456789"
-	einBlob, err := cipher.Encrypt(plainEIN)
+	einBlob, err := cipher.Encrypt(context.Background(), plainEIN)
 	if err != nil {
 		t.Fatalf("encrypt ein: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestCorporationService_GetByEntityUUID_GrantedCallerSeesEIN(t *testing.T) {
 	}
 
 	const plainEIN = "98-7654321"
-	einBlob, err := cipher.Encrypt(plainEIN)
+	einBlob, err := cipher.Encrypt(context.Background(), plainEIN)
 	if err != nil {
 		t.Fatalf("encrypt ein: %v", err)
 	}

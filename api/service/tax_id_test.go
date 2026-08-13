@@ -409,7 +409,7 @@ func TestProfile_TaxIDPopulated(t *testing.T) {
 	entityUUID := q.seedNaturalPerson("Ivan", "Jones")
 	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
 
-	blob, err := cipher.Encrypt("444-55-6666")
+	blob, err := cipher.Encrypt(context.Background(), "444-55-6666")
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}

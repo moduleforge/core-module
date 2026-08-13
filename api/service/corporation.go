@@ -119,7 +119,7 @@ func (s *CorporationService) Create(
 		var einBlob []byte
 		einAudit := "unchanged"
 		if strings.TrimSpace(in.EIN) != "" {
-			blob, err := s.cipher.Encrypt(strings.TrimSpace(in.EIN))
+			blob, err := s.cipher.Encrypt(ctx, strings.TrimSpace(in.EIN))
 			if err != nil {
 				return fmt.Errorf("encrypt ein: %w", err)
 			}
@@ -246,7 +246,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 				einParam = []byte{} // clear
 				einAudit = "cleared"
 			} else {
-				b, err := s.cipher.Encrypt(val)
+				b, err := s.cipher.Encrypt(ctx, val)
 				if err != nil {
 					return fmt.Errorf("encrypt ein: %w", err)
 				}
@@ -289,5 +289,5 @@ func (s *CorporationService) GetDecryptedEIN(ctx context.Context, q coredb.Queri
 	if err != nil {
 		return "", fmt.Errorf("corporation.GetDecryptedEIN: %w", err)
 	}
-	return s.cipher.Decrypt(corp.Ein)
+	return s.cipher.Decrypt(ctx, corp.Ein)
 }
