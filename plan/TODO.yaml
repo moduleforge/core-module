@@ -74,6 +74,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: wire-decrypt-call-sites
+          title: Wire Rotation Through Decrypt Call Sites
+          path: phase-03-rotate-on-read/002-wire-decrypt-call-sites.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 4
       slug: admin-rotation-api
       title: Admin Key-Rotation API
