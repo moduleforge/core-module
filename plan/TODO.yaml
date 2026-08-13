@@ -16,6 +16,16 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-blob-rotation-write-back-queries
+          title: Add Blob Rotation Write-Back Queries
+          path: phase-01-key-store-model/002-add-blob-rotation-write-back-queries.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
