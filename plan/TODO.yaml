@@ -23,6 +23,7 @@ phases:
           path: phase-01-key-store-model/002-add-blob-rotation-write-back-queries.md
           done: false
           tier: sonnet-med
+          digest: 'Added the two narrow compare-and-swap write-back queries the Phase 3 rotation-on-read helper will use: UpdateNaturalPersonSSNBlob and UpdateCorporationEINBlob, both :execrows with old_ssn/old_ein CAS predicates matching the design note exactly. cd model && make verify passed. No make gen, model/db/, or api/ changes made, per scope boundary.'
           git:
             branch: plan/fieldcrypto-key-rotation-01-002
             commit:
