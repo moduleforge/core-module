@@ -97,4 +97,14 @@ phases:
     - number: 4
       slug: admin-rotation-api
       title: Admin Key-Rotation API
-      tasks: []
+      tasks:
+        - number: 1
+          slug: field-crypto-key-handler
+          title: Field Crypto Key Admin Handler
+          path: phase-04-admin-rotation-api/001-field-crypto-key-handler.md
+          done: false
+          tier: opus-med
+          git:
+            branch: null
+            commit: []
+            merge: null
