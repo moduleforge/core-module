@@ -58,9 +58,6 @@ func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntit
 func (s *stubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
 	return coredb.GetEntityByUUIDRow{}, nil
 }
-func (s *stubQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
-	return nil, nil
-}
 func (s *stubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
@@ -76,14 +73,32 @@ func (s *stubQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Type, erro
 func (s *stubQuerier) GetTypeBySlug(_ context.Context, _ string) (coredb.Type, error) {
 	return coredb.Type{}, nil
 }
+func (s *stubQuerier) InsertActiveFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
+}
 func (s *stubQuerier) InsertApp(_ context.Context, _ coredb.InsertAppParams) (coredb.InsertAppRow, error) {
 	return coredb.InsertAppRow{}, nil
 }
-func (s *stubQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, _ []byte) ([]byte, error) {
-	return nil, nil
+func (s *stubQuerier) InsertInitialFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
 }
 func (s *stubQuerier) ListApps(_ context.Context) ([]coredb.ListAppsRow, error) {
 	return nil, nil
+}
+func (s *stubQuerier) ListFieldCryptoKeyMetadata(_ context.Context) ([]coredb.ListFieldCryptoKeyMetadataRow, error) {
+	return nil, nil
+}
+func (s *stubQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.FieldCryptoKey, error) {
+	return nil, nil
+}
+func (s *stubQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
+	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
+}
+func (s *stubQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
+	return 0, nil
+}
+func (s *stubQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
+	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil
 }
 func (s *stubQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
 func (s *stubQuerier) UpdateApp(_ context.Context, _ coredb.UpdateAppParams) error {
@@ -92,8 +107,14 @@ func (s *stubQuerier) UpdateApp(_ context.Context, _ coredb.UpdateAppParams) err
 func (s *stubQuerier) UpdateCorporation(_ context.Context, _ coredb.UpdateCorporationParams) error {
 	return nil
 }
+func (s *stubQuerier) UpdateCorporationEINBlob(_ context.Context, _ coredb.UpdateCorporationEINBlobParams) (int64, error) {
+	return 0, nil
+}
 func (s *stubQuerier) UpdateNaturalPerson(_ context.Context, _ coredb.UpdateNaturalPersonParams) error {
 	return nil
+}
+func (s *stubQuerier) UpdateNaturalPersonSSNBlob(_ context.Context, _ coredb.UpdateNaturalPersonSSNBlobParams) (int64, error) {
+	return 0, nil
 }
 
 var _ coredb.Querier = (*stubQuerier)(nil)

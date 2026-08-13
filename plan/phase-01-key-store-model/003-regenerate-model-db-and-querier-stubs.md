@@ -89,3 +89,15 @@ being merged first. No standard skill covers this work.
 - After `make gen` and committing `model/db/`.
 - After the first three stub files compile.
 - After all six stub files compile and `cd api && make test` passes.
+
+## Status
+
+- Outcome: succeeded (2026-08-13).
+- `sqlc v1.31.1` (not the pinned v1.28.0) was used, per the dispatcher's operating-contract note; `cd model && make gen` ran cleanly against it with no compile errors.
+- `model/db/` regenerated and committed. `FieldCryptoKey` matches the predicted shape exactly (`Version int32`, `KeyBytes []byte`, `CreatedAt`/`UpdatedAt` `pgtype.Timestamptz`, `RetiredAt`/`DecryptableUntil`/`CompromisedAt` `*time.Time`).
+- Requirement 3 confirmed as corrected: `ListUsableFieldCryptoKeys`, `InsertInitialFieldCryptoKey`, `InsertActiveFieldCryptoKey` all reuse `FieldCryptoKey`; `RetireActiveFieldCryptoKey` returns a bare `int32`; `MarkFieldCryptoKeyCompromised` and `SetFieldCryptoKeyDecryptableUntil` emit narrow `...Row` types; `ListFieldCryptoKeyMetadataRow` carries no `KeyBytes` field. No query/schema changes were needed.
+- All six `coredb.Querier` implementations found via `grep -rn "coredb.Querier = " api/` matched the task doc's predicted list exactly. Each had `GetFieldCryptoKey`/`InsertFieldCryptoKeyIfAbsent` removed and the nine new methods (seven key queries + `UpdateCorporationEINBlob`/`UpdateNaturalPersonSSNBlob`) added as no-op stubs returning zero values, in each file's existing alphabetical-by-method style. No real behavior was added.
+- `gofmt` flagged a stray missing blank line in `api/httpapi/apps_test.go` left by the stub removal edit (mechanical whitespace artifact in a file already in this task's diff); fixed via `gofmt -w` as a same-diff self-fix.
+- Affected source files: `model/db/*.go` (regenerated), `api/types/types_test.go`, `api/entity/resolver_test.go`, `api/display/registry_test.go`, `api/httpapi/apps_test.go`, `api/httpapi/masked_lookup_test.go`, `api/service/mock_test.go`.
+- Confirmed expected/accepted breakage per `## Assumptions`: `api/internal/fieldcrypto` was left untouched (its own `FieldKeyQuerier` interface still compiles fine under default `go build`/`go test`/`go vet`), but `go vet -tags integration ./internal/fieldcrypto/...` now fails with `*db.Queries does not implement fieldcrypto.FieldKeyQuerier (missing method GetFieldCryptoKey)` in `generate_integration_test.go`, exactly as predicted. Phase 2's cipher task is expected to repair this.
+- The task doc's `## Validation` grep check `grep -rn "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" api/ model/db/` is not fully empty: it still matches `api/internal/fieldcrypto/fieldcrypto.go` and `api/internal/fieldcrypto/generate_test.go`, which declare and use those same method names on their own, separate `FieldKeyQuerier` interface (not `coredb.Querier`). This is the direct, unavoidable consequence of Requirement 6 ("leave `api/internal/fieldcrypto` alone") and is not a defect in this task's work — `model/db/` and all six `coredb.Querier` stub files are clean of those names.

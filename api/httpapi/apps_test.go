@@ -243,9 +243,6 @@ func (q *appsFakeQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (
 func (q *appsFakeQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
 	return coredb.GetEntityByIDRow{}, nil
 }
-func (q *appsFakeQuerier) GetFieldCryptoKey(_ context.Context) ([]byte, error) {
-	return nil, nil
-}
 
 // GetEntityByUUID backs entity.Resolver.Resolve, which AppsHandler now calls
 // (via loadAppByUUIDParam) to authorize against the bare entity id before
@@ -282,16 +279,40 @@ func (q *appsFakeQuerier) GetServiceAccountByEntityID(_ context.Context, _ int64
 func (q *appsFakeQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Type, error) {
 	return coredb.Type{}, nil
 }
-func (q *appsFakeQuerier) InsertFieldCryptoKeyIfAbsent(_ context.Context, _ []byte) ([]byte, error) {
-	return nil, nil
+func (q *appsFakeQuerier) InsertActiveFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
+}
+func (q *appsFakeQuerier) InsertInitialFieldCryptoKey(_ context.Context, _ []byte) (coredb.FieldCryptoKey, error) {
+	return coredb.FieldCryptoKey{}, nil
 }
 func (q *appsFakeQuerier) ListAllTypes(_ context.Context) ([]coredb.Type, error) { return nil, nil }
-func (q *appsFakeQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error  { return nil }
+func (q *appsFakeQuerier) ListFieldCryptoKeyMetadata(_ context.Context) ([]coredb.ListFieldCryptoKeyMetadataRow, error) {
+	return nil, nil
+}
+func (q *appsFakeQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.FieldCryptoKey, error) {
+	return nil, nil
+}
+func (q *appsFakeQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
+	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
+}
+func (q *appsFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
+	return 0, nil
+}
+func (q *appsFakeQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
+	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil
+}
+func (q *appsFakeQuerier) UnarchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
 func (q *appsFakeQuerier) UpdateCorporation(_ context.Context, _ coredb.UpdateCorporationParams) error {
 	return nil
 }
+func (q *appsFakeQuerier) UpdateCorporationEINBlob(_ context.Context, _ coredb.UpdateCorporationEINBlobParams) (int64, error) {
+	return 0, nil
+}
 func (q *appsFakeQuerier) UpdateNaturalPerson(_ context.Context, _ coredb.UpdateNaturalPersonParams) error {
 	return nil
+}
+func (q *appsFakeQuerier) UpdateNaturalPersonSSNBlob(_ context.Context, _ coredb.UpdateNaturalPersonSSNBlobParams) (int64, error) {
+	return 0, nil
 }
 
 var _ coredb.Querier = (*appsFakeQuerier)(nil)
