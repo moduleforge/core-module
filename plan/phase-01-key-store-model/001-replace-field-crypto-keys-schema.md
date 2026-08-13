@@ -87,7 +87,9 @@ owns regeneration and the api-side fallout. No standard skill covers this work; 
 - `cd model && make lint` passes — applies every migration in order to an ephemeral shadow Postgres
   (requires Docker). This is what proves the DDL, the partial unique index, the two CHECK
   constraints, and the trigger are all actually valid.
-- `grep -n "id = 1" model/migrations/0017_field_crypto_keys.sql` returns nothing.
+- `grep -n "CHECK (id = 1)" model/migrations/0017_field_crypto_keys.sql` returns nothing (the narrow,
+  structural form — the historical comment prose quoting `id = 1` as explanatory text is expected and
+  is not what this check guards against).
 - `grep -rn "GetFieldCryptoKey\|InsertFieldCryptoKeyIfAbsent" model/queries/` returns nothing.
 - `grep -c "^-- name:" model/queries/field_crypto_keys.sql` returns `7`.
 - `grep -n "key_bytes" model/queries/field_crypto_keys.sql` shows no occurrence inside the

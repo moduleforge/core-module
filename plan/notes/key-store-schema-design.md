@@ -459,12 +459,15 @@ Deliberately **not** included and deliberately not returning key material: an ad
 whether that route exists; if added, its narrower column list yields a distinct sqlc row type, which
 usefully makes "no key material crosses this boundary" a compile-time property.
 
-**Query-authoring notes for the implementer.** Give the five key-material-bearing queries the full
-column list in table order so sqlc reuses the `FieldCryptoKey` model struct rather than emitting a
-per-query `...Row` type. `sqlc.narg()` is required for the nullable grace-days argument and
-`sqlc.arg(...)::BYTEA` for the bare-`SELECT` bootstrap insert, whose parameter type is otherwise
-uninferable. Verify all of it with `cd model && make verify` (`goose validate` + `sqlc compile`)
-before regenerating.
+**Query-authoring notes for the implementer.** Give the three queries that return a full row —
+`ListUsableFieldCryptoKeys`, `InsertInitialFieldCryptoKey`, and `InsertActiveFieldCryptoKey` — the
+full column list in table order so sqlc reuses the `FieldCryptoKey` model struct rather than emitting
+a per-query `...Row` type. The other three (`RetireActiveFieldCryptoKey`,
+`MarkFieldCryptoKeyCompromised`, `SetFieldCryptoKeyDecryptableUntil`) use the narrow `RETURNING`
+clauses given in the table above, not the full column list. `sqlc.narg()` is required for the
+nullable grace-days argument and `sqlc.arg(...)::BYTEA` for the bare-`SELECT` bootstrap insert, whose
+parameter type is otherwise uninferable. Verify all of it with `cd model && make verify` (`goose
+validate` + `sqlc compile`) before regenerating.
 
 ### Cost this imposes on `coredb.Querier` implementers
 
