@@ -42,7 +42,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-01-003
             commit:
                 - 6743ced
-            merge: null
+            merge: a576cd4
     - number: 2
       slug: versioned-cipher
       title: Versioned Multi-Key Cipher
