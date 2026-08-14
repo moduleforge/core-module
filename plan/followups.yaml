@@ -31,7 +31,7 @@ items:
       id: GzQ5
       date: "2026-08-10"
       tags:
-        - type:ambiguity
+        - type:enhancement
         - plan/phase:durable-field-key
         - plan/slug:catalog-readiness
         - priority:unspecified
