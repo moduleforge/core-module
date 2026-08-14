@@ -37,16 +37,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: make lint / shadow-db-lint.sh only exercises goose up, never down, for any migration — task doc assumed it also validates Down; verified manually instead. Possible follow-up if down-migration regressions should be caught in CI.
-    - title: 'Sandbox-only note: a native non-Docker Postgr'
-      id: iuHr
-      date: "2026-08-10"
-      tags:
-        - type:ambiguity
-        - plan/phase:durable-field-key
-        - plan/slug:catalog-readiness
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
     - title: 'rotating_cipher: pool 2nd-conn deadlock risk'
       id: 6hKu
       date: "2026-08-14"
