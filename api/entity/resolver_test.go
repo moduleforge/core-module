@@ -23,6 +23,9 @@ type resolverStubQuerier struct {
 	err    error
 }
 
+func (s *resolverStubQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
+	return coredb.GetFieldCryptoKeyByVersionRow{}, nil
+}
 func (s *resolverStubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
 	return s.entity, s.err
 }
@@ -97,8 +100,8 @@ func (s *resolverStubQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]co
 func (s *resolverStubQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
 	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
 }
-func (s *resolverStubQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
-	return 0, nil
+func (s *resolverStubQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (coredb.RetireActiveFieldCryptoKeyRow, error) {
+	return coredb.RetireActiveFieldCryptoKeyRow{}, nil
 }
 func (s *resolverStubQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
 	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil

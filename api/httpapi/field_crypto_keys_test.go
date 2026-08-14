@@ -57,6 +57,7 @@ type fckFakeQuerier struct {
 
 	listMetadataErr error
 	listUsableErr   error
+	getByVersionErr error
 	retireErr       error
 	insertErr       error
 	markErr         error
@@ -139,6 +140,24 @@ func (q *fckFakeQuerier) ListFieldCryptoKeyMetadata(_ context.Context) ([]coredb
 	return rows, nil
 }
 
+func (q *fckFakeQuerier) GetFieldCryptoKeyByVersion(_ context.Context, version int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
+	if q.getByVersionErr != nil {
+		return coredb.GetFieldCryptoKeyByVersionRow{}, q.getByVersionErr
+	}
+	k := q.keyByVersion(version)
+	if k == nil {
+		return coredb.GetFieldCryptoKeyByVersionRow{}, pgx.ErrNoRows
+	}
+	return coredb.GetFieldCryptoKeyByVersionRow{
+		Version:          k.version,
+		CreatedAt:        pgtype.Timestamptz{Time: k.createdAt, Valid: true},
+		UpdatedAt:        pgtype.Timestamptz{Time: k.updatedAt, Valid: true},
+		RetiredAt:        k.retiredAt,
+		DecryptableUntil: k.decryptableUntil,
+		CompromisedAt:    k.compromisedAt,
+	}, nil
+}
+
 func (q *fckFakeQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.FieldCryptoKey, error) {
 	q.listUsableCalls++
 	if q.onListUsable != nil {
@@ -187,13 +206,13 @@ func (q *fckFakeQuerier) InsertActiveFieldCryptoKey(_ context.Context, material 
 	return q.row(*q.keyByVersion(q.seedKey(material, false))), nil
 }
 
-func (q *fckFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, arg coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
+func (q *fckFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, arg coredb.RetireActiveFieldCryptoKeyParams) (coredb.RetireActiveFieldCryptoKeyRow, error) {
 	if q.retireErr != nil {
-		return 0, q.retireErr
+		return coredb.RetireActiveFieldCryptoKeyRow{}, q.retireErr
 	}
 	active := q.activeKey()
 	if active == nil {
-		return 0, pgx.ErrNoRows
+		return coredb.RetireActiveFieldCryptoKeyRow{}, pgx.ErrNoRows
 	}
 	now := time.Now()
 	active.retiredAt = &now
@@ -208,7 +227,12 @@ func (q *fckFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, arg cored
 		compromisedAt := now
 		active.compromisedAt = &compromisedAt
 	}
-	return active.version, nil
+	return coredb.RetireActiveFieldCryptoKeyRow{
+		Version:          active.version,
+		RetiredAt:        active.retiredAt,
+		DecryptableUntil: active.decryptableUntil,
+		CompromisedAt:    active.compromisedAt,
+	}, nil
 }
 
 func (q *fckFakeQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, version int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {

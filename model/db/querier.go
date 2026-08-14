@@ -23,6 +23,7 @@ type Querier interface {
 	GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error)
 	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
+	GetFieldCryptoKeyByVersion(ctx context.Context, version int32) (GetFieldCryptoKeyByVersionRow, error)
 	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error)
 	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (GetNaturalPersonByEntityIDRow, error)
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
@@ -41,7 +42,7 @@ type Querier interface {
 	ListFieldCryptoKeyMetadata(ctx context.Context) ([]ListFieldCryptoKeyMetadataRow, error)
 	ListUsableFieldCryptoKeys(ctx context.Context) ([]FieldCryptoKey, error)
 	MarkFieldCryptoKeyCompromised(ctx context.Context, version int32) (MarkFieldCryptoKeyCompromisedRow, error)
-	RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (int32, error)
+	RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (RetireActiveFieldCryptoKeyRow, error)
 	SetFieldCryptoKeyDecryptableUntil(ctx context.Context, arg SetFieldCryptoKeyDecryptableUntilParams) (SetFieldCryptoKeyDecryptableUntilRow, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
 	UpdateApp(ctx context.Context, arg UpdateAppParams) error

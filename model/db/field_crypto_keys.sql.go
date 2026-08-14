@@ -12,6 +12,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getFieldCryptoKeyByVersion = `-- name: GetFieldCryptoKeyByVersion :one
+SELECT version, created_at, updated_at, retired_at, decryptable_until, compromised_at
+FROM field_crypto_keys
+WHERE version = $1
+`
+
+type GetFieldCryptoKeyByVersionRow struct {
+	Version          int32              `json:"version"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	RetiredAt        *time.Time         `json:"retired_at"`
+	DecryptableUntil *time.Time         `json:"decryptable_until"`
+	CompromisedAt    *time.Time         `json:"compromised_at"`
+}
+
+func (q *Queries) GetFieldCryptoKeyByVersion(ctx context.Context, version int32) (GetFieldCryptoKeyByVersionRow, error) {
+	row := q.db.QueryRow(ctx, getFieldCryptoKeyByVersion, version)
+	var i GetFieldCryptoKeyByVersionRow
+	err := row.Scan(
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RetiredAt,
+		&i.DecryptableUntil,
+		&i.CompromisedAt,
+	)
+	return i, err
+}
+
 const insertActiveFieldCryptoKey = `-- name: InsertActiveFieldCryptoKey :one
 INSERT INTO field_crypto_keys (key_bytes)
 VALUES ($1::BYTEA)
@@ -161,7 +190,7 @@ SET retired_at = now(),
     END,
     compromised_at = CASE WHEN $2::BOOLEAN THEN now() ELSE NULL END
 WHERE retired_at IS NULL
-RETURNING version
+RETURNING version, retired_at, decryptable_until, compromised_at
 `
 
 type RetireActiveFieldCryptoKeyParams struct {
@@ -169,11 +198,23 @@ type RetireActiveFieldCryptoKeyParams struct {
 	Compromised bool        `json:"compromised"`
 }
 
-func (q *Queries) RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (int32, error) {
+type RetireActiveFieldCryptoKeyRow struct {
+	Version          int32      `json:"version"`
+	RetiredAt        *time.Time `json:"retired_at"`
+	DecryptableUntil *time.Time `json:"decryptable_until"`
+	CompromisedAt    *time.Time `json:"compromised_at"`
+}
+
+func (q *Queries) RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (RetireActiveFieldCryptoKeyRow, error) {
 	row := q.db.QueryRow(ctx, retireActiveFieldCryptoKey, arg.GraceDays, arg.Compromised)
-	var version int32
-	err := row.Scan(&version)
-	return version, err
+	var i RetireActiveFieldCryptoKeyRow
+	err := row.Scan(
+		&i.Version,
+		&i.RetiredAt,
+		&i.DecryptableUntil,
+		&i.CompromisedAt,
+	)
+	return i, err
 }
 
 const setFieldCryptoKeyDecryptableUntil = `-- name: SetFieldCryptoKeyDecryptableUntil :one

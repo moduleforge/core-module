@@ -342,13 +342,14 @@ func rotateFieldCryptoKey(t *testing.T, ctx context.Context, graceDays *int32, c
 		grace = pgtype.Int4{Int32: *graceDays, Valid: true}
 	}
 
-	retiredVersion, err = q.RetireActiveFieldCryptoKey(ctx, coredb.RetireActiveFieldCryptoKeyParams{
+	retired, err := q.RetireActiveFieldCryptoKey(ctx, coredb.RetireActiveFieldCryptoKeyParams{
 		GraceDays:   grace,
 		Compromised: compromised,
 	})
 	if err != nil {
 		t.Fatalf("retire active field crypto key: %v", err)
 	}
+	retiredVersion = retired.Version
 
 	row, err := q.InsertActiveFieldCryptoKey(ctx, randomKeyBytes(t))
 	if err != nil {

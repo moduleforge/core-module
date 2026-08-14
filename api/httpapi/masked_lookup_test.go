@@ -100,6 +100,9 @@ func (s *stubQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (core
 func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
 	return coredb.GetEntityByIDRow{}, nil
 }
+func (s *stubQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
+	return coredb.GetFieldCryptoKeyByVersionRow{}, nil
+}
 func (s *stubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
@@ -139,8 +142,8 @@ func (s *stubQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.Fie
 func (s *stubQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
 	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
 }
-func (s *stubQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
-	return 0, nil
+func (s *stubQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (coredb.RetireActiveFieldCryptoKeyRow, error) {
+	return coredb.RetireActiveFieldCryptoKeyRow{}, nil
 }
 func (s *stubQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
 	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil

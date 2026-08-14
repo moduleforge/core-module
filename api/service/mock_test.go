@@ -390,6 +390,10 @@ func (m *mockQuerier) GetEntityByUUID(_ context.Context, argUuid uuid.UUID) (cor
 	return coredb.GetEntityByUUIDRow{}, pgx.ErrNoRows
 }
 
+func (m *mockQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
+	return coredb.GetFieldCryptoKeyByVersionRow{}, nil
+}
+
 func (m *mockQuerier) GetEntityByID(_ context.Context, id int64) (coredb.GetEntityByIDRow, error) {
 	if e, ok := m.entitiesByID[id]; ok {
 		return coredb.GetEntityByIDRow{
@@ -501,8 +505,8 @@ func (m *mockQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) 
 	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
 }
 
-func (m *mockQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
-	return 0, nil
+func (m *mockQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (coredb.RetireActiveFieldCryptoKeyRow, error) {
+	return coredb.RetireActiveFieldCryptoKeyRow{}, nil
 }
 
 func (m *mockQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {

@@ -20,7 +20,7 @@ SET retired_at = now(),
     END,
     compromised_at = CASE WHEN sqlc.arg(compromised)::BOOLEAN THEN now() ELSE NULL END
 WHERE retired_at IS NULL
-RETURNING version;
+RETURNING version, retired_at, decryptable_until, compromised_at;
 
 -- name: InsertActiveFieldCryptoKey :one
 INSERT INTO field_crypto_keys (key_bytes)
@@ -46,3 +46,8 @@ RETURNING version, decryptable_until;
 SELECT version, created_at, updated_at, retired_at, decryptable_until, compromised_at
 FROM field_crypto_keys
 ORDER BY version;
+
+-- name: GetFieldCryptoKeyByVersion :one
+SELECT version, created_at, updated_at, retired_at, decryptable_until, compromised_at
+FROM field_crypto_keys
+WHERE version = $1;

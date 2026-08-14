@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -124,12 +125,30 @@ func (h *FieldCryptoKeyHandler) querier(tx pgx.Tx) coredb.Querier {
 	return coredb.New(tx)
 }
 
+// fieldCryptoKeyLifecycle is the version-and-lifecycle-timestamps shape
+// common to every query in this file that can supply a single row's
+// lifecycle state — the list, get-by-version, and retire-returning queries
+// each generate their own distinct sqlc row type with these same fields, so a
+// caller with any one of them converts it to this shared shape before handing
+// it to keyLifecycleState.
+type fieldCryptoKeyLifecycle struct {
+	Version          int32
+	RetiredAt        *time.Time
+	DecryptableUntil *time.Time
+	CompromisedAt    *time.Time
+}
+
 // keyMetadataResponse builds the inventory wire shape for one key. Its
 // parameter type is the metadata row — the one row type in coredb that
 // carries no key material — which is what keeps "no key material crosses this
 // boundary" a property of the types rather than a review comment.
 func keyMetadataResponse(row coredb.ListFieldCryptoKeyMetadataRow) map[string]any {
-	resp := keyLifecycleState(row)
+	resp := keyLifecycleState(fieldCryptoKeyLifecycle{
+		Version:          row.Version,
+		RetiredAt:        row.RetiredAt,
+		DecryptableUntil: row.DecryptableUntil,
+		CompromisedAt:    row.CompromisedAt,
+	})
 	resp["created_at"] = timestamptzOrNil(row.CreatedAt)
 	resp["updated_at"] = timestamptzOrNil(row.UpdatedAt)
 	return resp
@@ -140,7 +159,7 @@ func keyMetadataResponse(row coredb.ListFieldCryptoKeyMetadataRow) map[string]an
 // changed about a key's life, and never anything about its material. Row
 // bookkeeping (created_at / updated_at) is left to keyMetadataResponse, which
 // is the only caller that wants it.
-func keyLifecycleState(row coredb.ListFieldCryptoKeyMetadataRow) map[string]any {
+func keyLifecycleState(row fieldCryptoKeyLifecycle) map[string]any {
 	return map[string]any{
 		"version":           row.Version,
 		"retired_at":        row.RetiredAt,
@@ -307,7 +326,13 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		// Order is mandatory: the one-active partial unique index is checked
 		// immediately and, being partial, cannot be deferred, so inserting
 		// the replacement before retiring the incumbent always fails.
-		retiredVersion, err := q.RetireActiveFieldCryptoKey(ctx, retireParams)
+		//
+		// RetireActiveFieldCryptoKey's own RETURNING clause already computes
+		// retired_at, decryptable_until, and compromised_at for the row it
+		// just updated, so the response and audit state are built directly
+		// from this result — no read-back query needed to re-fetch a row this
+		// same transaction just wrote.
+		retired, err := q.RetireActiveFieldCryptoKey(ctx, retireParams)
 		if err != nil {
 			return retireFailure(err)
 		}
@@ -322,28 +347,19 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		// need have been read out of it.
 		clear(active.KeyBytes)
 
-		// Read back the retired row's resolved lifecycle timestamps —
-		// retired_at and decryptable_until are computed by the database
-		// clock, so they cannot be reconstructed here — for the response and
-		// the audit payload alike.
-		rows, err := q.ListFieldCryptoKeyMetadata(ctx)
-		if err != nil {
-			return fmt.Errorf("field_crypto_keys.rotate read back: %w", err)
-		}
-		retired, ok := findFieldCryptoKey(rows, retiredVersion)
-		if !ok {
-			// Impossible: this transaction just updated that row. Fail the
-			// whole rotation rather than answer with a partial shape.
-			return fmt.Errorf("field_crypto_keys.rotate: retired key version %d missing from inventory", retiredVersion)
-		}
-		retiredState = keyLifecycleState(retired)
+		retiredState = keyLifecycleState(fieldCryptoKeyLifecycle{
+			Version:          retired.Version,
+			RetiredAt:        retired.RetiredAt,
+			DecryptableUntil: retired.DecryptableUntil,
+			CompromisedAt:    retired.CompromisedAt,
+		})
 
 		// An admin rotation is a domain-significant, security-relevant
 		// mutation, so unlike the re-encrypt-on-read write-back it is
 		// audited. before is the retired key as it stood while active; after
 		// is both rows' resulting state. Neither carries key material.
 		before := map[string]any{
-			"version":           retiredVersion,
+			"version":           retired.Version,
 			"retired_at":        nil,
 			"decryptable_until": nil,
 			"compromised_at":    nil,
@@ -568,25 +584,30 @@ func (h *FieldCryptoKeyHandler) SetGrace(w http.ResponseWriter, r *http.Request)
 	apiresp.WriteJSON(w, http.StatusOK, state)
 }
 
-// loadRetiredKey finds version in the inventory and requires it to be a
-// retired key. Both update routes run it inside their own transaction, before
-// the update, for two reasons: it splits 404 (unknown version) from 409 (the
-// still-active key, which both update queries refuse by construction — their
-// WHERE clauses require retired_at IS NOT NULL) from a single consistent
-// snapshot, and it supplies the observer's before-state.
-func loadRetiredKey(ctx context.Context, q coredb.Querier, version int32) (coredb.ListFieldCryptoKeyMetadataRow, error) {
-	rows, err := q.ListFieldCryptoKeyMetadata(ctx)
+// loadRetiredKey finds version by a WHERE version = $1 point query and
+// requires it to be a retired key. Both update routes run it inside their own
+// transaction, before the update, for two reasons: it splits 404 (unknown
+// version) from 409 (the still-active key, which both update queries refuse
+// by construction — their WHERE clauses require retired_at IS NOT NULL) from
+// a single consistent snapshot, and it supplies the observer's before-state.
+func loadRetiredKey(ctx context.Context, q coredb.Querier, version int32) (fieldCryptoKeyLifecycle, error) {
+	row, err := q.GetFieldCryptoKeyByVersion(ctx, version)
 	if err != nil {
-		return coredb.ListFieldCryptoKeyMetadataRow{}, fmt.Errorf("field_crypto_keys: load inventory: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fieldCryptoKeyLifecycle{}, errFieldCryptoKeyUnknown
+		}
+		return fieldCryptoKeyLifecycle{}, fmt.Errorf("field_crypto_keys: load key: %w", err)
 	}
-	row, ok := findFieldCryptoKey(rows, version)
-	if !ok {
-		return coredb.ListFieldCryptoKeyMetadataRow{}, errFieldCryptoKeyUnknown
+	lifecycle := fieldCryptoKeyLifecycle{
+		Version:          row.Version,
+		RetiredAt:        row.RetiredAt,
+		DecryptableUntil: row.DecryptableUntil,
+		CompromisedAt:    row.CompromisedAt,
 	}
-	if row.RetiredAt == nil {
-		return coredb.ListFieldCryptoKeyMetadataRow{}, errFieldCryptoKeyActive
+	if lifecycle.RetiredAt == nil {
+		return fieldCryptoKeyLifecycle{}, errFieldCryptoKeyActive
 	}
-	return row, nil
+	return lifecycle, nil
 }
 
 // writeKeyUpdateError maps a mark-compromised / grace transaction failure
@@ -605,16 +626,6 @@ func (h *FieldCryptoKeyHandler) writeKeyUpdateError(w http.ResponseWriter, r *ht
 	default:
 		apiresp.WriteError(w, r, err)
 	}
-}
-
-// findFieldCryptoKey returns the inventory row for version.
-func findFieldCryptoKey(rows []coredb.ListFieldCryptoKeyMetadataRow, version int32) (coredb.ListFieldCryptoKeyMetadataRow, bool) {
-	for _, row := range rows {
-		if row.Version == version {
-			return row, true
-		}
-	}
-	return coredb.ListFieldCryptoKeyMetadataRow{}, false
 }
 
 // maxFieldCryptoKeyBodyBytes bounds the request body this handler's two

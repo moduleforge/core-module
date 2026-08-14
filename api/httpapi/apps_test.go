@@ -267,6 +267,9 @@ func (q *appsFakeQuerier) GetEntityByUUID(_ context.Context, argUuid uuid.UUID) 
 	}
 	return coredb.GetEntityByUUIDRow{}, pgx.ErrNoRows
 }
+func (q *appsFakeQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
+	return coredb.GetFieldCryptoKeyByVersionRow{}, nil
+}
 func (q *appsFakeQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
@@ -295,8 +298,8 @@ func (q *appsFakeQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb
 func (q *appsFakeQuerier) MarkFieldCryptoKeyCompromised(_ context.Context, _ int32) (coredb.MarkFieldCryptoKeyCompromisedRow, error) {
 	return coredb.MarkFieldCryptoKeyCompromisedRow{}, nil
 }
-func (q *appsFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (int32, error) {
-	return 0, nil
+func (q *appsFakeQuerier) RetireActiveFieldCryptoKey(_ context.Context, _ coredb.RetireActiveFieldCryptoKeyParams) (coredb.RetireActiveFieldCryptoKeyRow, error) {
+	return coredb.RetireActiveFieldCryptoKeyRow{}, nil
 }
 func (q *appsFakeQuerier) SetFieldCryptoKeyDecryptableUntil(_ context.Context, _ coredb.SetFieldCryptoKeyDecryptableUntilParams) (coredb.SetFieldCryptoKeyDecryptableUntilRow, error) {
 	return coredb.SetFieldCryptoKeyDecryptableUntilRow{}, nil
