@@ -224,3 +224,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'security-002 (minor, low confidence): a pgconn.PgError''s Detail can quote key_bytes; harmless under both stdlib slog handlers; only matters if a custom slog handler is ever installed.'
+    - title: 'rotate: grace_period_days:0 convergence gap'
+      id: LO1V
+      date: "2026-08-14"
+      tags:
+        - plan/phase:phase-04-admin-rotation-api
+        - plan/slug:fieldcrypto-key-rotation
+        - type:security
+        - priority:unspecified
+        - effort:unspecified
+      text: 'graceDaysParam accepts grace_period_days: 0 on the rotation route, resolving decryptable_until to the retirement instant itself — the key is already past its deadline the moment the transaction commits. Only the process that served the rotation reloads its cipher; every other process keeps the pre-rotation snapshot for up to the 60s key-set TTL and keeps sealing new blobs under the just-retired version, which are then unreadable on write (ListUsableFieldCryptoKeys filters the version out). Worse, since the version isn''t in the loaded set at all, unusableVersionError takes the "unknown key version" branch instead of the one naming PUT /v1/field-crypto-keys/{version}/grace as the recovery action — least-actionable diagnostic for exactly the situation the grace route fixes. Recoverable (clearing the deadline via grace re-admits the version) but only by an operator who works out what happened. Every value >=1 is safe (a one-day window vastly exceeds the 60s convergence bound). Fix options need a design decision: reject grace_period_days:0 on the rotation route with a field error naming the convergence window, or floor the resolved deadline at retirement+margin exceeding the TTL, or keep 0 but document the consequence explicitly in the route''s OpenAPI description. Found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys.go:617-629. Severity: minor, confidence: medium.'
