@@ -244,3 +244,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'The fckRoutes 403 table covers all four routes but supplies a well-formed body and valid {version} in every case, so it establishes only that a denied request is refused, not that authorization is evaluated before parsing. The stronger invariant (a denied caller must never reach the body decoder or path-parameter parser) is unpinned. This matters because the sibling handler a maintainer would naturally copy from, AppsHandler.Create (api/httpapi/apps.go:138-162), does the opposite — decodes/validates before authorizing — so a future edit aligning this handler with that precedent would turn a 403 into a 400 on malformed input, silently disclosing input-validity information to an unauthorized caller, with every existing test still passing. Fix: extend the fckRoutes table with a deliberately invalid payload variant (malformed JSON on the two body-accepting routes, non-numeric {version} on the two version-scoped routes) and assert the response stays 403 rather than 400 when the authorizer denies. Found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys_test.go:406-471. Severity: suggestion, confidence: high.'
+    - title: 'rotate: unzeroed active.KeyBytes in memory'
+      id: VZYK
+      date: "2026-08-14"
+      tags:
+        - plan/phase:phase-04-admin-rotation-api
+        - plan/slug:fieldcrypto-key-rotation
+        - type:security
+        - priority:unspecified
+        - effort:unspecified
+      text: 'The file''s own type doc states rotation is "the one place raw key material exists here, as a local that is zeroed on return" — true for the request-derived copy (deferred clear(keyMaterial)) but InsertActiveFieldCryptoKey''s query also returns key_bytes among its result columns, so the returned coredb.FieldCryptoKey held in local `active` carries a second live copy of the brand-new active key material. Only Version and CreatedAt are read from it; KeyBytes is never zeroed and becomes garbage, readable in process memory until GC. Nothing is disclosed over the wire (activeKeyResponse is built from the two scalars, not the row) — this is memory hygiene, not a leak — but it''s the one place the file''s stated invariant is stronger than the code, misleading a future maintainer. Same class as existing followup MnvB (unzeroed key material in fromPersistedOrGenerated) — consider folding into one hardening item. Fix: either add a narrower sqlc query returning only version and created_at for the rotation insert, or clear(active.KeyBytes) immediately after Version/CreatedAt are copied out. Found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys.go:289-294. Severity: suggestion, confidence: high.'
