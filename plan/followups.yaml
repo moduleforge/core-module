@@ -154,3 +154,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'security-001 (followup material, not resolved here): verifyStale at api/service/rotating_cipher.go:341 treats any stored key version other than the source version as already-rotated, so a row re-encrypted under a second compromised retired version by a process with a stale key snapshot lets this read succeed while compromised ciphertext remains at rest. Bounded and self-correcting on the next read. A safe refinement would be for fieldcrypto to expose whether an arbitrary version is compromised, letting verifyStale accept only a non-compromised replacement version — this needs new fieldcrypto API surface, not a trivial fix.'
+    - title: 'Followup pfuW (MustPersist doc wording): read'
+      id: qpPO
+      date: "2026-08-14"
+      tags:
+        - type:ambiguity
+        - plan/phase:rotate-on-read
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Followup pfuW (MustPersist doc wording): read plan/overview.md requirement 4 directly and implemented its full semantics including the ''verifiably already gone'' qualifier via verifyStale — the implementation matches the overview. The api/internal/fieldcrypto package doc still carries the narrower wording; nothing in this task''s diff touches that file, so pfuW remains open for the manager to dispose of.'
