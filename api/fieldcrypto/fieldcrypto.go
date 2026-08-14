@@ -73,6 +73,13 @@ func (a *keyStoreAdapter) LoadUsableKeys(ctx context.Context) ([]KeyRecord, erro
 	for i, row := range rows {
 		rec, err := keyRecordFromRow(row)
 		if err != nil {
+			// Best-effort key hygiene, mirroring the internal package's own
+			// zeroKeyMaterial: a mapping failure partway through the batch
+			// must not leave any row's key bytes — processed or not —
+			// sitting unzeroed in the returned rows slice.
+			for j := range rows {
+				zeroBytes(rows[j].KeyBytes)
+			}
 			return nil, err
 		}
 		records[i] = rec
@@ -85,8 +92,18 @@ func (a *keyStoreAdapter) InsertInitialKey(ctx context.Context, keyBytes []byte)
 	if err != nil {
 		return KeyRecord{}, err
 	}
-	return keyRecordFromRow(row)
+	rec, err := keyRecordFromRow(row)
+	if err != nil {
+		zeroBytes(row.KeyBytes)
+		return KeyRecord{}, err
+	}
+	return rec, nil
 }
+
+// zeroBytes overwrites b. Best-effort key hygiene, matching the internal
+// package's zeroBytes: it shortens how long key material sits in a heap the
+// process may later dump or swap, and nothing more.
+func zeroBytes(b []byte) { clear(b) }
 
 // keyRecordFromRow maps one coredb.FieldCryptoKey row onto a KeyRecord,
 // returning a fresh KeyRecord built directly from row on every call — never a

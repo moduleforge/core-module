@@ -127,6 +127,11 @@ type fakeFieldKeyQuerier struct {
 	insertErr error
 
 	insertCalls int
+	// lastInsertedRow records the exact row value handed back by the most
+	// recent InsertInitialFieldCryptoKey call, so a test can inspect its
+	// KeyBytes backing array after the adapter has had a chance to zero it
+	// on a mapping-failure path (the adapter mutates in place via aliasing).
+	lastInsertedRow coredb.FieldCryptoKey
 }
 
 func (f *fakeFieldKeyQuerier) ListUsableFieldCryptoKeys(_ context.Context) ([]coredb.FieldCryptoKey, error) {
@@ -143,6 +148,7 @@ func (f *fakeFieldKeyQuerier) InsertInitialFieldCryptoKey(_ context.Context, key
 	// the Cipher goes on to zero, or a second call in the same test would
 	// observe zeroed bytes rather than the seed it inserted.
 	row.KeyBytes = append([]byte(nil), keyBytes...)
+	f.lastInsertedRow = row
 	return row, nil
 }
 
@@ -200,5 +206,46 @@ func TestNewFromEnvOrGenerateWrapsInsertError(t *testing.T) {
 
 	if _, err := NewFromEnvOrGenerate(context.Background(), q); err == nil {
 		t.Fatal("NewFromEnvOrGenerate: expected an error from a failed insert, got nil")
+	}
+}
+
+// allZero reports whether every byte of b is zero.
+func allZero(b []byte) bool {
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestLoadUsableKeysZeroesKeyBytesOnMappingFailure(t *testing.T) {
+	badKey := testKey(9)
+	q := &fakeFieldKeyQuerier{usable: []coredb.FieldCryptoKey{{
+		Version:  -1,
+		KeyBytes: badKey,
+	}}}
+	adapter := &keyStoreAdapter{q: q}
+
+	if _, err := adapter.LoadUsableKeys(context.Background()); err == nil {
+		t.Fatal("LoadUsableKeys: expected an error for a negative version, got nil")
+	}
+	if !allZero(badKey) {
+		t.Errorf("LoadUsableKeys: row KeyBytes = %x, want all zero after a mapping failure", badKey)
+	}
+}
+
+func TestInsertInitialKeyZeroesKeyBytesOnMappingFailure(t *testing.T) {
+	q := &fakeFieldKeyQuerier{insertRow: coredb.FieldCryptoKey{Version: -1}}
+	adapter := &keyStoreAdapter{q: q}
+
+	if _, err := adapter.InsertInitialKey(context.Background(), testKey(9)); err == nil {
+		t.Fatal("InsertInitialKey: expected an error for a negative version, got nil")
+	}
+	if q.insertCalls != 1 {
+		t.Fatalf("InsertInitialFieldCryptoKey called %d times, want 1", q.insertCalls)
+	}
+	if !allZero(q.lastInsertedRow.KeyBytes) {
+		t.Errorf("InsertInitialKey: row KeyBytes = %x, want all zero after a mapping failure", q.lastInsertedRow.KeyBytes)
 	}
 }
