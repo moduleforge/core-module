@@ -66,16 +66,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'reload() stamps lastLoadAttempt before issuing its query, so a decrypt driven by an already-cancelled request context burns the shared reload rate-limit budget (minReloadInterval) for no useful work — LoadUsableKeys returns ctx.Err() immediately. For the following window, encryptSet''s TTL-driven refresh takes its early-return branch and silently keeps the stale snapshot (no log at all on that branch, unlike the reload-failure branch). This can delay a replica''s convergence onto a rotated key set. Fix: don''t charge a context-cancellation failure against the shared budget (restore lastLoadAttempt on ctx.Err()); log at warn from encryptSet''s early-return branch when the snapshot is past keySetTTL but reload was rate-limited. Found by phase-2 boundary security review (opus-high), api/internal/fieldcrypto/fieldcrypto.go:335-347 and :404-424. Severity: minor, confidence: medium.'
-    - title: 'fieldcrypto adapter: no zero on error path'
-      id: 0DI1
-      date: "2026-08-13"
-      tags:
-        - plan/phase:phase-02-versioned-cipher
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'keyStoreAdapter zeroes key material via aliasing on the success path (records[i].KeyBytes shares memory with rows[i].KeyBytes, later zeroed by the cipher), but on a mapping failure (e.g. the negative-version guard) LoadUsableKeys returns nil, discarding both rows and records un-zeroed — asymmetric with the internal package''s reload(), which defers zeroKeyMaterial before calling buildKeySet so a mid-build failure still wipes everything. Best-effort hygiene either way (pgx''s wire buffers hold their own copies), but one corrupt row currently turns the hygiene property off for the whole key set. Fix: wipe rows[i].KeyBytes on the failure path in both LoadUsableKeys and InsertInitialKey before returning an error. Found by phase-2 boundary security review (opus-high), api/fieldcrypto/fieldcrypto.go:65-79. Severity: suggestion, confidence: high.'
     - title: 'fieldcrypto: MustPersist doc wording drift'
       id: pfuW
       date: "2026-08-13"
