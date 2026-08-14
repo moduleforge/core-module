@@ -165,6 +165,7 @@ phases:
           path: phase-05-doc-updates/001-update-architecture-docs.md
           done: false
           tier: sonnet-high
+          digest: 'Updated AGENTS.md''s fieldcrypto/, model/migrations/, and httpapi/ rows plus Conventions section to reflect the completed key-rotation work across phases 1-4: versioned multi-key storage, CORE_FIELD_KEY_HEX as first-boot-only seed (fails loudly on mismatch), lazy re-encrypt-on-read, FieldCryptoKeyHandler''s four admin-only routes, and the fleet-wide TTL convergence caveat (partially addressing followup 8x4a). model/README.md and README.md confirmed accurate/unchanged; docs/architecture/ confirmed still absent. All validation checks pass; exactly one file changed.'
           git:
             branch: plan/fieldcrypto-key-rotation-05-001
             commit:
