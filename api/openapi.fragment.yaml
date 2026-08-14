@@ -372,9 +372,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FieldCryptoKeyMetadata"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -437,7 +441,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+                $ref: "#/components/schemas/FieldCryptoKeyLifecycleState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -481,7 +487,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+                $ref: "#/components/schemas/FieldCryptoKeyLifecycleState"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -857,6 +863,40 @@ components:
           description: |
             Set when this retired key has been flagged compromised, either at
             rotation time or after the fact. Always null for the active key.
+
+    FieldCryptoKeyLifecycleState:
+      type: object
+      description: |
+        Version and lifecycle-timestamp state for one field-encryption key,
+        as returned by the mark-compromised and grace-window routes. Unlike
+        FieldCryptoKeyMetadata, this shape never includes the created_at /
+        updated_at row-bookkeeping timestamps — those routes build their
+        response from lifecycle state alone, not the broader inventory row.
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+          description: Key version number; the identity sequence starts at 1.
+        retired_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set once this version is no longer the active key.
+        decryptable_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Absolute deadline after which this retired key stops decrypting.
+            Null means no deadline (the safe default).
+        compromised_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Set when this retired key has been flagged compromised, either at
+            rotation time or after the fact.
 
     RotateFieldCryptoKeyRequest:
       type: object
