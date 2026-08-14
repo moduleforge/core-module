@@ -405,6 +405,11 @@ paths:
         retired key's decrypt deadline to the retirement instant itself,
         making blobs those processes are still concurrently sealing under
         the just-retired version unreadable the moment they are written.
+        A 201 response confirms the rotation was recorded and this
+        process's cipher reloaded; it is not confirmation that the
+        compromised key has stopped being used fleet-wide, since other
+        processes may keep encrypting new plaintext under the retired key
+        for up to the 60-second key-set TTL until they next reload.
         Requires wildcard-grant admin privileges.
       requestBody:
         required: false
