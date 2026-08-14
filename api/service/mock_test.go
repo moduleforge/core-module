@@ -34,6 +34,16 @@ func testCipher(t *testing.T) *fieldcrypto.Cipher {
 	return c
 }
 
+// testRotatingCipher wraps testCipher(t) in a RotatingCipher with a nil write
+// handle, which disables write-back — exactly right here, since testCipher
+// returns a store-less, version-1-pinned Cipher that never reports a needed
+// rotation in the first place. Every service test that used to hold a bare
+// *fieldcrypto.Cipher on the cipher field uses this instead.
+func testRotatingCipher(t *testing.T) *RotatingCipher {
+	t.Helper()
+	return NewRotatingCipher(testCipher(t), nil, nil)
+}
+
 // --- stub authz.Authorizer ---
 
 // allowAllAuthz is a stub Authorizer that always permits every operation.
