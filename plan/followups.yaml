@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: Narrow-measure content width token
-      id: XKY2
-      date: "2026-08-06"
-      tags:
-        - type:enhancement
-        - plan/phase:contract-documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: '--mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. gui/tokens/CONTRACT.md records this as an accepted open limitation. DECIDED: add a second token role, --mf-max-content-width-narrow, alongside the existing --mf-max-content-width. Implement: define the new custom property in the token source, wire it through gui/style-dictionary/build-tokens.mjs the same way --mf-max-content-width is emitted, and update gui/tokens/CONTRACT.md to document it (replacing the "accepted open limitation" note with the new role''s definition and usage).'
     - title: 'field-crypto-keys: full-scan not point query'
       id: b4lw
       date: "2026-08-14"
