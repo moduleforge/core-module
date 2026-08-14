@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -38,6 +39,19 @@ import (
 // already know how to adjudicate. It is a fixed statement with nothing
 // interpolated into it.
 const setRotationLockTimeout = "SET LOCAL lock_timeout = '250ms'"
+
+// writeBackTimeout bounds writeBack's call to txhelper.Run end to end —
+// acquiring a pool connection to begin the transaction, running the
+// compare-and-swap, and committing — not merely the in-transaction row-lock
+// wait that setRotationLockTimeout bounds. Matched to that same 250ms: if
+// rc.db's pool is saturated (see the db field's doc comment on why that
+// should never happen, but might), acquiring a second connection can block
+// indefinitely with nothing in Postgres itself to time it out, since that
+// wait happens before any statement — including the SET LOCAL above — ever
+// runs. This timeout converts that hang into an ordinary write-back failure,
+// which the policy branches in decryptRotating already know how to
+// adjudicate.
+const writeBackTimeout = 250 * time.Millisecond
 
 // rotateOnReadEvent tags every structured log line the write-back emits, so
 // rotation progress (or the lack of it) is greppable as one event stream.
@@ -88,6 +102,19 @@ type RotatingCipher struct {
 	// read-only-transaction cases that motivated the tolerant policy in the
 	// first place. A separate handle makes "log and skip" actually mean that.
 	// A nil db disables write-back, which is what unit tests use.
+	//
+	// db must never be a handle a caller may already hold a connection from
+	// (e.g. a pool a caller-owned transaction was checked out of). writeBack
+	// opens its own transaction on db, which means acquiring a second pool
+	// connection; if every connection in that pool is already held by
+	// callers waiting on a rotating read of their own, the pool
+	// self-deadlocks. writeBackTimeout bounds how long that acquisition (and
+	// the transaction it begins) may block, which turns pool saturation into
+	// an ordinary write-back failure instead of an indefinite hang — but it
+	// mitigates the consequence, it does not eliminate the precondition:
+	// callers are still expected to give RotatingCipher a handle backed by a
+	// pool distinct from any transaction they may be holding a connection
+	// from.
 	db txhelper.DB
 
 	// newQuerier derives a transaction-scoped querier; defaults to coredb.New.
@@ -251,6 +278,15 @@ func (rc *RotatingCipher) writeBack(
 	if rc.db == nil {
 		return false, errNoWriteHandle
 	}
+
+	// Bound the whole of Run — connection acquisition included, not just the
+	// in-transaction lock wait setRotationLockTimeout covers — so pool
+	// saturation degrades into an ordinary write-back failure the policy
+	// branches in decryptRotating already handle, rather than hanging until
+	// the caller's own request context expires. See writeBackTimeout and the
+	// db field's doc comment.
+	ctx, cancel := context.WithTimeout(ctx, writeBackTimeout)
+	defer cancel()
 
 	persisted := false
 	err := txhelper.Run(ctx, rc.db, func(ctx context.Context, tx pgx.Tx) error {
