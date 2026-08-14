@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -226,8 +227,11 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 	var req rotateFieldCryptoKeyRequest
 	// An empty body is the recommended invocation (server-generated key,
 	// standard rotation, no deadline), so it decodes as the zero request
-	// rather than as a malformed one.
-	if _, err := decodeFieldCryptoKeyBody(r, &req); err != nil {
+	// rather than as a malformed one. Rotate does not distinguish an absent
+	// grace_period_days key from an explicit null — both mean "no
+	// deadline" — so the raw body decodeFieldCryptoKeyBody returns is
+	// unused here.
+	if _, _, err := decodeFieldCryptoKeyBody(r, &req); err != nil {
 		apiresp.WriteError(w, r, err)
 		return
 	}
@@ -478,10 +482,21 @@ func (h *FieldCryptoKeyHandler) SetGrace(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req setFieldCryptoKeyGraceRequest
-	empty, err := decodeFieldCryptoKeyBody(r, &req)
+	raw, empty, err := decodeFieldCryptoKeyBody(r, &req)
 	if err != nil {
 		apiresp.WriteError(w, r, err)
 		return
+	}
+	// A present-but-key-omitted body ("{}") decodes to the same zero value
+	// as an explicit {"grace_period_days": null} — Go's json package does
+	// not distinguish "absent" from "present and null" on a pointer field.
+	// Left unchecked, that collapse would silently clear the deadline on a
+	// truncated request exactly as the byte-empty-body case would, which is
+	// what setFieldCryptoKeyGraceRequest's doc comment says never happens.
+	// Inspecting the raw body's own key set (fieldCryptoKeyBodyHasKey)
+	// recovers the distinction the struct decode alone cannot make.
+	if !empty && !fieldCryptoKeyBodyHasKey(raw, "grace_period_days") {
+		empty = true
 	}
 	if empty {
 		apiresp.WriteError(w, r, apiresp.InvalidInput(apiresp.FieldError{
@@ -578,20 +593,42 @@ func findFieldCryptoKey(rows []coredb.ListFieldCryptoKeyMetadataRow, version int
 }
 
 // decodeFieldCryptoKeyBody decodes r's body into dst, reporting whether the
-// body was empty so each route can decide what an absent body means. Unknown
-// members are rejected: silently ignoring a misspelled "compromised" would
-// perform a standard rotation while the operator believed they had flagged a
-// leaked key.
-func decodeFieldCryptoKeyBody(r *http.Request, dst any) (empty bool, err error) {
-	dec := json.NewDecoder(r.Body)
+// body was empty (zero bytes) so each route can decide what an absent body
+// means, and returning the raw body bytes so a caller that must distinguish
+// "key absent" from "key explicitly null" — a distinction encoding/json
+// collapses to the same zero value on a pointer field — can inspect the raw
+// JSON itself (see fieldCryptoKeyBodyHasKey). Unknown members are rejected:
+// silently ignoring a misspelled "compromised" would perform a standard
+// rotation while the operator believed they had flagged a leaked key.
+func decodeFieldCryptoKeyBody(r *http.Request, dst any) (raw []byte, empty bool, err error) {
+	body, rerr := io.ReadAll(r.Body)
+	if rerr != nil {
+		return nil, false, apiresp.ErrInvalidInput
+	}
+	if len(body) == 0 {
+		return nil, true, nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()
 	if derr := dec.Decode(dst); derr != nil {
-		if errors.Is(derr, io.EOF) {
-			return true, nil
-		}
-		return false, apiresp.ErrInvalidInput
+		return nil, false, apiresp.ErrInvalidInput
 	}
-	return false, nil
+	return body, false, nil
+}
+
+// fieldCryptoKeyBodyHasKey reports whether raw's top-level JSON object
+// contains key. raw is decodeFieldCryptoKeyBody's returned bytes, already
+// proven to unmarshal (that function's postcondition), so the unmarshal here
+// is not expected to fail; a failure is treated as "absent" rather than
+// panicking or propagating a second error path this deep into validation.
+func fieldCryptoKeyBodyHasKey(raw []byte, key string) bool {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return false
+	}
+	_, ok := probe[key]
+	return ok
 }
 
 // fieldCryptoKeyVersionParam parses the {version} path param. Version numbers

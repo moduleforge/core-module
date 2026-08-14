@@ -986,11 +986,20 @@ func TestFieldCryptoKeyGrace_400_InvalidInput(t *testing.T) {
 		name  string
 		body  string
 		field string
+		code  string
 	}{
-		{"absent body", "", "grace_period_days"},
-		{"negative days", `{"grace_period_days":-5}`, "grace_period_days"},
-		{"malformed json", `{"grace_period_days":`, ""},
-		{"unknown member", `{"grace_days":5}`, ""},
+		{"absent body", "", "grace_period_days", "field_crypto_keys.grace_period_days_required"},
+		// A present-but-empty object omits grace_period_days entirely,
+		// which decodes to the same zero value as an explicit
+		// {"grace_period_days": null}. Left uncaught, that collapse would
+		// silently clear the deadline on a truncated request — exactly the
+		// failure mode setFieldCryptoKeyGraceRequest's doc comment says an
+		// absent body is rejected to prevent, just reached via "{}" instead
+		// of a zero-byte body.
+		{"empty object", "{}", "grace_period_days", "field_crypto_keys.grace_period_days_required"},
+		{"negative days", `{"grace_period_days":-5}`, "grace_period_days", ""},
+		{"malformed json", `{"grace_period_days":`, "", ""},
+		{"unknown member", `{"grace_days":5}`, "", ""},
 	}
 
 	for _, tc := range cases {
@@ -1005,12 +1014,19 @@ func TestFieldCryptoKeyGrace_400_InvalidInput(t *testing.T) {
 				t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
 			}
 			if tc.field != "" {
-				if details := errorDetails(t, rec); len(details) != 1 || details[0].Field != tc.field {
+				details := errorDetails(t, rec)
+				if len(details) != 1 || details[0].Field != tc.field {
 					t.Errorf("details: got %+v, want one field error naming %q", details, tc.field)
+				}
+				if tc.code != "" && (len(details) != 1 || details[0].Code != tc.code) {
+					t.Errorf("details: got %+v, want one field error coded %q", details, tc.code)
 				}
 			}
 			if len(h.obs.calls) != 0 {
 				t.Errorf("rejected request still observed a mutation: %+v", h.obs.calls)
+			}
+			if h.q.keyByVersion(retired).decryptableUntil != nil {
+				t.Error("rejected request still set decryptable_until")
 			}
 		})
 	}
