@@ -75,6 +75,7 @@ phases:
     - number: 3
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
+      diff_base: 4d1d4f0ad63887180ae5a3af69e5e79da6b4546a
       tasks:
         - number: 1
           slug: rotating-cipher-helper
