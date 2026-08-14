@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: Per-component radius override levers
-      id: 7nrP
-      date: "2026-08-06"
-      tags:
-        - type:enhancement
-        - plan/phase:contract-documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'gui/tokens/CONTRACT.md documents --mf-radius as the single settable radius lever, with --radius-sm/-md/-lg/-xl derived from it via calc(var(--mf-radius, var(--mf-radius-default)) * k) and explicitly not individually settable. A brand that wants, say, pill-shaped buttons but square-cornered cards cannot express that — every primitive rescales together. DECIDED: implement a per-component radius override tier now. Add mf.component.<component>.radius entries to gui/tokens/component/overrides.json (currently empty, the intended home). Follow the --mf-content-margins-* breakpoint-band lever family as the precedent for layering a second override axis onto a derived-calc() token — axis here is component instead of breakpoint. Update gui/tokens/CONTRACT.md to document the new override tier once implemented.'
     - title: Narrow-measure content width token
       id: XKY2
       date: "2026-08-06"
