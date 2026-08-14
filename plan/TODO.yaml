@@ -109,7 +109,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/fieldcrypto-key-rotation-03-003
-            commit: []
+            commit:
+                - 4b16f27
             merge: null
     - number: 4
       slug: admin-rotation-api
