@@ -50,6 +50,15 @@
  *          Also intended: it is exactly what `--mf-content-margins-tb` is for. Ordinary utilities
  *          (`py-0`, `py-8`) are emitted after both container rules and still win, so the escape
  *          hatch is intact.
+ *   5. A `[data-mf-component="<component>"]` scoped block for every `mf.component.<component>.radius`
+ *      entry found in `tokens/component/overrides.json` (followup 7nrP) — the per-COMPONENT
+ *      counterpart to the per-BAND `--mf-content-margins-*` lever family above: same mechanism
+ *      (an outer fallback-chained lever standing in for the global one, still scaled by the
+ *      existing per-step multiplier), with "component" as the second override axis instead of
+ *      "breakpoint band". Emitted only when at least one such entry exists, so the default
+ *      (no-override) build is byte-identical to a build without this feature. See
+ *      `componentRadiusOverrideBlock` below and `tokens/CONTRACT.md`'s
+ *      "Per-component radius override tier" section for the full contract.
  *
  * Regenerate with `npm run build:tokens` (or `bun run build:tokens`) after editing any file
  * under `tokens/`. This script produces no manual post-edits and is deterministic: token lists
@@ -338,6 +347,65 @@ function containerUtilityBlock(tokens) {
   ].join('\n');
 }
 
+/** Finds every component that carries a `--mf-component-<component>-radius` token (compiled from
+ * `mf.component.<component>.radius` in `tokens/component/overrides.json`) and returns its
+ * component-name segment, sorted. Deliberately generic over the component name — a component
+ * whose own name contains hyphens (e.g. a hypothetical "button-group") still round-trips, since
+ * `.+` is greedy and the "-radius" suffix only occurs once per token name. Returns an empty array
+ * when no such token exists, which is the default (no-override) case.
+ * @param {{name: string}[]} tokens
+ * @returns {string[]} */
+function componentRadiusOverrideNames(tokens) {
+  const names = tokens
+    .map((t) => /^mf-component-(.+)-radius$/.exec(t.name))
+    .filter(Boolean)
+    .map((m) => m[1]);
+  return [...new Set(names)].sort();
+}
+
+/** Renders the `[data-mf-component="<component>"]` scoped blocks for every component-specific
+ * radius override found in the resolved tokens (followup 7nrP). This is the per-COMPONENT
+ * counterpart to `containerUtilityBlock`'s per-BAND `--mf-content-margins-*` lever: the same
+ * "outer var() lever standing in for the global one, inside the same calc() shape" idiom, with
+ * component as the second override axis instead of breakpoint band.
+ *
+ * Each derived `--radius-{sm,md,lg,xl}` Tailwind theme key is itself just a real CSS custom
+ * property (`@theme inline` compiles to a `:root`-scoped declaration), so redeclaring it inside a
+ * `[data-mf-component="…"]` selector shadows the global value for any element nested under that
+ * attribute via ordinary CSS cascade/inheritance — no change to `RADIUS_THEME_MAP` or the
+ * `@theme` block itself is needed. Every step keeps its usual per-step multiplier (the same one
+ * `RADIUS_THEME_MAP`'s global declarations use), scaled from the component's own lever instead of
+ * `--mf-radius`, so a component override still yields proportionate sm/md/lg/xl steps within its
+ * own scope — exactly like `--mf-radius` does globally.
+ *
+ * The per-component lever resolves through the same fallback chain as every other `--mf-x`: a
+ * style package may supply `--mf-component-<component>-radius` directly, falling back to
+ * `--mf-component-<component>-radius-default` (compiled from `overrides.json`'s `$value`, emitted
+ * automatically as an ordinary token by the existing `:root`/`@property` emission — no special
+ * casing needed there since it is `isSemanticToken`-true and mode-independent like radius).
+ *
+ * Returns `''` when no component carries a radius override (the default case), so callers can
+ * omit the whole section — including its comment — for a byte-identical build.
+ * @param {{name: string, $extensions?: Record<string, any>}[]} tokens
+ * @returns {string} */
+function componentRadiusOverrideBlock(tokens) {
+  const components = componentRadiusOverrideNames(tokens);
+  if (components.length === 0) return '';
+
+  const blocks = components.map((component) => {
+    const varName = `mf-component-${component}-radius`;
+    requireToken(tokens, varName);
+    const lever = `var(--${varName}, var(--${varName}-default))`;
+    const decls = RADIUS_THEME_MAP.map(([mfName, twVar]) => {
+      const multiplier = radiusMultiplierOf(tokens, mfName);
+      return `  ${twVar}: calc(${lever} * ${multiplier});`;
+    }).join('\n');
+    return `[data-mf-component="${component}"] {\n${decls}\n}`;
+  });
+
+  return blocks.join('\n\n');
+}
+
 async function main() {
   // Mode-independent tokens (radius, spacing/layout) plus the LIGHT color set. Light is the
   // baseline mode, so this one instance backs both `:root` and the light-scoped re-assertion;
@@ -420,6 +488,7 @@ async function main() {
   const declList = (tokens) => tokens.map((t) => `  --${t.name}-default: ${formatValue(t)};`).join('\n');
 
   const containerBlock = containerUtilityBlock(lightTokens);
+  const componentRadiusBlock = componentRadiusOverrideBlock(lightTokens);
 
   const rootBlock = declList(lightTokens);
   const lightColorBlock = declList(lightColorTokens);
@@ -457,7 +526,19 @@ ${themeLines.join('\n')}
        is what \`--mf-content-margins-tb\` is for. Ordinary utilities (\`py-0\`, \`py-8\`) are emitted
        after the container rules and still win, so the escape hatch is intact. */
 ${containerBlock}
-
+${
+    componentRadiusBlock
+      ? `
+/* Per-component radius override tier (followup 7nrP) — see tokens/CONTRACT.md's "Per-component
+   radius override tier" section. Each block below shadows --radius-{sm,md,lg,xl} for elements
+   nested under its [data-mf-component="…"] attribute, deriving them from that component's own
+   --mf-component-<component>-radius lever (with the usual -default fallback) instead of the
+   global --mf-radius, scaled by the same per-step multiplier. Absent entirely when no
+   tokens/component/overrides.json entry defines a component radius override. */
+${componentRadiusBlock}
+`
+      : ''
+  }
 /* Light is the baseline: the full default set (colors + mode-independent typography/radius),
    active whenever data-mf-theme is absent. */
 :root {

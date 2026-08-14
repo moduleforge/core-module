@@ -144,6 +144,79 @@ overriding `--mf-radius` rescales all of them. (The compiled `--mf-radius-{sm,md
 values exist as typed `@property` reference values; they are **not** part of the runtime-settable
 chain — override `--mf-radius`, not the derived steps.)
 
+#### Per-component radius override tier
+
+`--mf-radius` rescales **every** primitive together — there is no way, through the global lever
+alone, for a brand to want pill-shaped buttons but square-cornered cards. The **component-override
+tier** (`tokens/component/overrides.json`, `mf.component.<component>.<property>` — see
+[README.md](./README.md#tiering-convention)) is the escape hatch for exactly this case, via a
+reserved `radius` property: `mf.component.<component>.radius`.
+
+This is the per-**component** counterpart to the per-**breakpoint-band**
+[`--mf-content-margins-*` lever family](#spacing-and-container-width) above — same mechanism
+(an outer, fallback-chained lever standing in for the global one, inside the same `calc()` shape),
+with component as the second override axis instead of breakpoint band:
+
+- **Valid keys.** `mf.component.<component>.radius` in `tokens/component/overrides.json`, `$type:
+  "dimension"`, e.g. `mf.component.button.radius`. `<component>` is a free-form kebab-case
+  component name; `radius` is the only property name this tier gives special build-time handling
+  to (every other `mf.component.<component>.<property>` entry is a plain alias, per the file's
+  existing convention).
+- **Compiled output.** For every `mf.component.<component>.radius` entry, the compiler
+  (`../style-dictionary/build-tokens.mjs`, `componentRadiusOverrideBlock`) emits a
+  `[data-mf-component="<component>"]` scoped block that shadows `--radius-sm`, `--radius-md`,
+  `--radius-lg`, and `--radius-xl` for any element nested under that attribute:
+
+  ```css
+  [data-mf-component="button"] {
+    --radius-sm: calc(var(--mf-component-button-radius, var(--mf-component-button-radius-default)) * 0.6);
+    --radius-md: calc(var(--mf-component-button-radius, var(--mf-component-button-radius-default)) * 0.8);
+    --radius-lg: calc(var(--mf-component-button-radius, var(--mf-component-button-radius-default)) * 1);
+    --radius-xl: calc(var(--mf-component-button-radius, var(--mf-component-button-radius-default)) * 1.4);
+  }
+  ```
+
+  Each step keeps its usual global multiplier (`0.6` / `0.8` / `1.0` / `1.4`), scaled from the
+  component's own lever instead of `--mf-radius`, so an overridden component still gets
+  proportionate sm/md/lg/xl steps within its own scope — exactly like `--mf-radius` does globally.
+  A component author opts in by rendering the primitive's root element with
+  `data-mf-component="button"`; a Tailwind `rounded-md` (etc.) utility nested under that attribute
+  resolves the shadowed `--radius-md` custom property via ordinary CSS cascade, no per-utility
+  change needed. **Wiring the `data-mf-component` attribute onto mod-core's own primitives
+  (`button.tsx`, `card.tsx`, …) is a separate, not-yet-done step** — this tier establishes the
+  token-compiler mechanism only.
+- **Interaction with `--mf-radius` / `--radius-*`.** `--mf-component-<component>-radius` resolves
+  through the same fallback chain as every other `--mf-x` lever: a style package may set it
+  directly, falling back to its compiler-baked `-default` twin (from `overrides.json`'s `$value`)
+  when unset. It takes precedence over the global `--mf-radius` derivation **only inside its own
+  `[data-mf-component="…"]` scope**; elements outside that scope, and any component with no
+  `mf.component.<component>.radius` entry, are unaffected and continue deriving from the global
+  `--mf-radius` lever exactly as before. `--mf-component-<component>-radius-default` is
+  compiler-only, exactly like every other `-default` twin in this contract — not part of the
+  runtime-settable chain.
+- **Default (no-override) behavior is unchanged.** When `overrides.json` defines no
+  `mf.component.<component>.radius` entries — the shipped default — the compiler emits no
+  `[data-mf-component="…"]` blocks at all; the output is byte-identical to a build without this
+  tier.
+- **Example.** A brand wanting pill-shaped buttons while leaving cards square adds, in
+  `tokens/component/overrides.json`:
+
+  ```json
+  {
+    "mf": {
+      "component": {
+        "button": {
+          "radius": { "$type": "dimension", "$value": "9999px" }
+        }
+      }
+    }
+  }
+  ```
+
+  and (once `data-mf-component="button"` is wired onto the `Button` primitive) every `rounded-*`
+  utility on `Button` resolves to a full pill, while `Card` — which carries no
+  `mf.component.card.radius` entry — keeps deriving from the global `--mf-radius` scale unchanged.
+
 ### Typography
 
 - **Families:** `--mf-font-sans`, `--mf-font-mono` (both wired into the `@theme` font map),
