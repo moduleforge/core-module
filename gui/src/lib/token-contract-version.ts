@@ -25,5 +25,12 @@
  * `--mf-content-margins-lr` / `--mf-content-margins-tb`, and their
  * per-breakpoint-band override forms `--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}`.
  * This is a MINOR bump: new roles only, no existing role removed, renamed, or revalued.
+ * `1.2.0` adds two further additions: the per-component radius override tier
+ * (`mf.component.<component>.radius` in `tokens/component/overrides.json`, compiled by
+ * `../../tokens/style-dictionary/build-tokens.mjs`'s `componentRadiusOverrideBlock` into
+ * `[data-mf-component="..."]` scoped blocks that shadow the derived radius steps for that
+ * component alone — followup 7nrP) and the `--mf-max-content-width-narrow` token role (a second,
+ * narrower content-width scalar, independent of `--mf-max-content-width` — followup XKY2). This
+ * is also a MINOR bump: new roles/mechanism only, no existing role removed, renamed, or revalued.
  */
-export const MF_TOKEN_CONTRACT_VERSION = '1.1.0';
+export const MF_TOKEN_CONTRACT_VERSION = '1.2.0';

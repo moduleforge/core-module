@@ -93,11 +93,13 @@ task beyond ensuring the source carries the default values (it does).
 **Type scale:** `--mf-text-h1`…`--mf-text-h6`, `--mf-text-body`, `--mf-text-body-sm`,
 `--mf-text-label` — each with `size` / `line-height` / `weight` / `tracking` sub-tokens.
 
-**Spacing and container width:** three scalar roles — `--mf-max-content-width`,
-`--mf-content-margins-lr`, `--mf-content-margins-tb` — plus twelve per-band levers,
-`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` (six bands × two axes). Base values: both
-axis base inputs are `1rem` (`spacing.content-margin-base`); `--mf-max-content-width` defaults to
-`80rem` (`spacing.max-content-width`). Mode-independent, like radius and typography.
+**Spacing and container width:** four scalar roles — `--mf-max-content-width`,
+`--mf-max-content-width-narrow`, `--mf-content-margins-lr`, `--mf-content-margins-tb` — plus twelve
+per-band levers, `--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` (six bands × two axes). Base
+values: both axis base inputs are `1rem` (`spacing.content-margin-base`); `--mf-max-content-width`
+defaults to `80rem` (`spacing.max-content-width`); `--mf-max-content-width-narrow` defaults to
+`42rem` (`spacing.max-content-width-narrow`, followup XKY2) — a second, independent content-width
+scalar for reading-oriented pages. Mode-independent, like radius and typography.
 
 **Spacing: dual-carry preserved.** DTCG has no calc primitive, so each derived per-band token in
 `semantic/layout.json` carries **both** a pre-computed literal `$value` (so the baked `@property`
