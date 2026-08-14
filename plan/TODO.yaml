@@ -107,6 +107,7 @@ phases:
           path: phase-03-rotate-on-read/003-rotate-on-read-integration-test.md
           done: false
           tier: sonnet-high
+          digest: 'Added api/service/rotating_cipher_integration_test.go (build-tagged integration), proving the rotate-on-read success criterion against real Postgres. Three tests: standard rotation persisting and idempotent on second read (table-driven over both columns); grace-window-expiry failing loudly; compromised-key branch''s three sub-cases (working handle succeeds, nil handle fails, genuinely-uncommittable write-back via real competing row lock fails). Database genuinely available and exercised twice in a row, both green. make test/vet/lint and git diff --stat all passed as specified.'
           git:
             branch: plan/fieldcrypto-key-rotation-03-003
             commit:
