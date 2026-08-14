@@ -1,11 +1,2 @@
 version: 2
-items:
-    - title: Bump token contract version
-      id: ydre
-      date: "2026-08-14"
-      tags:
-        - type:documentation
-        - plan/phase:contract-documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Two recently-landed token additions (followup 7nrP''s per-component radius override tier, and followup XKY2''s --mf-max-content-width-narrow role) both skipped bumping gui/src/lib/token-contract-version.ts''s MF_TOKEN_CONTRACT_VERSION (currently 1.1.0) and did not update gui/tokens/STYLE-PACKAGE-CONTRACT.md''s changelog, even though STYLE-PACKAGE-CONTRACT.md''s own documented policy states a new --mf-x role is a MINOR version bump (precedent: 1.0.0 -> 1.1.0 when --mf-max-content-width was first added). XKY2''s implementing agent flagged this explicitly as a judgment call worth manager review, noting the new --mf-max-content-width-narrow role is unconditional/always-emitted (closer to the original 1.0.0->1.1.0 case than to 7nrP''s opt-in, empty-by-default component-override tier, which has a better case for not needing a bump since default output is byte-identical). DECIDED: bump MF_TOKEN_CONTRACT_VERSION to the next MINOR version (1.2.0) to cover both additions in one bump, update gui/tokens/STYLE-PACKAGE-CONTRACT.md''s changelog with entries for both the per-component radius override tier and --mf-max-content-width-narrow, and update gui/tokens/README.md''s "three scalar roles" enumeration to reflect the now-four roles (also left stale by XKY2, per its own report). Implement in gui/src/lib/token-contract-version.ts, gui/tokens/STYLE-PACKAGE-CONTRACT.md, gui/tokens/README.md.'
+items: []
