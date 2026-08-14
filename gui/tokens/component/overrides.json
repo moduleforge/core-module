@@ -1,12 +1,13 @@
 {
-  "$description": "Component-override tier — a sparse escape-hatch namespace. INTENTIONALLY MINIMAL at this stage; this file exists to establish the convention, not to populate it. A component-override token is added here ONLY when a specific component needs to diverge from the semantic tier and no semantic role fits. Naming convention: mf.component.<component>.<property> (e.g. mf.component.button.destructive-hover), each aliasing a semantic --mf-* role or a raw value. Prefer adding/using a semantic role over an override; overrides are the exception. The example below is commented-out-by-convention (kept under an inert `$example` group so nothing is emitted) purely to document the shape.",
+  "$description": "Component-override tier — a sparse escape-hatch namespace. INTENTIONALLY MINIMAL at this stage; this file exists to establish the convention, not to populate it. A component-override token is added here ONLY when a specific component needs to diverge from the semantic tier and no semantic role fits. Naming convention: mf.component.<component>.<property> (e.g. mf.component.button.destructive-hover), each aliasing a semantic --mf-* role or a raw value. Prefer adding/using a semantic role over an override; overrides are the exception. The example below is commented-out-by-convention (kept under an inert `$example` group so nothing is emitted) purely to document the shape. `mf.component.<component>.radius` is a reserved property name within this convention: mod-core/gui/style-dictionary/build-tokens.mjs (see componentRadiusOverrideBlock) recognizes it specifically and emits a `[data-mf-component=\"<component>\"]` scoped block that shadows --radius-{sm,md,lg,xl} for that component alone (followup 7nrP) — see tokens/CONTRACT.md's \"Per-component radius override tier\" section for the full contract. Every other `<property>` name in this file is a plain alias with no special build-time handling.",
   "mf": {
     "component": {
       "$description": "Empty by design. Add real per-component override tokens as siblings of $example when a genuine need arises.",
       "$example": {
         "$description": "Illustrative only — task 002 must NOT emit tokens under $example. Shows the intended mf.component.<component>.<property> shape.",
         "button": {
-          "destructive-hover": { "$type": "color", "$value": "{color.red.dark}", "$description": "EXAMPLE ONLY. How a button-specific override would alias a raw or semantic value." }
+          "destructive-hover": { "$type": "color", "$value": "{color.red.dark}", "$description": "EXAMPLE ONLY. How a button-specific override would alias a raw or semantic value." },
+          "radius": { "$type": "dimension", "$value": "9999px", "$description": "EXAMPLE ONLY. How a component would opt out of the global --mf-radius scale (e.g. pill-shaped buttons) via the reserved `radius` property — see tokens/CONTRACT.md's \"Per-component radius override tier\" section." }
         }
       }
     }
