@@ -51,8 +51,14 @@
 //     underneath it. A reload failure there is logged at error level and the
 //     existing snapshot is used: failing every write because the key table is
 //     briefly unreachable is worse than a bounded window of stale encryption.
+//     A stale snapshot returned instead because a reload is currently
+//     rate-limited is logged at warn level for the same reason.
 //   - Reload is exported so the process that serves an admin rotation can
 //     converge immediately instead of waiting out the TTL.
+//   - a load attempt that fails because its context was already cancelled or
+//     past its deadline never reached the key table, so it does not charge
+//     the shared reload-rate-limit budget; only a load that actually failed
+//     to reach the key table does.
 //
 // # CORE_FIELD_KEY_HEX
 //
@@ -334,7 +340,21 @@ func (c *Cipher) Reload(ctx context.Context) error {
 // unreachable is worse than a bounded window of stale encryption.
 func (c *Cipher) encryptSet(ctx context.Context) *keySet {
 	set := c.set.Load()
-	if c.store == nil || time.Since(set.loadedAt) < c.keySetTTL || !c.reloadAllowed() {
+	stale := time.Since(set.loadedAt) >= c.keySetTTL
+	if c.store == nil || !stale || !c.reloadAllowed() {
+		if c.store != nil && stale {
+			// Reaching here with a store present and the snapshot already
+			// past its TTL means the early return above was driven by
+			// !c.reloadAllowed(), not by having nothing to reload (store ==
+			// nil) or by the snapshot still being fresh — both of which stay
+			// silent. That case is worth a log of its own: it says the
+			// snapshot Encrypt is about to use is stale for a reason that
+			// resolves itself once the rate-limit window passes, symmetric
+			// with the reload-failure branch below, which also logs.
+			slog.WarnContext(ctx, "fieldcrypto: key-set snapshot is past its TTL but reload is currently rate-limited; encrypting under the existing snapshot",
+				"snapshot_age_seconds", time.Since(set.loadedAt).Seconds(),
+				"active_version", set.active)
+		}
 		return set
 	}
 	if err := c.reload(ctx); err != nil {
@@ -421,11 +441,28 @@ func (c *Cipher) reload(ctx context.Context) error {
 		return nil
 	}
 
+	// Captured before it is overwritten below, so a load that turns out to
+	// have done no useful work can put the budget back the way it found it.
+	previousAttempt := c.lastLoadAttempt.Load()
 	startedAt := time.Now()
 	c.lastLoadAttempt.Store(startedAt.UnixNano())
 
 	records, err := c.store.LoadUsableKeys(ctx)
 	if err != nil {
+		if ctx.Err() != nil {
+			// ctx was already cancelled or past its deadline, so the store
+			// call failed immediately without ever reaching the key table:
+			// it did no useful work and told us nothing about whether the
+			// key table itself is reachable. Charging the shared reload
+			// budget for it would only starve the next real attempt for no
+			// reason, so restore the pre-call value instead. Checked against
+			// ctx directly rather than the returned error, since a store
+			// implementation is not guaranteed to wrap context.Canceled /
+			// context.DeadlineExceeded the same way (or at all). Every other
+			// failure — a real DB or network error with ctx.Err() == nil —
+			// keeps charging the budget exactly as before.
+			c.lastLoadAttempt.Store(previousAttempt)
+		}
 		return fmt.Errorf("fieldcrypto: load usable keys: %w", err)
 	}
 	defer zeroKeyMaterial(records)
