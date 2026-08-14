@@ -164,3 +164,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Followup pfuW (MustPersist doc wording): read plan/overview.md requirement 4 directly and implemented its full semantics including the ''verifiably already gone'' qualifier via verifyStale — the implementation matches the overview. The api/internal/fieldcrypto package doc still carries the narrower wording; nothing in this task''s diff touches that file, so pfuW remains open for the manager to dispose of.'
+    - title: 'Note for task 002 (no action needed): service'
+      id: GTTY
+      date: "2026-08-14"
+      tags:
+        - type:ambiguity
+        - plan/phase:rotate-on-read
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Note for task 002 (no action needed): service.New still constructs services with a bare *fieldcrypto.Cipher; nothing yet holds a RotatingCipher, so ssnColumn/einColumn are exercised only by tests until the call sites are wired.'
