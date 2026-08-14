@@ -41,7 +41,9 @@ func NewFromKey(key []byte) (*Cipher, error) {
 // FieldKeyQuerier is the façade's persistence contract: the two
 // field_crypto_keys queries NewFromEnvOrGenerate needs. It is satisfied
 // structurally by both *coredb.Queries and coredb.Querier, so the module
-// manifest's queries:coredb arg source still type-checks unchanged.
+// manifest's queries:coredb arg source still type-checks unchanged. Returned
+// KeyBytes must be freshly allocated on every call and retained by nothing
+// else — the cipher zeroes it after building the AEAD.
 type FieldKeyQuerier interface {
 	ListUsableFieldCryptoKeys(ctx context.Context) ([]coredb.FieldCryptoKey, error)
 	InsertInitialFieldCryptoKey(ctx context.Context, keyBytes []byte) (coredb.FieldCryptoKey, error)
