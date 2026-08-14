@@ -9,16 +9,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: '--mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. gui/tokens/CONTRACT.md records this as an accepted open limitation. DECIDED: add a second token role, --mf-max-content-width-narrow, alongside the existing --mf-max-content-width. Implement: define the new custom property in the token source, wire it through gui/style-dictionary/build-tokens.mjs the same way --mf-max-content-width is emitted, and update gui/tokens/CONTRACT.md to document it (replacing the "accepted open limitation" note with the new role''s definition and usage).'
-    - title: 'Doc: compromised-rotation TTL window'
-      id: 8x4a
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-05-doc-updates
-        - plan/slug:fieldcrypto-key-rotation
-        - type:documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'A rotation with compromised:true is the operator asserting the outgoing key has leaked, but post-commit convergence reloads only the process that served the request. Every other process continues encrypting new plaintext under the key just declared compromised for up to the 60s key-set TTL. PARTIALLY RESOLVED: phase 5''s doc-updates task (001-update-architecture-docs) added this convergence-window caveat to AGENTS.md''s Conventions section, covering the operator-runbook half. Remaining scope: the rotation route''s OpenAPI description (api/openapi.fragment.yaml, POST /field-crypto-keys/rotations) still does not mention that a 201 response is not the point at which the compromised key stops being used fleet-wide — add a note there to fully close this out. Small, well-scoped, doc-only. Originally found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys.go:332-343. Severity: minor, confidence: medium.'
     - title: 'field-crypto-keys: full-scan not point query'
       id: b4lw
       date: "2026-08-14"
