@@ -124,16 +124,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
-    - title: 'Note for task 002 (no action needed): service'
-      id: GTTY
-      date: "2026-08-14"
-      tags:
-        - type:ambiguity
-        - plan/phase:rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Note for task 002 (no action needed): service.New still constructs services with a bare *fieldcrypto.Cipher; nothing yet holds a RotatingCipher, so ssnColumn/einColumn are exercised only by tests until the call sites are wired.'
     - title: 'rotating_cipher: narrow verifyStale check'
       id: 9l49
       date: "2026-08-14"
