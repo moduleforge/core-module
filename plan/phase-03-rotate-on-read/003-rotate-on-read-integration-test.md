@@ -86,3 +86,69 @@ covers this work.
 - [`../notes/key-store-schema-design.md`](../notes/key-store-schema-design.md#grace-expiry-semantics)
   — expiry behavior, enforced in both SQL and Go.
 - `api/internal/fieldcrypto/generate_integration_test.go` — the in-repo integration-test convention.
+
+## Status
+
+**Outcome: succeeded.** Implemented 2026-08-13.
+
+Added `api/service/rotating_cipher_integration_test.go` (`//go:build integration`, package
+`service_test`), following the `TestMain` / prerequisite-check / host-resolution / shadow-DB-reset
+pattern of `api/internal/fieldcrypto/generate_integration_test.go` and
+`api/authz/setup/grant_table_integration_test.go`, against its own shadow database
+(`core_rotate_on_read_verify_dev`).
+
+Three top-level tests:
+
+- `TestRotateOnRead_StandardRotationPersistsAndIsIdempotent` — table-driven over
+  `natural_persons.ssn` and `corporations.ein`: bootstraps a real cipher (version 1), writes through
+  `RotatingCipher.Encrypt` into a seeded entity/legal_entity/natural_person-or-corporation row,
+  rotates directly through `RetireActiveFieldCryptoKey` + `InsertActiveFieldCryptoKey` (mandatory
+  order), reloads, reads through the service method and asserts the plaintext, re-reads the raw
+  stored blob and asserts its version prefix decodes to the new active version, then reads a second
+  time and asserts no further write occurred (`updated_at` unchanged, raw blob bytes unchanged).
+- `TestRotateOnRead_GraceWindowExpiredFailsRead` — retires version 1 with a back-dated, already-past
+  `decryptable_until` (same technique as `TestFieldKeyRealExpiredGraceWindowStopsDecrypting`), reloads,
+  and asserts a read of the still-version-1 blob fails loudly rather than returning empty or wrong
+  plaintext.
+- `TestRotateOnRead_CompromisedKeyReadRequiresWorkingWriteHandle` — retires version 1 as compromised
+  and exercises three independent rows/sub-cases: a working write handle persists the replacement and
+  the read succeeds; a nil write handle fails the read; and a write-back that genuinely cannot commit
+  (implemented by holding a real competing row lock in a separate uncommitted transaction, so the
+  write-back's own `SET LOCAL lock_timeout = '250ms'` genuinely expires with SQLSTATE 55P03) also
+  fails the read. All three assert the stored blob was left untouched on failure.
+
+Validation, all executed:
+
+- `cd api && make test` (`go test ./...`, no build tag) — passes unchanged; the new file is excluded
+  by its build tag. All 13 packages `ok`.
+- `cd api && go vet -tags integration ./service/...` — clean, no findings.
+- `cd api && go test -tags=integration -p 1 -v ./service/...` — run against the real
+  `users-module-postgres` container. **Database was available and the suite was actually executed**,
+  not skipped: `CORE_DEV_PG_HOST=192.168.1.153` (verified via `psql`: plain `localhost` on this host
+  resolves to a *different*, host-native Postgres with no `users` role — the same finding
+  phase-2/task-001's integration test recorded; the container is reachable at the host's LAN IP).
+  Every test in the package passed, including the three new tests and all prior unit/service tests.
+- `cd api && make lint` (`go vet ./...` + `gofmt -l .`) — clean.
+- Idempotency: ran the new tests twice in a row — once as two separate `go test` invocations (each
+  triggering `TestMain`'s drop/recreate of the shadow database), and once with `-count=2` in a single
+  process (no DB reset between the two `m.Run()` passes, so the second pass hit whatever the first
+  pass's `t.Cleanup` left behind). Both passed both times.
+- `git diff --stat` — exactly one new file (744 lines), no other changes.
+
+Assumptions applied (from `## Assumptions` above): tasks 001/002 landed and Phase 1's key queries/CAS
+updates are available through `coredb` (confirmed — `RetireActiveFieldCryptoKey`,
+`InsertActiveFieldCryptoKey`, `UpdateNaturalPersonSSNBlob`, `UpdateCorporationEINBlob` all present and
+used directly); entity/subtype rows are created via the existing query surface, reusing the
+`seedNaturalPerson`/`seedCorporation` pattern from `grant_table_integration_test.go` (adapted to carry
+a pre-encrypted blob rather than an empty one) rather than a parallel fixture helper; a rotation
+performed directly through the Phase 1 queries (not the not-yet-existing Phase 4 HTTP endpoint) is
+sufficient and correct for this test's purpose.
+
+One decision beyond the task doc's explicit direction: for the compromised-key "write-back cannot
+commit" sub-case, the task doc left the mechanism open. Chose a real competing row lock (a separate
+uncommitted transaction holding `SELECT ... FOR UPDATE` on the target row) over a synthetic failure
+path, so the write-back's own `SET LOCAL lock_timeout` is exercised for real rather than simulated —
+this is the exact lock-ordering hazard `plan/notes/rotation-api-shape.md` documents as the reason that
+timeout exists.
+
+Files touched: `api/service/rotating_cipher_integration_test.go` (new).
