@@ -129,7 +129,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-04-001
             commit:
                 - 02d8505
-            merge: null
+            merge: 49ce33b
         - number: 2
           slug: manifest-and-openapi-routes
           title: Manifest And OpenAPI Route Entries
