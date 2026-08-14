@@ -230,12 +230,18 @@ with component as the second override axis instead of breakpoint band:
 
 ### Spacing and container width
 
-Three scalar roles plus twelve per-band levers (six bands × two axes), all **mode-independent** —
+Four scalar roles plus twelve per-band levers (six bands × two axes), all **mode-independent** —
 emitted once in `:root` and never re-emitted in the `data-mf-theme` scope selectors (see
 [Emission shape](#emission-shape) below).
 
 - **`--mf-max-content-width`** — the max width page content grows to. A single scalar; the ordinary
   `var(--mf-max-content-width, var(--mf-max-content-width-default))` chain, no second axis.
+- **`--mf-max-content-width-narrow`** — a second, narrower content-width scalar (followup XKY2),
+  for reading-oriented pages nested inside a wider shell. Independent of `--mf-max-content-width`
+  — the two roles do not interact or derive from one another — and is the ordinary
+  `var(--mf-max-content-width-narrow, var(--mf-max-content-width-narrow-default))` chain, no second
+  axis. See [Opting into the narrow measure](#opting-into-the-narrow-measure) below for how a page
+  consumes it.
 - **`--mf-content-margins-lr`** / **`--mf-content-margins-tb`** — the base inputs for the inline-
   and block-axis gutter ladders. Setting either rescales **every** band, exactly as `--mf-radius`
   rescales every derived radius step.
@@ -301,14 +307,40 @@ style package that wants continuous scaling inside a band can set, e.g.,
 `--mf-content-margins-lr-lg: clamp(1rem, 4vw, 3rem)`. This is the answer to "can I do fluid
 spacing?" — yes, inside any single band.
 
-#### Known limitation (accepted, still open)
+#### Opting into the narrow measure
 
 `--mf-max-content-width` is a single global scalar, so an application whose shell is wide (e.g.
-`80rem`) but whose reading-oriented pages want a narrower measure cannot express both through the
-token. Adoption needs either a per-app `--mf-max-content-width` override or a narrower wrapper
-alongside the container. This sits in the same accepted-and-open register this document uses
-elsewhere for the `data-mf-theme="inverse"` / `dark:` gap (see
-[Back-compat bridge and reconciliation](#back-compat-bridge-and-reconciliation)).
+`80rem`) but whose reading-oriented pages want a narrower measure could not previously express both
+through the token — this was formerly documented here as an accepted, open limitation. Followup
+XKY2 closes it with a second, narrower content-width role: **`--mf-max-content-width-narrow`**,
+defaulting to `42rem` (`spacing.max-content-width-narrow` in `tokens/base/spacing.json`, aliased
+into `mf.max-content-width-narrow` in `tokens/semantic/layout.json`). It is purely additive: adding
+it does not change `--mf-max-content-width`'s own default or behavior, and a build with no consumer
+opting into the narrow measure is otherwise unaffected.
+
+`--mf-max-content-width-narrow` is emitted the same way as every other scalar semantic token — a
+compiler-baked `--mf-max-content-width-narrow-default: 42rem` in `:root` plus a typed `@property`
+registration — but, like `--mf-max-content-width` before it, it does **not** feed a dedicated
+Tailwind utility or its own `@utility container` variant; the existing `container` utility's
+`max-width` still reads only `--mf-max-content-width`. A page opts into the narrow measure the same
+way `ProfileEditor.tsx` opts into a page-specific width today (followup AkGw): adopt the `container`
+utility, then pin `--mf-max-content-width` locally, for that scope only, to the narrow role's
+fallback-chained value:
+
+```tsx
+<div
+  className="container"
+  style={{
+    ['--mf-max-content-width' as string]:
+      'var(--mf-max-content-width-narrow, var(--mf-max-content-width-narrow-default))',
+  } as CSSProperties}
+>
+```
+
+so the page's `container` resolves to the narrow measure (`42rem` by default, or a style package's
+`--mf-max-content-width-narrow` override) while every other consumer of `--mf-max-content-width` —
+including sibling pages that don't re-scope it — keeps resolving to the wide, shell-level default
+unchanged.
 
 ## Unified scoping — `data-mf-theme`
 
