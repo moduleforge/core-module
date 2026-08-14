@@ -56,16 +56,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
-    - title: 'fieldcrypto: cancelled-ctx reload budget'
-      id: EoJ6
-      date: "2026-08-13"
-      tags:
-        - plan/phase:phase-02-versioned-cipher
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'reload() stamps lastLoadAttempt before issuing its query, so a decrypt driven by an already-cancelled request context burns the shared reload rate-limit budget (minReloadInterval) for no useful work — LoadUsableKeys returns ctx.Err() immediately. For the following window, encryptSet''s TTL-driven refresh takes its early-return branch and silently keeps the stale snapshot (no log at all on that branch, unlike the reload-failure branch). This can delay a replica''s convergence onto a rotated key set. Fix: don''t charge a context-cancellation failure against the shared budget (restore lastLoadAttempt on ctx.Err()); log at warn from encryptSet''s early-return branch when the snapshot is past keySetTTL but reload was rate-limited. Found by phase-2 boundary security review (opus-high), api/internal/fieldcrypto/fieldcrypto.go:335-347 and :404-424. Severity: minor, confidence: medium.'
     - title: 'fieldcrypto: MustPersist doc wording drift'
       id: pfuW
       date: "2026-08-13"
