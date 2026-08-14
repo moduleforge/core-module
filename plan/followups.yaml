@@ -56,16 +56,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
-    - title: 'Optional: zero field-crypto key after use'
-      id: MnvB
-      date: "2026-08-10"
-      tags:
-        - type:security
-        - priority:low
-        - effort:small
-        - plan/phase:phase-01-durable-field-key
-        - plan/slug:catalog-readiness
-      text: '[Surfaced by phase-01 escalated security review lens, suggestion severity, low confidence] api/internal/fieldcrypto/fieldcrypto.go''s fromPersistedOrGenerated never explicitly zeroes the randomly generated candidate key or persisted-key byte slices after they''re consumed by NewFromKey — they remain reachable in memory until GC''s normal schedule rather than being scrubbed immediately after use. Optional hardening only: consider zeroing candidate (and persisted-key slices) via a defer after consumption by NewFromKey. Go''s GC/escape-analysis semantics mean this is best-effort, not a guarantee — reviewer explicitly scored this a suggestion, not a blocking finding.'
     - title: 'fieldcrypto: cancelled-ctx reload budget'
       id: EoJ6
       date: "2026-08-13"
