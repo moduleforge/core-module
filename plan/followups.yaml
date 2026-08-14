@@ -224,3 +224,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'security-001 (suggestion): request bodies on the two body-accepting routes are unbounded, matching every other api/httpapi handler — package-wide gap, not fixed here to avoid diverging from sibling handlers. Right fix is shared router middleware.'
+    - title: 'security-002 (minor, low confidence): a pgcon'
+      id: aLt7
+      date: "2026-08-14"
+      tags:
+        - type:ambiguity
+        - plan/phase:admin-rotation-api
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: 'security-002 (minor, low confidence): a pgconn.PgError''s Detail can quote key_bytes; harmless under both stdlib slog handlers; only matters if a custom slog handler is ever installed.'
