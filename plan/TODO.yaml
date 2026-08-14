@@ -139,7 +139,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-04-002
             commit:
                 - 1343cca
-            merge: null
+            merge: bf8843b
         - number: 3
           slug: rotation-endpoint-integration-test
           title: Rotation Endpoint Concurrency Integration Test
