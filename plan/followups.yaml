@@ -124,16 +124,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
-    - title: security-001 (followup material, not resolved
-      id: GPRN
-      date: "2026-08-14"
-      tags:
-        - type:ambiguity
-        - plan/phase:rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'security-001 (followup material, not resolved here): verifyStale at api/service/rotating_cipher.go:341 treats any stored key version other than the source version as already-rotated, so a row re-encrypted under a second compromised retired version by a process with a stale key snapshot lets this read succeed while compromised ciphertext remains at rest. Bounded and self-correcting on the next read. A safe refinement would be for fieldcrypto to expose whether an arbitrary version is compromised, letting verifyStale accept only a non-compromised replacement version — this needs new fieldcrypto API surface, not a trivial fix.'
     - title: 'Followup pfuW (MustPersist doc wording): read'
       id: qpPO
       date: "2026-08-14"
