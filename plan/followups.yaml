@@ -37,16 +37,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Under a compromised rotation, any competing row lock on the row being read (e.g. a legitimate concurrent update of the same entity''s own subtype row) converts an ordinary read into a 500: the write-back''s CAS blocks behind the lock, SET LOCAL lock_timeout=''250ms'' fires, and the compromised branch correctly fails the read (verified end-to-end by the integration sub-case at rotating_cipher_integration_test.go:710-743). The failure direction is correct — the CAS never ran, so compromised ciphertext genuinely can''t be shown to be gone — but this operator-visible consequence (sporadic 500s on reads of concurrently-edited rows during a compromise response) was previously unmitigated. DECIDED: retry the write-back transaction once on a lock-timeout (SQLSTATE 55P03) before adjudicating the policy branch — transient contention usually clears within a second attempt. Implement in api/service/rotating_cipher.go:265-272. (The separate documentation angle — recording this consequence in app-mfmanager''s deploy/README.md "Secret generation, loss, and rotation" section — remains tracked as part of that already-deferred rewrite, not duplicated here.) Found by phase-3 boundary security review (opus-high).'
-    - title: 'rotating_cipher: missing std-rotation test'
-      id: fKHH
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-03-rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - type:enhancement
-        - priority:unspecified
-        - effort:unspecified
-      text: 'The integration suite pins the compromised half of the per-key failure policy end-to-end against a real database (real field_crypto_keys rows, real RetireActiveFieldCryptoKey, real facade adapter), but never pins the standard half the same way — its only standard-rotation case has a write-back that succeeds. Every test exercising the tolerate-on-failure branch builds its fieldcrypto.KeyRecord by hand in Go with CompromisedAt left nil, so the SQL that actually derives that column (compromised_at = CASE WHEN compromised THEN now() ELSE NULL END in RetireActiveFieldCryptoKey) and the facade adapter''s mapping of it are untested for the false case. An inversion or mis-mapping anywhere on that path would make every ordinary rotation silently adopt compromised-key policy — reads would start 500ing on any transient write-back failure (a read-only replica, a lock timeout, a permission error) while the entire test suite, including the standard integration case, stayed green. Fix: add a fourth sub-case to the standard-rotation integration test reproducing the compromised suite''s competing-row-lock technique against a standard-rotated key, asserting the read succeeds and returns correct plaintext with the stored blob unchanged — the direct counterpart of the existing compromised sub-case at rotating_cipher_integration_test.go:710-743. Found by phase-3 boundary security review (opus-high). Severity: minor, confidence: medium.'
     - title: 'rotate: grace_period_days:0 convergence gap'
       id: LO1V
       date: "2026-08-14"
