@@ -134,16 +134,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
-    - title: 'Phase 4: verify Reload authz gate'
-      id: MW1a
-      date: "2026-08-13"
-      tags:
-        - plan/phase:phase-04-admin-rotation-api
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: Cipher.Reload is deliberately unrate-limited (bypasses TTL and reloadAllowed per task 001 requirement 4) — correct for phase 2, but it is a one-call-one-DB-query amplification primitive whose only bound will be Phase 4's rotation-handler authz (manage, nil target / wildcard-grant-admin-only). Phase 4's security review should explicitly verify Reload is unreachable without that credential rather than assuming it. Found by phase-2 boundary security review (opus-high).
     - title: security-001 (followup material, not resolved
       id: GPRN
       date: "2026-08-14"
