@@ -148,3 +148,37 @@ architectural_impact: true
 - After the rotation `POST` including validation, transaction, and status mapping.
 - After `mark-compromised` and `grace` with their 404/409 split.
 - After the observer dispatch and the full test file.
+
+## Status
+
+**succeeded** — 2026-08-13.
+
+Files: [`api/httpapi/field_crypto_keys.go`](../../api/httpapi/field_crypto_keys.go) (new),
+[`api/httpapi/field_crypto_keys_test.go`](../../api/httpapi/field_crypto_keys_test.go) (new). No
+other file changed: `moduleforge.module.yaml` and `api/openapi.fragment.yaml` are untouched, as task
+002 owns them.
+
+Validation: `cd api && make build`, `make test`, and `make lint` all pass;
+`go test ./httpapi/ -run FieldCryptoKey -v` passes 26 test functions (48 run entries with subtests),
+also green under `-race`. All six grep checks pass — `key_bytes`/`KeyBytes` appears only in one comment
+explaining the exclusion, `Authorize(` appears exactly four times (one per route, all
+`"manage"` with a nil target), `Reload(` appears once post-commit, and
+`InsertActiveFieldCryptoKey` follows `RetireActiveFieldCryptoKey` inside the same closure.
+
+Decisions taken where the task doc left latitude:
+
+- Zero-row detection is `pgx.ErrNoRows` (what a sqlc `:one` returns for an UPDATE that matched
+  nothing), classified into the `errNoActiveFieldCryptoKey` sentinel at the retire step rather than
+  inferred from the transaction error at the top level.
+- `mark-compromised` and `grace` run their one inventory lookup *before* the update, inside the same
+  transaction: it splits 404 from 409 off one consistent snapshot and supplies the observer's
+  `before` state without a second query.
+- The rotation transaction reads the inventory once after its two statements, because `retired_at`
+  and `decryptable_until` are resolved by the database clock and cannot be reconstructed in Go.
+- Request bodies reject unknown members: a misspelled `compromised` would otherwise perform a
+  standard rotation while the operator believed they had flagged a leaked key. An absent body is the
+  zero request on `rotations` (the recommended invocation) but a 400 on `grace`, where reading it as
+  "clear the deadline" would let a truncated request silently drop an expiry.
+- `key_hex` is additionally rejected when all-zero, matching `CORE_FIELD_KEY_HEX`'s own guard: such a
+  row would be persisted as the active key and only then refused when a cipher tried to build an
+  AEAD from it. `grace_period_days` is bounded to `int32` so it cannot wrap to a past deadline.
