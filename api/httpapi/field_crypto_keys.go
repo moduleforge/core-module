@@ -72,10 +72,7 @@ const fieldCryptoKeySize = 32
 // onto an apiresp sentinel, whose public message is fixed by apiresp.
 var (
 	// errNoActiveFieldCryptoKey is RetireActiveFieldCryptoKey matching no
-	// row: either a concurrent rotation won the race (its UPDATE committed
-	// first, so this one's WHERE retired_at IS NULL now matches nothing) or
-	// the table holds no active key at all. Both are conflicts an operator
-	// can act on, not server faults.
+	// row, classified by retireFailure below.
 	errNoActiveFieldCryptoKey = errors.New("field_crypto_keys: no active key to retire")
 
 	// errFieldCryptoKeyUnknown is a {version} path param naming no row.
@@ -268,6 +265,11 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 	// Held no longer than the insert needs it: the row is the durable copy.
 	defer clear(keyMaterial)
 
+	retireParams := coredb.RetireActiveFieldCryptoKeyParams{
+		GraceDays:   graceDays,
+		Compromised: req.Compromised,
+	}
+
 	var (
 		retiredState  map[string]any
 		activeVersion int32
@@ -280,17 +282,10 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		// Order is mandatory: the one-active partial unique index is checked
 		// immediately and, being partial, cannot be deferred, so inserting
 		// the replacement before retiring the incumbent always fails.
-		retiredVersion, err := q.RetireActiveFieldCryptoKey(ctx, coredb.RetireActiveFieldCryptoKeyParams{
-			GraceDays:   graceDays,
-			Compromised: req.Compromised,
-		})
+		retiredVersion, err := q.RetireActiveFieldCryptoKey(ctx, retireParams)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return errNoActiveFieldCryptoKey
-			}
-			return fmt.Errorf("field_crypto_keys.rotate retire: %w", err)
+			return retireFailure(err)
 		}
-
 		active, err := q.InsertActiveFieldCryptoKey(ctx, keyMaterial)
 		if err != nil {
 			return fmt.Errorf("field_crypto_keys.rotate insert: %w", err)
@@ -351,6 +346,18 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		"retired": retiredState,
 		"active":  activeKeyResponse(activeVersion, activeCreated),
 	})
+}
+
+// retireFailure names the outcome of a failed RetireActiveFieldCryptoKey.
+// Zero rows is not a fault: either a concurrent rotation committed its own
+// retire first — so this one's WHERE retired_at IS NULL now matches nothing —
+// or the table holds no active key at all. Both become a conflict rather than
+// a 500.
+func retireFailure(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errNoActiveFieldCryptoKey
+	}
+	return fmt.Errorf("field_crypto_keys.rotate retire: %w", err)
 }
 
 // activeKeyResponse is the newly-inserted key's wire shape: its version and
