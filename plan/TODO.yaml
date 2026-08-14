@@ -64,7 +64,7 @@ phases:
           slug: facade-key-store-adapter
           title: Facade Key Store Adapter
           path: phase-02-versioned-cipher/002-facade-key-store-adapter.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: 'Replaced task 001''s placeholder api/fieldcrypto/fieldcrypto.go with its real shape: a FieldKeyQuerier interface declared over coredb.FieldCryptoKey/coredb.Querier-shaped methods, an unexported keyStoreAdapter mapping rows onto fieldcrypto.KeyRecord with an explicit negative-version guard, and NewFromEnvOrGenerate(ctx, FieldKeyQuerier) wrapping the adapter — name/params/error-return unchanged from what moduleforge.module.yaml''s cipher block already names, so the manifest required zero edits. Façade re-exports Rotation and BlobVersion alongside existing aliases. Full api build/test/lint green including -race; inline security review found no issues, confirming the adapter respects task 001''s key-material zeroing contract.'
           git:
