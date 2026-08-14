@@ -250,6 +250,28 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A rotation's grace_period_days of 0 (or less) is rejected outright,
+	// unlike SetGrace's identically-shaped field: only the process that
+	// serves this request reloads its cipher immediately after commit, and
+	// every other process keeps its pre-rotation key-set snapshot for up to
+	// the 60s key-set TTL, continuing to seal new blobs under the
+	// just-retired version in the meantime. A 0-day window resolves
+	// decryptable_until to the retirement instant itself, so those
+	// concurrently-sealed blobs become unreadable the moment they are
+	// written — and because the version is never in the loaded set at all,
+	// unusableVersionError takes the "unknown key version" branch instead of
+	// the one naming PUT /v1/field-crypto-keys/{version}/grace as the
+	// recovery action. Every value >= 1 day vastly exceeds the 60s
+	// convergence bound, so 1 remains the floor rather than a larger number.
+	if req.GracePeriodDays != nil && *req.GracePeriodDays < 1 {
+		apiresp.WriteError(w, r, apiresp.InvalidInput(apiresp.FieldError{
+			Field:   "grace_period_days",
+			Code:    "field_crypto_keys.grace_period_days_too_small",
+			Message: "grace_period_days must be at least 1 to allow fleet-wide key-set convergence (other processes may take up to 60s to reload the key set after rotation)",
+		}))
+		return
+	}
+
 	graceDays, ferr := graceDaysParam(req.GracePeriodDays)
 	if ferr != nil {
 		apiresp.WriteError(w, r, apiresp.InvalidInput(*ferr))

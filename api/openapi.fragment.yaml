@@ -398,8 +398,14 @@ paths:
         `CORE_FIELD_KEY_HEX` is. When `compromised` is true, the retired key
         is flagged compromised at rotation time and `grace_period_days` must
         be omitted or null — any read that still depends on the retired key
-        and cannot re-encrypt away from it will subsequently fail. Requires
-        wildcard-grant admin privileges.
+        and cannot re-encrypt away from it will subsequently fail. When
+        `grace_period_days` is present, it must be at least 1: other
+        processes may take up to 60 seconds to reload their key set after
+        this rotation, and a 0-day (or negative) window resolves the
+        retired key's decrypt deadline to the retirement instant itself,
+        making blobs those processes are still concurrently sealing under
+        the just-retired version unreadable the moment they are written.
+        Requires wildcard-grant admin privileges.
       requestBody:
         required: false
         content:
@@ -924,13 +930,18 @@ components:
         grace_period_days:
           type: integer
           format: int32
-          minimum: 0
+          minimum: 1
           maximum: 36500
           nullable: true
           description: |
             Number of days the retired key remains valid for decryption, up
             to 36500 days (~100 years). Null/omitted means no expiry. Must
-            be omitted or null when compromised is true.
+            be omitted or null when compromised is true. Must be at least 1
+            when present — 0 (or a negative value) is rejected, since a
+            window that short is inside the up-to-60s window other
+            processes may take to reload their key set after this
+            rotation, and would resolve the retired key's decrypt deadline
+            to the retirement instant itself.
 
     RetiredFieldCryptoKeySummary:
       type: object

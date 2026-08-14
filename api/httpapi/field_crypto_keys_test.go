@@ -700,6 +700,62 @@ func TestFieldCryptoKeyRotate_201_GracePeriod(t *testing.T) {
 	}
 }
 
+// TestFieldCryptoKeyRotate_400_GracePeriodDaysTooSmall pins followup LO1V:
+// grace_period_days: 0 (and negative values) are rejected on the rotation
+// route, since only the process serving the rotation reloads its cipher
+// immediately — every other process may keep sealing new blobs under the
+// just-retired version for up to the 60s key-set TTL, which a 0-day window
+// would make unreadable the instant they are written. grace_period_days: 1
+// must continue to succeed exactly as before.
+func TestFieldCryptoKeyRotate_400_GracePeriodDaysTooSmall(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"zero", `{"grace_period_days":0}`},
+		{"negative", `{"grace_period_days":-1}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newFCKHarness(t)
+
+			rec := h.do(http.MethodPost, "/field-crypto-keys/rotations", tc.body)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+			details := errorDetails(t, rec)
+			if len(details) != 1 || details[0].Field != "grace_period_days" {
+				t.Fatalf("details: got %+v, want one field error naming grace_period_days", details)
+			}
+			if !strings.Contains(details[0].Message, "at least 1") || !strings.Contains(details[0].Message, "convergence") {
+				t.Errorf("message: got %q, want it to mention the minimum and fleet-wide convergence", details[0].Message)
+			}
+			if h.q.activeKey() == nil || h.q.activeKey().version != 1 {
+				t.Errorf("rejected request still rotated: %+v", h.q.keys)
+			}
+		})
+	}
+}
+
+func TestFieldCryptoKeyRotate_201_GracePeriodDaysOneSucceeds(t *testing.T) {
+	h := newFCKHarness(t)
+
+	rec := h.do(http.MethodPost, "/field-crypto-keys/rotations", `{"grace_period_days":1}`)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+	retired, _ := decodeBody(t, rec)["retired"].(map[string]any)
+	if retired["decryptable_until"] == nil {
+		t.Error("decryptable_until: got null, want a deadline ~1 day out")
+	}
+	if until := h.q.keyByVersion(1).decryptableUntil; until == nil || until.After(time.Now().AddDate(0, 0, 2)) || until.Before(time.Now()) {
+		t.Errorf("persisted decryptable_until: got %v, want ~1 day out", until)
+	}
+}
+
 // TestFieldCryptoKeyRotate_400_CompromisedWithGrace pins the schema-q5
 // resolution: the combination is rejected, never silently overridden to NULL.
 func TestFieldCryptoKeyRotate_400_CompromisedWithGrace(t *testing.T) {
