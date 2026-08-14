@@ -27,16 +27,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: '--mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. gui/tokens/CONTRACT.md records this as an accepted open limitation. DECIDED: add a second token role, --mf-max-content-width-narrow, alongside the existing --mf-max-content-width. Implement: define the new custom property in the token source, wire it through gui/style-dictionary/build-tokens.mjs the same way --mf-max-content-width is emitted, and update gui/tokens/CONTRACT.md to document it (replacing the "accepted open limitation" note with the new role''s definition and usage).'
-    - title: 'make lint / shadow-db-lint.sh only exercises '
-      id: GzQ5
-      date: "2026-08-10"
-      tags:
-        - type:enhancement
-        - plan/phase:durable-field-key
-        - plan/slug:catalog-readiness
-        - priority:unspecified
-        - effort:unspecified
-      text: 'make lint / shadow-db-lint.sh only exercises goose up, never goose down, for any migration — task doc assumed it also validated Down; verified manually instead. DECIDED: add down-migration validation to CI. Implement: extend shadow-db-lint.sh (and/or make lint) to also run goose down for every migration against the shadow DB and fail on error, mirroring the existing goose up validation.'
     - title: 'rotating_cipher: lock-timeout 500s'
       id: PNVB
       date: "2026-08-14"
