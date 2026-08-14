@@ -96,7 +96,7 @@ phases:
           done: false
           tier: sonnet-high
           git:
-            branch: null
+            branch: plan/fieldcrypto-key-rotation-03-002
             commit: []
             merge: null
         - number: 3
