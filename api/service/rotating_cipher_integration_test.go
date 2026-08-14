@@ -31,7 +31,16 @@ package service_test
 //     working write handle persists the replacement and the read succeeds; a
 //     nil write handle fails the read; and a write-back that genuinely cannot
 //     commit (a competing row lock that outlasts the write-back's own
-//     SET LOCAL lock_timeout) also fails the read.
+//     SET LOCAL lock_timeout) also fails the read;
+//   - the standard-rotation counterpart of that last sub-case: the identical
+//     competing-row-lock technique, against a standard (non-compromised)
+//     rotation, must NOT fail the read — the tolerate-on-failure branch lets
+//     it through with the stored blob left unchanged. This is the one
+//     real-SQL pin for compromised_at's false case (the CASE WHEN compromised
+//     THEN now() ELSE NULL END in RetireActiveFieldCryptoKey, and the facade
+//     adapter's mapping of it) — every unit test exercising this branch
+//     builds its fieldcrypto.KeyRecord by hand with CompromisedAt left nil,
+//     so none of them actually exercises that SQL or the adapter mapping.
 //
 // Structural precedent: api/internal/fieldcrypto/generate_integration_test.go
 // and api/authz/setup/grant_table_integration_test.go establish the TestMain
@@ -741,4 +750,82 @@ func TestRotateOnRead_CompromisedKeyReadRequiresWorkingWriteHandle(t *testing.T)
 			t.Error("a write-back that could not commit must not have altered the stored blob")
 		}
 	})
+}
+
+// TestRotateOnRead_StandardRotationWriteBackBlockedByLockTolerated pins the
+// standard-rotation counterpart of
+// TestRotateOnRead_CompromisedKeyReadRequiresWorkingWriteHandle's
+// "write-back that cannot commit fails the read" sub-case above: the
+// identical competing-row-lock technique, but against a standard
+// (non-compromised) rotation, must NOT fail the read. Under a standard
+// rotation a write-back that cannot commit is a tolerated miss
+// (decryptRotating's default branch in rotating_cipher.go) — the plaintext
+// the reader already decrypted is still valid, and the row is left for a
+// later read to retry the rotation.
+//
+// Every rotating_cipher_test.go unit test exercising this tolerate-on-failure
+// branch builds its fieldcrypto.KeyRecord by hand with CompromisedAt left
+// nil, so none of them ever exercises the real SQL that derives that column
+// (compromised_at = CASE WHEN compromised THEN now() ELSE NULL END in
+// RetireActiveFieldCryptoKey) or the facade adapter's mapping of it for the
+// false case. This test closes that gap against a real database, real
+// RetireActiveFieldCryptoKey, and the real facade adapter — mirroring the
+// compromised sub-case's fixture and locking technique exactly, so the only
+// variable that differs is the compromised flag.
+func TestRotateOnRead_StandardRotationWriteBackBlockedByLockTolerated(t *testing.T) {
+	ctx := context.Background()
+	col := rotationColumns[0] // natural_persons.ssn; the branch under test is column-agnostic.
+	cipher := bootstrapCipher(t, ctx)
+
+	blob, err := cipher.Encrypt(ctx, col.plaintext)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	entityID := col.seed(t, ctx, blob)
+
+	// Standard rotation: compromised=false, so rot.MustPersist will be false
+	// and a lost write-back is a tolerated miss rather than a failed read —
+	// the opposite of the compromised sub-case this mirrors.
+	graceDays := int32(30)
+	rotateFieldCryptoKey(t, ctx, &graceDays, false)
+	if err := cipher.Reload(ctx); err != nil {
+		t.Fatalf("Reload after standard rotation: %v", err)
+	}
+
+	// Hold a competing row lock, in a separate uncommitted transaction, on
+	// exactly the row the write-back will try to update. The write-back's own
+	// SET LOCAL lock_timeout = '250ms' (rotating_cipher.go) bounds how long it
+	// waits on that lock before failing — the same technique the compromised
+	// suite's blocked-lock sub-case above uses, reproduced here against a
+	// standard-rotated key.
+	lockTx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin competing lock transaction: %v", err)
+	}
+	defer func() {
+		if rerr := lockTx.Rollback(ctx); rerr != nil && !errors.Is(rerr, pgx.ErrTxClosed) {
+			t.Errorf("release competing row lock: %v", rerr)
+		}
+	}()
+	if _, err := lockTx.Exec(ctx, "SELECT ssn FROM natural_persons WHERE entity_id = $1 FOR UPDATE", entityID); err != nil {
+		t.Fatalf("acquire competing row lock: %v", err)
+	}
+
+	rc := service.NewRotatingCipher(cipher, pool, nil)
+	got, err := col.decrypt(ctx, rc, entityID, blob)
+	if err != nil {
+		t.Fatalf("standard rotation read must tolerate a write-back that cannot commit, not fail: %v", err)
+	}
+	if got != col.plaintext {
+		t.Errorf("plaintext = %q, want %q", got, col.plaintext)
+	}
+
+	// The competing lock is still held at this point (released only by the
+	// deferred rollback above, after this test function returns), so the
+	// write-back's compare-and-swap cannot have committed — the stored blob
+	// must be exactly what was written before the rotation.
+	stored := col.rawBlob(t, ctx, entityID)
+	if !bytes.Equal(stored, blob) {
+		t.Error("a write-back blocked by a competing lock must not have altered the stored blob")
+	}
 }
