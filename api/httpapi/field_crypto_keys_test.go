@@ -999,6 +999,7 @@ func TestFieldCryptoKeyGrace_400_InvalidInput(t *testing.T) {
 		// of a zero-byte body.
 		{"empty object", "{}", "grace_period_days", "field_crypto_keys.grace_period_days_required"},
 		{"negative days", `{"grace_period_days":-5}`, "grace_period_days", ""},
+		{"grace beyond tightened max", `{"grace_period_days":40000}`, "grace_period_days", "field_crypto_keys.grace_period_days_invalid"},
 		{"malformed json", `{"grace_period_days":`, "", ""},
 		{"unknown member", `{"grace_days":5}`, "", ""},
 	}
