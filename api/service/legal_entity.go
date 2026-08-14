@@ -14,7 +14,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -34,9 +33,16 @@ type LegalEntityServicer interface {
 	GetTaxID(ctx context.Context, q coredb.Querier, entityID int64) (LegalEntityTaxID, error)
 }
 
-// LegalEntityService implements legal entity operations.
+// LegalEntityService implements legal entity operations. It is never
+// constructed in practice today: it has no constructor, is absent from the
+// Services aggregate, and this field is unexported, so no caller inside or
+// outside mod-core can build one with a non-nil cipher. It is kept
+// type-correct (cipher held as *RotatingCipher, matching every other
+// encrypted-column service) so the package compiles and stays consistent with
+// the rotation design; it carries no runtime risk and needs no integration
+// test.
 type LegalEntityService struct {
-	cipher *fieldcrypto.Cipher
+	cipher *RotatingCipher
 }
 
 // Compile-time assertion.
@@ -84,7 +90,7 @@ func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, ent
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID natural_person: %w", err)
 		}
-		val, err := s.cipher.Decrypt(np.Ssn)
+		val, err := s.cipher.DecryptSSN(ctx, entityID, np.Ssn)
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ssn: %w", err)
 		}
@@ -95,7 +101,7 @@ func (s *LegalEntityService) GetTaxID(ctx context.Context, q coredb.Querier, ent
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID corporation: %w", err)
 		}
-		val, err := s.cipher.Decrypt(corp.Ein)
+		val, err := s.cipher.DecryptEIN(ctx, entityID, corp.Ein)
 		if err != nil {
 			return LegalEntityTaxID{}, fmt.Errorf("legal_entity.GetTaxID decrypt ein: %w", err)
 		}

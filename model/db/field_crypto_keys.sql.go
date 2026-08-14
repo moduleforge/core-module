@@ -7,29 +7,198 @@ package db
 
 import (
 	"context"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getFieldCryptoKey = `-- name: GetFieldCryptoKey :one
-SELECT key_bytes FROM field_crypto_keys WHERE id = 1
+const insertActiveFieldCryptoKey = `-- name: InsertActiveFieldCryptoKey :one
+INSERT INTO field_crypto_keys (key_bytes)
+VALUES ($1::BYTEA)
+RETURNING version, key_bytes, created_at, updated_at, retired_at, decryptable_until, compromised_at
 `
 
-func (q *Queries) GetFieldCryptoKey(ctx context.Context) ([]byte, error) {
-	row := q.db.QueryRow(ctx, getFieldCryptoKey)
-	var key_bytes []byte
-	err := row.Scan(&key_bytes)
-	return key_bytes, err
+func (q *Queries) InsertActiveFieldCryptoKey(ctx context.Context, keyBytes []byte) (FieldCryptoKey, error) {
+	row := q.db.QueryRow(ctx, insertActiveFieldCryptoKey, keyBytes)
+	var i FieldCryptoKey
+	err := row.Scan(
+		&i.Version,
+		&i.KeyBytes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RetiredAt,
+		&i.DecryptableUntil,
+		&i.CompromisedAt,
+	)
+	return i, err
 }
 
-const insertFieldCryptoKeyIfAbsent = `-- name: InsertFieldCryptoKeyIfAbsent :one
-INSERT INTO field_crypto_keys (id, key_bytes)
-VALUES (1, $1)
-ON CONFLICT (id) DO NOTHING
-RETURNING key_bytes
+const insertInitialFieldCryptoKey = `-- name: InsertInitialFieldCryptoKey :one
+INSERT INTO field_crypto_keys (key_bytes)
+SELECT $1::BYTEA
+WHERE NOT EXISTS (SELECT 1 FROM field_crypto_keys)
+ON CONFLICT DO NOTHING
+RETURNING version, key_bytes, created_at, updated_at, retired_at, decryptable_until, compromised_at
 `
 
-func (q *Queries) InsertFieldCryptoKeyIfAbsent(ctx context.Context, keyBytes []byte) ([]byte, error) {
-	row := q.db.QueryRow(ctx, insertFieldCryptoKeyIfAbsent, keyBytes)
-	var key_bytes []byte
-	err := row.Scan(&key_bytes)
-	return key_bytes, err
+func (q *Queries) InsertInitialFieldCryptoKey(ctx context.Context, keyBytes []byte) (FieldCryptoKey, error) {
+	row := q.db.QueryRow(ctx, insertInitialFieldCryptoKey, keyBytes)
+	var i FieldCryptoKey
+	err := row.Scan(
+		&i.Version,
+		&i.KeyBytes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RetiredAt,
+		&i.DecryptableUntil,
+		&i.CompromisedAt,
+	)
+	return i, err
+}
+
+const listFieldCryptoKeyMetadata = `-- name: ListFieldCryptoKeyMetadata :many
+SELECT version, created_at, updated_at, retired_at, decryptable_until, compromised_at
+FROM field_crypto_keys
+ORDER BY version
+`
+
+type ListFieldCryptoKeyMetadataRow struct {
+	Version          int32              `json:"version"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	RetiredAt        *time.Time         `json:"retired_at"`
+	DecryptableUntil *time.Time         `json:"decryptable_until"`
+	CompromisedAt    *time.Time         `json:"compromised_at"`
+}
+
+func (q *Queries) ListFieldCryptoKeyMetadata(ctx context.Context) ([]ListFieldCryptoKeyMetadataRow, error) {
+	rows, err := q.db.Query(ctx, listFieldCryptoKeyMetadata)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFieldCryptoKeyMetadataRow
+	for rows.Next() {
+		var i ListFieldCryptoKeyMetadataRow
+		if err := rows.Scan(
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RetiredAt,
+			&i.DecryptableUntil,
+			&i.CompromisedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsableFieldCryptoKeys = `-- name: ListUsableFieldCryptoKeys :many
+SELECT version, key_bytes, created_at, updated_at, retired_at, decryptable_until, compromised_at
+FROM field_crypto_keys
+WHERE retired_at IS NULL OR decryptable_until IS NULL OR decryptable_until > now()
+ORDER BY version
+`
+
+func (q *Queries) ListUsableFieldCryptoKeys(ctx context.Context) ([]FieldCryptoKey, error) {
+	rows, err := q.db.Query(ctx, listUsableFieldCryptoKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FieldCryptoKey
+	for rows.Next() {
+		var i FieldCryptoKey
+		if err := rows.Scan(
+			&i.Version,
+			&i.KeyBytes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RetiredAt,
+			&i.DecryptableUntil,
+			&i.CompromisedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markFieldCryptoKeyCompromised = `-- name: MarkFieldCryptoKeyCompromised :one
+UPDATE field_crypto_keys
+SET compromised_at = COALESCE(compromised_at, now())
+WHERE version = $1 AND retired_at IS NOT NULL
+RETURNING version, compromised_at
+`
+
+type MarkFieldCryptoKeyCompromisedRow struct {
+	Version       int32      `json:"version"`
+	CompromisedAt *time.Time `json:"compromised_at"`
+}
+
+func (q *Queries) MarkFieldCryptoKeyCompromised(ctx context.Context, version int32) (MarkFieldCryptoKeyCompromisedRow, error) {
+	row := q.db.QueryRow(ctx, markFieldCryptoKeyCompromised, version)
+	var i MarkFieldCryptoKeyCompromisedRow
+	err := row.Scan(&i.Version, &i.CompromisedAt)
+	return i, err
+}
+
+const retireActiveFieldCryptoKey = `-- name: RetireActiveFieldCryptoKey :one
+UPDATE field_crypto_keys
+SET retired_at = now(),
+    decryptable_until = CASE
+      WHEN $1::INT IS NULL THEN NULL
+      ELSE now() + $1::INT * INTERVAL '1 day'
+    END,
+    compromised_at = CASE WHEN $2::BOOLEAN THEN now() ELSE NULL END
+WHERE retired_at IS NULL
+RETURNING version
+`
+
+type RetireActiveFieldCryptoKeyParams struct {
+	GraceDays   pgtype.Int4 `json:"grace_days"`
+	Compromised bool        `json:"compromised"`
+}
+
+func (q *Queries) RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (int32, error) {
+	row := q.db.QueryRow(ctx, retireActiveFieldCryptoKey, arg.GraceDays, arg.Compromised)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
+}
+
+const setFieldCryptoKeyDecryptableUntil = `-- name: SetFieldCryptoKeyDecryptableUntil :one
+UPDATE field_crypto_keys
+SET decryptable_until = CASE
+  WHEN $2::INT IS NULL THEN NULL
+  ELSE now() + $2::INT * INTERVAL '1 day'
+END
+WHERE version = $1 AND retired_at IS NOT NULL
+RETURNING version, decryptable_until
+`
+
+type SetFieldCryptoKeyDecryptableUntilParams struct {
+	Version   int32       `json:"version"`
+	GraceDays pgtype.Int4 `json:"grace_days"`
+}
+
+type SetFieldCryptoKeyDecryptableUntilRow struct {
+	Version          int32      `json:"version"`
+	DecryptableUntil *time.Time `json:"decryptable_until"`
+}
+
+func (q *Queries) SetFieldCryptoKeyDecryptableUntil(ctx context.Context, arg SetFieldCryptoKeyDecryptableUntilParams) (SetFieldCryptoKeyDecryptableUntilRow, error) {
+	row := q.db.QueryRow(ctx, setFieldCryptoKeyDecryptableUntil, arg.Version, arg.GraceDays)
+	var i SetFieldCryptoKeyDecryptableUntilRow
+	err := row.Scan(&i.Version, &i.DecryptableUntil)
+	return i, err
 }

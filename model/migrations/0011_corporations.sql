@@ -5,8 +5,8 @@ CREATE TABLE corporations (
   entity_id    BIGINT NOT NULL UNIQUE REFERENCES legal_entities(entity_id) ON DELETE RESTRICT,
   legal_name   TEXT NOT NULL,
   jurisdiction TEXT,
-  -- ein holds an AES-256-GCM blob (nonce || ciphertext || tag) produced
-  -- by the application. NULL means no EIN is recorded.
+  -- ein holds an AES-256-GCM blob (version || nonce || ciphertext || tag)
+  -- produced by the application. NULL means no EIN is recorded.
   ein          BYTEA,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()

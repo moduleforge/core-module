@@ -108,6 +108,26 @@ provides:
         - service:entityResolver
         - service:typeResolver
 
+    # coreFieldCryptoKeyHandler serves the four admin field-encryption-key
+    # rotation routes (inventory, rotate, mark-compromised, grace-window
+    # adjustment). Every route on this handler authorizes as
+    # h.az.Authorize(ctx, "manage", nil) — a nil target, which is
+    # wildcard-grant-admin-only per mod-users' reference Authorizer — since
+    # field_crypto_keys rows are not entities and carry no owner. Arg order
+    # matches corehttpapi.NewFieldCryptoKeyHandler's doc comment: infra:pool,
+    # queries:coredb, service:authorizer, service:observerGroup,
+    # service:cipher. This is additive relative to the existing cipher
+    # service below, which stays byte-for-byte unchanged.
+    - name: coreFieldCryptoKeyHandler
+      type: "*corehttpapi.FieldCryptoKeyHandler"
+      constructor: corehttpapi.NewFieldCryptoKeyHandler
+      args:
+        - infra:pool
+        - queries:coredb
+        - service:authorizer
+        - service:observerGroup
+        - service:cipher
+
   observers:
     - name: noopSentinel
       service: noopObserver
@@ -141,6 +161,20 @@ provides:
     - prefix: /v1
       handler: coreAppsHandler
       register: corehttpapi.RegisterAppRoutes
+      scope: authenticated
+
+    # Admin field-crypto-key rotation routes (followup to the rotation-api
+    # design note). handler: coreFieldCryptoKeyHandler references the
+    # already-constructed provides.services entry above, and register:
+    # composes RegisterFieldCryptoKeyRoutes onto the shared /v1 route tree —
+    # the same register:-onto-/v1 pattern coreAppsHandler uses above, for
+    # the same duplicate-Mount (gap G14) reason. All four routes are
+    # wildcard-grant-admin-only (h.az.Authorize(ctx, "manage", nil)); scope:
+    # authenticated here only gates unauthenticated access at the router
+    # level, not the per-route admin check the handler itself performs.
+    - prefix: /v1
+      handler: coreFieldCryptoKeyHandler
+      register: corehttpapi.RegisterFieldCryptoKeyRoutes
       scope: authenticated
 
 requires:

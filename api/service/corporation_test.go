@@ -14,7 +14,7 @@ func newCorpService(t *testing.T, q *mockQuerier) *CorporationService {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -28,7 +28,7 @@ func TestCorporationService_Create_WritesObserver(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -65,7 +65,7 @@ func TestCorporationService_Create_AuthzDenied(t *testing.T) {
 		db:             newFakeDB(),
 		az:             denyAllAuthz{err: authzErr},
 		obs:            observer.NewObserverGroup(),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -131,7 +131,7 @@ func TestCorporationService_Update_AuthzDenied(t *testing.T) {
 		db:             newFakeDB(),
 		az:             denyAllAuthz{err: authzErr},
 		obs:            observer.NewObserverGroup(),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -150,7 +150,7 @@ func TestCorporationService_Update_AdminSucceeds(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -199,7 +199,7 @@ func TestCorporationService_GetByEntityUUID_AuthzDenied(t *testing.T) {
 		db:             newFakeDB(),
 		az:             denyAllAuthz{err: authzErr},
 		obs:            observer.NewObserverGroup(),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -220,7 +220,7 @@ func TestCorporationService_GetByEntityUUID_AuthzDenied(t *testing.T) {
 // access control at the service layer.
 func TestCorporationService_GetByEntityUUID_AdminSeesEIN(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	svc := &CorporationService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -232,7 +232,7 @@ func TestCorporationService_GetByEntityUUID_AdminSeesEIN(t *testing.T) {
 	}
 
 	const plainEIN = "12-3456789"
-	einBlob, err := cipher.Encrypt(plainEIN)
+	einBlob, err := cipher.Encrypt(context.Background(), plainEIN)
 	if err != nil {
 		t.Fatalf("encrypt ein: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestCorporationService_GetByEntityUUID_AdminSeesEIN(t *testing.T) {
 // restriction is a future hardening step documented in next-steps.md.
 func TestCorporationService_GetByEntityUUID_GrantedCallerSeesEIN(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	// allowAllAuthz simulates a non-admin caller whose grant-based check passed.
 	svc := &CorporationService{
 		db:             newFakeDB(),
@@ -275,7 +275,7 @@ func TestCorporationService_GetByEntityUUID_GrantedCallerSeesEIN(t *testing.T) {
 	}
 
 	const plainEIN = "98-7654321"
-	einBlob, err := cipher.Encrypt(plainEIN)
+	einBlob, err := cipher.Encrypt(context.Background(), plainEIN)
 	if err != nil {
 		t.Fatalf("encrypt ein: %v", err)
 	}

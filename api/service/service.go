@@ -40,6 +40,9 @@ type Services struct {
 // pass observer.NewObserverGroup() for a no-op group.
 //
 // cipher is used to encrypt and decrypt SSN and EIN fields; it must not be nil.
+// New wraps it internally in a RotatingCipher (write-back handle db, default
+// logger) so every decrypt of a blob written under a retired key re-encrypts
+// and persists it under the active key on read; callers of New are unaffected.
 //
 // entityResolver maps public UUIDs to internal entity IDs; use entity.NewResolver()
 // for the default 403-on-missing policy.
@@ -56,10 +59,11 @@ func New(
 	typeResolver *types.Resolver,
 ) *Services {
 	newQ := func(tx pgx.Tx) coredb.Querier { return coredb.New(tx) }
+	rc := NewRotatingCipher(cipher, db, nil)
 	return &Services{
 		Entity:         &EntityService{db: db, az: az, obs: obs, newQuerier: newQ, entityResolver: entityResolver},
-		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
-		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: cipher, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
+		NaturalPerson:  &NaturalPersonService{db: db, az: az, obs: obs, cipher: rc, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
+		Corporation:    &CorporationService{db: db, az: az, obs: obs, cipher: rc, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
 		ServiceAccount: &ServiceAccountService{db: db, az: az, obs: obs, newQuerier: newQ, entityResolver: entityResolver, typeResolver: typeResolver},
 		q:              q,
 	}

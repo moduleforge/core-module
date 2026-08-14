@@ -23,29 +23,46 @@ type Querier interface {
 	GetCorporationByEntityID(ctx context.Context, entityID int64) (GetCorporationByEntityIDRow, error)
 	GetEntityByID(ctx context.Context, id int64) (GetEntityByIDRow, error)
 	GetEntityByUUID(ctx context.Context, argUuid uuid.UUID) (GetEntityByUUIDRow, error)
-	GetFieldCryptoKey(ctx context.Context) ([]byte, error)
 	GetLegalEntityByEntityID(ctx context.Context, entityID int64) (int64, error)
 	GetNaturalPersonByEntityID(ctx context.Context, entityID int64) (GetNaturalPersonByEntityIDRow, error)
 	GetServiceAccountByEntityID(ctx context.Context, entityID int64) (ServiceAccount, error)
 	GetTypeByID(ctx context.Context, id int64) (Type, error)
 	GetTypeBySlug(ctx context.Context, slug string) (Type, error)
+	InsertActiveFieldCryptoKey(ctx context.Context, keyBytes []byte) (FieldCryptoKey, error)
 	// Entity creation (fundamental_type = 'app') and archival reuse the existing
 	// generic entities.sql queries (GetTypeBySlug + CreateEntity to create,
 	// ArchiveEntity to archive) — the same pattern every other entity subtype
 	// (corporation, natural_person, service_account) already follows. Only the
 	// apps-table-specific operations are defined here.
 	InsertApp(ctx context.Context, arg InsertAppParams) (InsertAppRow, error)
-	InsertFieldCryptoKeyIfAbsent(ctx context.Context, keyBytes []byte) ([]byte, error)
+	InsertInitialFieldCryptoKey(ctx context.Context, keyBytes []byte) (FieldCryptoKey, error)
 	ListAllTypes(ctx context.Context) ([]Type, error)
 	ListApps(ctx context.Context) ([]ListAppsRow, error)
+	ListFieldCryptoKeyMetadata(ctx context.Context) ([]ListFieldCryptoKeyMetadataRow, error)
+	ListUsableFieldCryptoKeys(ctx context.Context) ([]FieldCryptoKey, error)
+	MarkFieldCryptoKeyCompromised(ctx context.Context, version int32) (MarkFieldCryptoKeyCompromisedRow, error)
+	RetireActiveFieldCryptoKey(ctx context.Context, arg RetireActiveFieldCryptoKeyParams) (int32, error)
+	SetFieldCryptoKeyDecryptableUntil(ctx context.Context, arg SetFieldCryptoKeyDecryptableUntilParams) (SetFieldCryptoKeyDecryptableUntilRow, error)
 	UnarchiveEntity(ctx context.Context, argUuid uuid.UUID) error
 	UpdateApp(ctx context.Context, arg UpdateAppParams) error
 	// NOTE: pass NULL for ein to leave it unchanged; pass an empty bytea
 	// to clear it. A non-empty bytea replaces it.
 	UpdateCorporation(ctx context.Context, arg UpdateCorporationParams) error
+	// Re-encrypt-on-read write-back: replaces the stored ein blob with a
+	// freshly re-encrypted one. The old-ein predicate is a compare-and-swap
+	// guard, not a lookup condition: it ensures the write only lands if the
+	// stored blob is still the one that was read, so a concurrent writer's
+	// change is never clobbered.
+	UpdateCorporationEINBlob(ctx context.Context, arg UpdateCorporationEINBlobParams) (int64, error)
 	// NOTE: pass NULL for ssn to leave it unchanged; pass an empty bytea
 	// ('\x'::bytea / []byte{}) to clear it. A non-empty bytea replaces it.
 	UpdateNaturalPerson(ctx context.Context, arg UpdateNaturalPersonParams) error
+	// Re-encrypt-on-read write-back: replaces the stored ssn blob with a
+	// freshly re-encrypted one. The old-ssn predicate is a compare-and-swap
+	// guard, not a lookup condition: it ensures the write only lands if the
+	// stored blob is still the one that was read, so a concurrent writer's
+	// change is never clobbered.
+	UpdateNaturalPersonSSNBlob(ctx context.Context, arg UpdateNaturalPersonSSNBlobParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

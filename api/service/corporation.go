@@ -13,7 +13,6 @@ import (
 	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
-	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
 	"github.com/moduleforge/core-api/types"
@@ -50,7 +49,7 @@ type CorporationService struct {
 	db             txhelper.DB
 	az             authz.Authorizer
 	obs            *observer.ObserverGroup
-	cipher         *fieldcrypto.Cipher
+	cipher         *RotatingCipher
 	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 	entityResolver *entity.Resolver
 	typeResolver   *types.Resolver
@@ -119,7 +118,7 @@ func (s *CorporationService) Create(
 		var einBlob []byte
 		einAudit := "unchanged"
 		if strings.TrimSpace(in.EIN) != "" {
-			blob, err := s.cipher.Encrypt(strings.TrimSpace(in.EIN))
+			blob, err := s.cipher.Encrypt(ctx, strings.TrimSpace(in.EIN))
 			if err != nil {
 				return fmt.Errorf("encrypt ein: %w", err)
 			}
@@ -246,7 +245,7 @@ func (s *CorporationService) UpdateByEntityUUID(
 				einParam = []byte{} // clear
 				einAudit = "cleared"
 			} else {
-				b, err := s.cipher.Encrypt(val)
+				b, err := s.cipher.Encrypt(ctx, val)
 				if err != nil {
 					return fmt.Errorf("encrypt ein: %w", err)
 				}
@@ -281,13 +280,14 @@ func (s *CorporationService) UpdateByEntityUUID(
 	return nil
 }
 
-// GetDecryptedEIN returns the plaintext EIN for the given entity.
-// Returns "" if not set. Returns an error only on decrypt failure
+// GetDecryptedEIN returns the plaintext EIN for the given entity, re-encrypting
+// and persisting it under the active key when it was written under an older
+// one. Returns "" if not set. Returns an error only on decrypt failure
 // (i.e. stored blob is corrupt or the key is wrong) — not for NULL.
 func (s *CorporationService) GetDecryptedEIN(ctx context.Context, q coredb.Querier, entityID int64) (string, error) {
 	corp, err := q.GetCorporationByEntityID(ctx, entityID)
 	if err != nil {
 		return "", fmt.Errorf("corporation.GetDecryptedEIN: %w", err)
 	}
-	return s.cipher.Decrypt(corp.Ein)
+	return s.cipher.DecryptEIN(ctx, entityID, corp.Ein)
 }
