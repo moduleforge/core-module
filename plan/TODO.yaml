@@ -124,6 +124,7 @@ phases:
           path: phase-04-admin-rotation-api/001-field-crypto-key-handler.md
           done: false
           tier: opus-med
+          digest: Added FieldCryptoKeyHandler with four admin-only routes (inventory, rotate, mark-compromised, grace) on /v1. Every route gates on Authorize(manage,nil) before any parsing or query. Rotation runs the two mandatory statements in one txhelper.Run, audits to observer group inside that transaction, reloads the cipher after commit (logging not failing on reload error). Status mapping 401/403/400/409/500 with 404-vs-409 split on version-scoped routes. Key material never crosses the boundary — every response/audit payload built from the material-free ListFieldCryptoKeyMetadata row type. 26 test functions cover authz gates, status mappings, idempotency, reload ordering/tolerance, and a sweep asserting no response body carries key bytes. Inline security review found no critical/major issue and directly confirmed Reload is unreachable without the admin credential and a committed rotation, via TestFieldCryptoKeyRotate_403_DoesNotReloadCipher — this answers the open followup MW1a.
           git:
             branch: plan/fieldcrypto-key-rotation-04-001
             commit:
