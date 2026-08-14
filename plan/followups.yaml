@@ -71,7 +71,7 @@ items:
       id: wXiC
       date: "2026-08-14"
       tags:
-        - type:ambiguity
+        - type:security
         - plan/phase:admin-rotation-api
         - plan/slug:fieldcrypto-key-rotation
         - priority:unspecified
