@@ -19,16 +19,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Under a compromised rotation, any competing row lock on the row being read (e.g. a legitimate concurrent update of the same entity''s own subtype row) converts an ordinary read into a 500: the write-back''s CAS blocks behind the lock, SET LOCAL lock_timeout=''250ms'' fires, and the compromised branch correctly fails the read (verified end-to-end by the integration sub-case at rotating_cipher_integration_test.go:710-743). The failure direction is correct — the CAS never ran, so compromised ciphertext genuinely can''t be shown to be gone — but this operator-visible consequence (sporadic 500s on reads of concurrently-edited rows during a compromise response) was previously unmitigated. DECIDED: retry the write-back transaction once on a lock-timeout (SQLSTATE 55P03) before adjudicating the policy branch — transient contention usually clears within a second attempt. Implement in api/service/rotating_cipher.go:265-272. (The separate documentation angle — recording this consequence in app-mfmanager''s deploy/README.md "Secret generation, loss, and rotation" section — remains tracked as part of that already-deferred rewrite, not duplicated here.) Found by phase-3 boundary security review (opus-high).'
-    - title: 'rotate: grace_period_days:0 convergence gap'
-      id: LO1V
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-04-admin-rotation-api
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'graceDaysParam accepts grace_period_days: 0 on the rotation route, resolving decryptable_until to the retirement instant itself — the key is already past its deadline the moment the transaction commits. Only the process that served the rotation reloads its cipher; every other process keeps the pre-rotation snapshot for up to the 60s key-set TTL and keeps sealing new blobs under the just-retired version, which are then unreadable on write (ListUsableFieldCryptoKeys filters the version out). Worse, since the version isn''t in the loaded set at all, unusableVersionError takes the "unknown key version" branch instead of the one naming PUT /v1/field-crypto-keys/{version}/grace as the recovery action — least-actionable diagnostic for exactly the situation the grace route fixes. Recoverable (clearing the deadline via grace re-admits the version) but only by an operator who works out what happened. Every value >=1 is safe (a one-day window vastly exceeds the 60s convergence bound). DECIDED: reject grace_period_days:0 on the rotation route with a field validation error naming the convergence window (e.g. "grace_period_days must be at least 1 to allow fleet-wide key-set convergence"). Implement in api/httpapi/field_crypto_keys.go:617-629, and update the route''s OpenAPI description accordingly. Found by phase-4 boundary security review (opus-high).'
     - title: 'Doc: compromised-rotation TTL window'
       id: 8x4a
       date: "2026-08-14"
