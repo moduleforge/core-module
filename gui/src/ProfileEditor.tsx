@@ -55,9 +55,12 @@ export function ProfileEditor({ initial, onSave, readOnly = false }: ProfileEdit
     // defaults to 80rem — far wider than this page's established 36rem measure — so the width is
     // pinned locally via a scoped inline override of that custom property, following the same
     // per-component `--mf-x` override mechanism demonstrated in TokenScoping.stories.tsx
-    // (`FallbackChain`), rather than touching the package-wide default. This is exactly the
-    // per-page narrow-width need CONTRACT.md's "Known limitation" section under Spacing and
-    // container width flags as accepted-and-open: a per-component override, not a global one.
+    // (`FallbackChain`), rather than touching the package-wide default. This is the per-page
+    // narrow-width need CONTRACT.md's "Spacing and container width" section used to flag as an
+    // accepted, open limitation (a per-component override, not a global one) — now that
+    // `--mf-max-content-width-narrow` exists (followup XKY2, CONTRACT.md's "Opting into the
+    // narrow measure"), this literal `36rem` could be replaced with that token's fallback-chained
+    // value; kept as a literal here since migrating it is not part of that followup's scope.
     <div
       className="container"
       style={{ ['--mf-max-content-width' as string]: '36rem' } as CSSProperties}
