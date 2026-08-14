@@ -9,16 +9,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: '--mf-max-content-width is a single global scalar, so an application whose shell is wide (80rem) but whose reading-oriented pages want a narrow measure (~42rem) cannot express both through the token contract. gui/tokens/CONTRACT.md records this as an accepted open limitation. DECIDED: add a second token role, --mf-max-content-width-narrow, alongside the existing --mf-max-content-width. Implement: define the new custom property in the token source, wire it through gui/style-dictionary/build-tokens.mjs the same way --mf-max-content-width is emitted, and update gui/tokens/CONTRACT.md to document it (replacing the "accepted open limitation" note with the new role''s definition and usage).'
-    - title: 'rotating_cipher: lock-timeout 500s'
-      id: PNVB
-      date: "2026-08-14"
-      tags:
-        - type:enhancement
-        - plan/phase:phase-03-rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Under a compromised rotation, any competing row lock on the row being read (e.g. a legitimate concurrent update of the same entity''s own subtype row) converts an ordinary read into a 500: the write-back''s CAS blocks behind the lock, SET LOCAL lock_timeout=''250ms'' fires, and the compromised branch correctly fails the read (verified end-to-end by the integration sub-case at rotating_cipher_integration_test.go:710-743). The failure direction is correct — the CAS never ran, so compromised ciphertext genuinely can''t be shown to be gone — but this operator-visible consequence (sporadic 500s on reads of concurrently-edited rows during a compromise response) was previously unmitigated. DECIDED: retry the write-back transaction once on a lock-timeout (SQLSTATE 55P03) before adjudicating the policy branch — transient contention usually clears within a second attempt. Implement in api/service/rotating_cipher.go:265-272. (The separate documentation angle — recording this consequence in app-mfmanager''s deploy/README.md "Secret generation, loss, and rotation" section — remains tracked as part of that already-deferred rewrite, not duplicated here.) Found by phase-3 boundary security review (opus-high).'
     - title: 'Doc: compromised-rotation TTL window'
       id: 8x4a
       date: "2026-08-14"
