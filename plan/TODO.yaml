@@ -83,6 +83,7 @@ phases:
           path: phase-03-rotate-on-read/001-rotating-cipher-helper.md
           done: false
           tier: opus-med
+          digest: 'Added api/service/rotating_cipher.go: RotatingCipher (cipher + pool-backed txhelper.DB + querier factory + logger), ssnColumn/einColumn blobColumn descriptors, the four-branch decryptRotating policy core, writeBack (own short transaction, SET LOCAL lock_timeout first, CAS on the exact blob read), and verifyStale (compromised-key re-read inside the same transaction). Standard rotation within grace window tolerates a failed write-back and returns plaintext at Warn; compromised key fails the read unless compromised ciphertext is verifiably already gone. No observer dispatched, nothing retried, write-back deliberately not atomic with the read. persisted never survives a txhelper.Run error. Eleven tests cover all four design-flagged cases plus happy path, both columns, fast paths.'
           git:
             branch: plan/fieldcrypto-key-rotation-03-001
             commit:
