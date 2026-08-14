@@ -756,6 +756,79 @@ func TestEncryptSurvivesReloadFailure(t *testing.T) {
 	}
 }
 
+// TestEncryptSetLogsWhenStaleAndRateLimited proves the encrypt-path early
+// return logs at warn level specifically when the reason for returning the
+// stale snapshot is that a reload is currently rate-limited — as opposed to a
+// store-less Cipher or a snapshot that is still fresh, both of which must stay
+// silent.
+func TestEncryptSetLogsWhenStaleAndRateLimited(t *testing.T) {
+	logs := captureDefaultLogger(t)
+
+	store := &fakeKeyStore{t: t, loadSeq: []fakeLoadResult{
+		{records: []fieldcrypto.KeyRecord{activeRecord(1, testKey(1))}},
+	}}
+	c := newStoreCipher(t, store)
+	// TTL 0 makes the snapshot stale immediately; a one-hour rate limit,
+	// pinned right after a construction load that just consumed the budget,
+	// guarantees reloadAllowed() is false for the Encrypt call below.
+	fieldcrypto.SetReloadTuningForTest(c, 0, time.Hour)
+
+	if _, err := c.Encrypt(context.Background(), "123-45-6789"); err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if loads, _ := store.counts(); loads != 1 {
+		t.Errorf("LoadUsableKeys called %d times, want 1: the reload is rate-limited, so no attempt should be made", loads)
+	}
+	if out := logs.String(); !strings.Contains(out, "level=WARN") || !strings.Contains(out, "rate-limited") {
+		t.Errorf("a stale-but-rate-limited encrypt snapshot must be observable at warn level; captured log was:\n%s", out)
+	}
+}
+
+// TestCancelledContextReloadDoesNotBurnBudget proves the fix for the
+// cancelled-ctx reload budget bug: a load attempt whose context is already
+// cancelled fails immediately via ctx.Err() without ever reaching the key
+// table, and must not charge the shared reload-rate-limit budget — otherwise
+// it would starve the very next, real reload attempt for work it never did.
+func TestCancelledContextReloadDoesNotBurnBudget(t *testing.T) {
+	store := &fakeKeyStore{t: t, loadSeq: []fakeLoadResult{
+		{records: []fieldcrypto.KeyRecord{activeRecord(1, testKey(1))}}, // construction
+		{err: errTestStoreUnreachable},                                  // the cancelled-context attempt
+		{records: []fieldcrypto.KeyRecord{activeRecord(2, testKey(2))}}, // the real reload that must not be blocked
+	}}
+	c := newStoreCipher(t, store)
+
+	const minInterval = 50 * time.Millisecond
+	// TTL 0 means every Encrypt call attempts a refresh, subject only to the
+	// rate limit; that isolates the rate-limit budget as the only variable
+	// under test.
+	fieldcrypto.SetReloadTuningForTest(c, 0, minInterval)
+
+	// Let enough time pass since construction's load that a real reload
+	// attempt would be allowed right now, before the cancelled attempt below
+	// has any chance to (wrongly) reset that clock.
+	time.Sleep(minInterval + 25*time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := c.Encrypt(ctx, "x"); err != nil {
+		t.Fatalf("Encrypt with a cancelled context = %v, want success under the existing snapshot (the failed refresh is logged, not returned)", err)
+	}
+	if loads, _ := store.counts(); loads != 2 {
+		t.Fatalf("LoadUsableKeys called %d times after the cancelled-context Encrypt, want 2 (construction + the cancelled attempt)", loads)
+	}
+
+	// Immediately afterward — well inside minInterval of the cancelled
+	// attempt, but well past minInterval of the construction load — a real
+	// reload must still be attempted if (and only if) the cancelled attempt
+	// above did not charge the budget.
+	if _, err := c.Encrypt(context.Background(), "y"); err != nil {
+		t.Fatalf("Encrypt immediately after the cancelled-context attempt: %v", err)
+	}
+	if loads, _ := store.counts(); loads != 3 {
+		t.Errorf("LoadUsableKeys called %d times, want 3 (construction + cancelled attempt + the reload that must not be blocked): a cancelled-context load attempt charged the reload budget", loads)
+	}
+}
+
 // TestReloadConvergesImmediately covers the exported Reload the admin rotation
 // handler calls post-commit: it must take effect regardless of TTL or rate
 // limit, both of which are pinned high here.
