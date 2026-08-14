@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/txhelper"
@@ -39,6 +40,13 @@ import (
 // already know how to adjudicate. It is a fixed statement with nothing
 // interpolated into it.
 const setRotationLockTimeout = "SET LOCAL lock_timeout = '250ms'"
+
+// pgerrcodeLockNotAvailable is Postgres' SQLSTATE for a statement that gave up
+// waiting on a row lock — exactly what setRotationLockTimeout's SET LOCAL
+// lock_timeout produces when it fires. writeBack retries once on this code
+// before handing the outcome to decryptRotating's policy branches; see
+// isLockTimeout and writeBack.
+const pgerrcodeLockNotAvailable = "55P03"
 
 // writeBackTimeout bounds writeBack's call to txhelper.Run end to end —
 // acquiring a pool connection to begin the transaction, running the
@@ -272,7 +280,30 @@ func (rc *RotatingCipher) decryptRotating(
 // harmless because the plaintext is unchanged. A rotation is never retried
 // here either — a skipped one is retried by construction on the next read of
 // that row.
+//
+// writeBack itself retries its single write-back attempt exactly once when
+// that attempt fails on pgerrcodeLockNotAvailable (Postgres SQLSTATE 55P03,
+// "lock_not_available") — the error setRotationLockTimeout's SET LOCAL
+// lock_timeout produces when the compare-and-swap blocks behind a competing
+// row lock. That contention is usually transient (e.g. a concurrent update of
+// the same row's own subtype columns that releases its lock quickly), and a
+// second attempt clears it far more often than not; this is a bounded,
+// single retry, not a backoff loop, so sustained contention still fails the
+// write-back exactly as it did before, just one attempt later.
 func (rc *RotatingCipher) writeBack(
+	ctx context.Context, col blobColumn, entityID int64, oldBlob []byte, rot fieldcrypto.Rotation,
+) (bool, error) {
+	persisted, err := rc.attemptWriteBack(ctx, col, entityID, oldBlob, rot)
+	if err != nil && isLockTimeout(err) {
+		persisted, err = rc.attemptWriteBack(ctx, col, entityID, oldBlob, rot)
+	}
+	return persisted, err
+}
+
+// attemptWriteBack runs the write-back's compare-and-swap exactly once. See
+// writeBack, which retries this once on a lock-timeout error before returning
+// to the caller.
+func (rc *RotatingCipher) attemptWriteBack(
 	ctx context.Context, col blobColumn, entityID int64, oldBlob []byte, rot fieldcrypto.Rotation,
 ) (bool, error) {
 	if rc.db == nil {
@@ -331,6 +362,16 @@ func (rc *RotatingCipher) writeBack(
 		return false, err
 	}
 	return persisted, nil
+}
+
+// isLockTimeout reports whether err is (or wraps) a *pgconn.PgError carrying
+// pgerrcodeLockNotAvailable — the SQLSTATE setRotationLockTimeout's SET LOCAL
+// lock_timeout produces when a write-back statement gives up waiting on a row
+// lock. writeBack uses it to decide whether a failed attempt is worth one
+// retry.
+func isLockTimeout(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcodeLockNotAvailable
 }
 
 // verifyStale runs only when the compare-and-swap matched no row under a
