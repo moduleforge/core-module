@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -48,7 +48,20 @@ export function ProfileEditor({ initial, onSave, readOnly = false }: ProfileEdit
   }
 
   return (
-    <div className="p-6 max-w-xl">
+    // Adopts core-gui's own `container` utility (tokens/CONTRACT.md's "Tailwind container
+    // integration") — the same idiom app-mftodo's TaskListContainer.tsx / TaskDetailContainer.tsx
+    // / TaskEditorContainer.tsx already consume — instead of the ad hoc `max-w-xl` this used to
+    // hardcode (followup AkGw). `container`'s width comes from `--mf-max-content-width`, which
+    // defaults to 80rem — far wider than this page's established 36rem measure — so the width is
+    // pinned locally via a scoped inline override of that custom property, following the same
+    // per-component `--mf-x` override mechanism demonstrated in TokenScoping.stories.tsx
+    // (`FallbackChain`), rather than touching the package-wide default. This is exactly the
+    // per-page narrow-width need CONTRACT.md's "Known limitation" section under Spacing and
+    // container width flags as accepted-and-open: a per-component override, not a global one.
+    <div
+      className="container"
+      style={{ ['--mf-max-content-width' as string]: '36rem' } as CSSProperties}
+    >
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Profile</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your account details</p>
