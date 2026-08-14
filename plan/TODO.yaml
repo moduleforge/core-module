@@ -167,5 +167,6 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/fieldcrypto-key-rotation-05-001
-            commit: []
+            commit:
+                - b36f200
             merge: null
