@@ -75,3 +75,51 @@ covers this work.
   wins, the other errors and is retried" rather than two active keys.
 - [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#routes) — the status mapping the
   409 and 400 assertions are checking.
+
+## Status
+
+**Outcome:** succeeded — 2026-08-13.
+
+Added `api/httpapi/field_crypto_keys_integration_test.go` (the only new file; `git diff --stat`
+confirms it). Ran against the real `users-module-postgres` container (`CORE_DEV_PG_HOST=192.168.1.153`
+— plain `localhost` on this machine resolves to an unrelated host-native Postgres with no `users`
+role, confirmed via `psql`), migrated from scratch via goose into a dedicated shadow database
+(`core_field_crypto_rotation_verify_dev`), following the TestMain / prerequisite-check /
+host-resolution / shadow-DB-reset pattern established by `api/authz/setup/grant_table_integration_test.go`,
+`api/internal/fieldcrypto/generate_integration_test.go`, and `api/service/rotating_cipher_integration_test.go`.
+
+Validation:
+
+- `cd api && make test` — passes unchanged (new file excluded by the `integration` build tag; no new
+  required env var, no skipped-test noise).
+- `cd api && go vet -tags integration ./httpapi/...` — clean.
+- `cd api && gofmt -l api` — clean (no output).
+- `CORE_DEV_PG_HOST=192.168.1.153 go test -tags=integration -p 1 -v ./httpapi/...` — all tests pass,
+  including the five new integration tests and every pre-existing unit test in the package (same test
+  binary). Ran twice in a row with `-count=1` against the same database (both passed) and once under
+  `-race` restricted to the concurrency test (passed clean).
+- `cd api && make lint` — passes (`go vet ./...` + gofmt check).
+- `git diff --stat` — exactly one new file.
+
+Notable implementation decision (see `decisions_made` in the task report for full detail): the
+headline concurrency test could not rely on a bare goroutine-plus-channel release to force a genuine
+race — a first attempt at that shape produced two clean `201`s on every run, because each rotation's
+full HTTP-to-commit round trip against a local Postgres is sub-millisecond, so the two requests simply
+ran start-to-finish one after another with no actual lock contention. The test instead holds the exact
+row lock `RetireActiveFieldCryptoKey`'s `UPDATE` needs in a separate "gatekeeper" transaction, confirms
+(by polling `pg_stat_activity`) that both real rotation requests are genuinely queued as waiters on
+that lock, then releases it — reproducing the same DB-level contention two truly simultaneous
+rotations would hit, deterministically. Verified stable across three repeated runs
+(`-count=3`) plus a `-race` run.
+
+Assumptions applied: task 001 (`001-field-crypto-key-handler.md`) has landed and
+`FieldCryptoKeyHandler` is constructible in-process against a real pool — confirmed directly
+(`api/httpapi/field_crypto_keys.go` exists with all four routes). A locally-defined `wildcardAuthorizer`
+(grants every operation unconditionally) stands in for the `authz.Authorizer` test double the task
+doc's Assumptions call for; the 401/403 authorization-gate paths are already covered by task 001's
+own unit tests (`field_crypto_keys_test.go`), so this suite does not re-cover them.
+
+Files touched:
+
+- `api/httpapi/field_crypto_keys_integration_test.go` (new)
+- `plan/phase-04-admin-rotation-api/003-rotation-endpoint-integration-test.md` (this Status section)
