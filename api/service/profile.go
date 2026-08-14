@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	coredb "github.com/moduleforge/core-model/db"
 )
 
@@ -30,8 +29,9 @@ type Profile struct {
 // ResolveProfileByEntityID loads an entity's sub-type records from the database
 // and returns a populated Profile. Dispatches via fundamental_type_slug.
 // cipher is optional; when non-nil, TaxID/TaxIDType are populated from the
-// decrypted field. When nil they remain empty strings.
-func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID int64, cipher ...*fieldcrypto.Cipher) (Profile, error) {
+// decrypted field, and a blob written under a retired key is re-encrypted and
+// persisted under the active key on read. When nil they remain empty strings.
+func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID int64, cipher ...*RotatingCipher) (Profile, error) {
 	entity, err := q.GetEntityByID(ctx, entityID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -54,7 +54,7 @@ func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID in
 	}
 
 	// Resolve optional cipher (variadic, at most one element).
-	var c *fieldcrypto.Cipher
+	var c *RotatingCipher
 	if len(cipher) > 0 {
 		c = cipher[0]
 	}
@@ -67,7 +67,7 @@ func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID in
 		}
 		profile.NaturalPerson = &np
 		if c != nil {
-			val, err := c.Decrypt(ctx, np.Ssn)
+			val, err := c.DecryptSSN(ctx, np.EntityID, np.Ssn)
 			if err != nil {
 				return Profile{}, fmt.Errorf("resolve profile decrypt ssn: %w", err)
 			}
@@ -82,7 +82,7 @@ func ResolveProfileByEntityID(ctx context.Context, q coredb.Querier, entityID in
 		}
 		profile.Corporation = &corp
 		if c != nil {
-			val, err := c.Decrypt(ctx, corp.Ein)
+			val, err := c.DecryptEIN(ctx, corp.EntityID, corp.Ein)
 			if err != nil {
 				return Profile{}, fmt.Errorf("resolve profile decrypt ein: %w", err)
 			}

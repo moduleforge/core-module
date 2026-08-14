@@ -13,7 +13,6 @@ import (
 	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
 	"github.com/moduleforge/core-api/entity"
-	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 	"github.com/moduleforge/core-api/txhelper"
 	"github.com/moduleforge/core-api/types"
@@ -55,7 +54,7 @@ type NaturalPersonService struct {
 	db             txhelper.DB
 	az             authz.Authorizer
 	obs            *observer.ObserverGroup
-	cipher         *fieldcrypto.Cipher
+	cipher         *RotatingCipher
 	newQuerier     func(pgx.Tx) coredb.Querier // injectable for tests; defaults to coredb.New
 	entityResolver *entity.Resolver
 	typeResolver   *types.Resolver
@@ -349,13 +348,14 @@ func (s *NaturalPersonService) UpdateByEntityUUID(
 	return nil
 }
 
-// GetDecryptedSSN returns the plaintext SSN for the given entity.
-// Returns "" if not set. Returns an error only on decrypt failure
+// GetDecryptedSSN returns the plaintext SSN for the given entity, re-encrypting
+// and persisting it under the active key when it was written under an older
+// one. Returns "" if not set. Returns an error only on decrypt failure
 // (i.e. stored blob is corrupt or the key is wrong) — not for NULL.
 func (s *NaturalPersonService) GetDecryptedSSN(ctx context.Context, q coredb.Querier, entityID int64) (string, error) {
 	np, err := q.GetNaturalPersonByEntityID(ctx, entityID)
 	if err != nil {
 		return "", fmt.Errorf("natural_person.GetDecryptedSSN: %w", err)
 	}
-	return s.cipher.Decrypt(ctx, np.Ssn)
+	return s.cipher.DecryptSSN(ctx, entityID, np.Ssn)
 }
