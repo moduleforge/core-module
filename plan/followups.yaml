@@ -124,16 +124,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
-    - title: 'Followup pfuW (MustPersist doc wording): read'
-      id: qpPO
-      date: "2026-08-14"
-      tags:
-        - type:ambiguity
-        - plan/phase:rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Followup pfuW (MustPersist doc wording): read plan/overview.md requirement 4 directly and implemented its full semantics including the ''verifiably already gone'' qualifier via verifyStale — the implementation matches the overview. The api/internal/fieldcrypto package doc still carries the narrower wording; nothing in this task''s diff touches that file, so pfuW remains open for the manager to dispose of.'
     - title: 'Note for task 002 (no action needed): service'
       id: GTTY
       date: "2026-08-14"
