@@ -89,3 +89,39 @@ architectural_impact: true
   internal package.
 - [`../notes/fieldcrypto-current-state.md`](../notes/fieldcrypto-current-state.md) — the current
   35-line façade and the manifest block it must keep satisfying.
+
+## Status
+
+**succeeded** — 2026-08-13.
+
+### Validation
+
+| Check | Result |
+| --- | --- |
+| `cd api && make build` | passed |
+| `cd api && make test` | passed (all 13 packages, including new `fieldcrypto` façade tests) |
+| `cd api && make lint` | passed (`go vet ./...`, `gofmt -l .` empty) |
+| `cd api && go test -race ./fieldcrypto/...` | passed |
+| `var _ FieldKeyQuerier = (coredb.Querier)(nil)` compiles | confirmed in `api/fieldcrypto/fieldcrypto_test.go` |
+| `grep -rn "core-model/db\|coredb" api/internal/fieldcrypto/` | no matches |
+| `grep -rn "func NewFromEnv(" api/` | no matches |
+| `git diff moduleforge.module.yaml` | empty |
+| Negative `Version` rejected by the adapter | asserted by `TestKeyRecordFromRowRejectsNegativeVersion` and `TestNewFromEnvOrGenerateRejectsCorruptRow` |
+| Inline security review (`review_focus: security`) | no findings — the diff is a thin mapping/re-export layer with no crypto logic of its own; key-material freshness (no adapter-level caching/aliasing of `KeyBytes` across calls) verified against the `KeyStore` zeroing contract from task 001 |
+
+### Affected source files
+
+- `api/fieldcrypto/fieldcrypto.go` — rewritten: `FieldKeyQuerier` interface over `coredb` types,
+  unexported `keyStoreAdapter` mapping `coredb.FieldCryptoKey` → `fieldcrypto.KeyRecord` (with the
+  negative-version guard), `NewFromEnvOrGenerate(ctx, FieldKeyQuerier)`, and re-exports of `Cipher`,
+  `KeyRecord`, `KeyStore`, `Rotation`, `BlobVersion`, `NewFromKey`.
+- `api/fieldcrypto/fieldcrypto_test.go` — new: adapter mapping tests (nullable timestamps, negative
+  version rejection), the `coredb.Querier` ⇒ `FieldKeyQuerier` compile-time assertion, and
+  `NewFromEnvOrGenerate` wiring tests against a `FieldKeyQuerier` fake.
+
+### Notes
+
+- `moduleforge.module.yaml`'s `cipher` service block is untouched, confirmed by an empty `git diff`.
+- No callers outside this façade invoke `fieldcrypto.NewFromEnvOrGenerate` today (grepped across
+  `api/` and `model/`), so the constructor's signature change (from a `KeyStore` parameter to
+  `FieldKeyQuerier`) has no ripple effect inside this repo.
