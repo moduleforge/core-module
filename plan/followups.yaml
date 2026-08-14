@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: Wire data-mf-component onto primitives
-      id: A3Op
-      date: "2026-08-14"
-      tags:
-        - type:enhancement
-        - plan/phase:contract-documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Followup 7nrP implemented the per-component radius override *compiler mechanism*: mf.component.<component>.radius entries in gui/tokens/component/overrides.json now compile through build-tokens.mjs into a [data-mf-component="<component>"] CSS block that shadows --radius-sm/-md/-lg/-xl for that scope, verified end-to-end with a temporary test entry (button, 9999px). What remains: no actual GUI primitive (e.g. gui/src/button.tsx, card.tsx) sets the data-mf-component="<component>" attribute yet, so the mechanism is unreachable from real components today. DECIDED (implied by 7nrP''s scope note): wire the data-mf-component attribute onto the relevant primitive components (starting with button and card, the followup''s own motivating example — pill buttons vs square-cornered cards) so a brand can actually populate overrides.json and see the effect. See gui/tokens/CONTRACT.md''s "Per-component radius override tier" section (added by 7nrP) for the compiled shape and usage.'
     - title: Bump token contract version
       id: ydre
       date: "2026-08-14"
