@@ -705,6 +705,41 @@ func TestFieldCryptoKeyRotate_400_InvalidInput(t *testing.T) {
 	}
 }
 
+// TestFieldCryptoKeyRotate_400_OversizedBody pins the local, per-route
+// stopgap request-body cap (maxFieldCryptoKeyBodyBytes): a body well past
+// what any valid rotation payload could need is rejected as invalid_input
+// rather than being read into memory in full.
+func TestFieldCryptoKeyRotate_400_OversizedBody(t *testing.T) {
+	h := newFCKHarness(t)
+	oversized := fmt.Sprintf(`{"key_hex":%q}`, strings.Repeat("a", maxFieldCryptoKeyBodyBytes+1))
+
+	rec := h.do(http.MethodPost, "/field-crypto-keys/rotations", oversized)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if h.q.activeKey() == nil || h.q.activeKey().version != 1 {
+		t.Errorf("oversized request still rotated: %+v", h.q.keys)
+	}
+}
+
+// TestFieldCryptoKeyGrace_400_OversizedBody covers the same cap on the
+// handler's other body-accepting route.
+func TestFieldCryptoKeyGrace_400_OversizedBody(t *testing.T) {
+	h := newFCKHarness(t)
+	retired := h.q.seedKey(testKeyMaterial(6), true)
+	oversized := `{"grace_period_days":30,"padding":"` + strings.Repeat("a", maxFieldCryptoKeyBodyBytes+1) + `"}`
+
+	rec := h.do(http.MethodPut, fmt.Sprintf("/field-crypto-keys/%d/grace", retired), oversized)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if h.q.keyByVersion(retired).decryptableUntil != nil {
+		t.Error("oversized request still set decryptable_until")
+	}
+}
+
 // TestFieldCryptoKeyRotate_409_NoActiveKey covers the lost concurrent
 // rotation: the winner's UPDATE committed first, so this one's WHERE
 // retired_at IS NULL matches nothing.

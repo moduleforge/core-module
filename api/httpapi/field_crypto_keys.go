@@ -230,7 +230,7 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 	// grace_period_days key from an explicit null — both mean "no
 	// deadline" — so the raw body decodeFieldCryptoKeyBody returns is
 	// unused here.
-	if _, _, err := decodeFieldCryptoKeyBody(r, &req); err != nil {
+	if _, _, err := decodeFieldCryptoKeyBody(w, r, &req); err != nil {
 		apiresp.WriteError(w, r, err)
 		return
 	}
@@ -485,7 +485,7 @@ func (h *FieldCryptoKeyHandler) SetGrace(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req setFieldCryptoKeyGraceRequest
-	raw, empty, err := decodeFieldCryptoKeyBody(r, &req)
+	raw, empty, err := decodeFieldCryptoKeyBody(w, r, &req)
 	if err != nil {
 		apiresp.WriteError(w, r, err)
 		return
@@ -595,6 +595,19 @@ func findFieldCryptoKey(rows []coredb.ListFieldCryptoKeyMetadataRow, version int
 	return coredb.ListFieldCryptoKeyMetadataRow{}, false
 }
 
+// maxFieldCryptoKeyBodyBytes bounds the request body this handler's two
+// body-accepting routes (Rotate, SetGrace) will read. Both bodies are a
+// handful of scalar fields (key_hex is at most 64 hex characters,
+// compromised is a bool, grace_period_days is a small integer), so 4KB is
+// generous headroom while still refusing an oversized/abusive payload before
+// it is buffered into memory.
+//
+// This is a narrow, per-route stopgap: every other api/httpapi handler has
+// the same unbounded-body gap, and a package-wide middleware fix is tracked
+// separately (followup wXiC). Do not treat this as the pattern to copy
+// elsewhere — the middleware fix should replace this once it lands.
+const maxFieldCryptoKeyBodyBytes = 4 << 10 // 4KB
+
 // decodeFieldCryptoKeyBody decodes r's body into dst, reporting whether the
 // body was empty (zero bytes) so each route can decide what an absent body
 // means, and returning the raw body bytes so a caller that must distinguish
@@ -603,7 +616,13 @@ func findFieldCryptoKey(rows []coredb.ListFieldCryptoKeyMetadataRow, version int
 // JSON itself (see fieldCryptoKeyBodyHasKey). Unknown members are rejected:
 // silently ignoring a misspelled "compromised" would perform a standard
 // rotation while the operator believed they had flagged a leaked key.
-func decodeFieldCryptoKeyBody(r *http.Request, dst any) (raw []byte, empty bool, err error) {
+//
+// The body reader is wrapped in http.MaxBytesReader (see
+// maxFieldCryptoKeyBodyBytes) before anything is read, so an oversized body
+// fails here — surfaced as invalid_input like any other malformed body —
+// rather than being buffered in full.
+func decodeFieldCryptoKeyBody(w http.ResponseWriter, r *http.Request, dst any) (raw []byte, empty bool, err error) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxFieldCryptoKeyBodyBytes)
 	body, rerr := io.ReadAll(r.Body)
 	if rerr != nil {
 		return nil, false, apiresp.ErrInvalidInput
