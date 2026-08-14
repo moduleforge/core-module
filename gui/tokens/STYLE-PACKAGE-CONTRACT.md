@@ -220,13 +220,28 @@ proposed initial value is **`1.0.0`**, corresponding to the Phase 1–2 surface 
 `--mf-radius`, the typography families and type scale, and the `data-mf-theme` light/dark/inverse
 scoping).
 
-**Current value: `1.1.0`.** The spacing/container token category — `--mf-max-content-width`, the two
-base levers `--mf-content-margins-{lr,tb}`, and the twelve per-band levers
-`--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` — is a **MINOR** bump under the table below: new
-roles only, nothing existing removed, renamed, or revalued. The authoritative constant is
-`MF_TOKEN_CONTRACT_VERSION`, exported from
+**Current value: `1.2.0`.** `1.1.0` added the spacing/container token category —
+`--mf-max-content-width`, the two base levers `--mf-content-margins-{lr,tb}`, and the twelve
+per-band levers `--mf-content-margins-{lr,tb}-{base,sm,md,lg,xl,2xl}` — a **MINOR** bump under the
+table below: new roles only, nothing existing removed, renamed, or revalued.
+
+`1.2.0` adds two further additions, both also **MINOR** bumps under the table below: new
+roles/mechanism only, nothing existing removed, renamed, or revalued.
+
+- The **per-component radius override tier** — `mf.component.<component>.radius` in
+  `tokens/component/overrides.json`, compiled by `../style-dictionary/build-tokens.mjs`'s
+  `componentRadiusOverrideBlock` into a `[data-mf-component="<component>"]` scoped block that
+  shadows the derived `--radius-{sm,md,lg,xl}` steps for that component alone (followup 7nrP) — see
+  [CONTRACT.md's "Per-component radius override tier"](./CONTRACT.md#per-component-radius-override-tier)
+  section for the full contract.
+- The **`--mf-max-content-width-narrow`** token role — a second, narrower content-width scalar for
+  reading-oriented pages, independent of `--mf-max-content-width` (followup XKY2) — see
+  [CONTRACT.md's "Opting into the narrow measure"](./CONTRACT.md#opting-into-the-narrow-measure)
+  section.
+
+The authoritative constant is `MF_TOKEN_CONTRACT_VERSION`, exported from
 [`../src/lib/token-contract-version.ts`](../src/lib/token-contract-version.ts); its own doc comment
-records the same `1.1.0` / MINOR characterization, and the two must be kept in agreement.
+records the same `1.2.0` / MINOR characterization, and the two must be kept in agreement.
 
 **Where it lives (for the loader to read).** The runtime loader ships in `@moduleforge/core-gui` and
 runs alongside the compiled defaults, so it reads the active contract version from mod-core directly
