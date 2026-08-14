@@ -471,6 +471,63 @@ func TestFieldCryptoKeyRoutes_403_Forbidden(t *testing.T) {
 	}
 }
 
+// fckInvalidPayloadRoutes pairs each fckRoutes entry that accepts a body or a
+// {version} path segment with a deliberately invalid variant of that input:
+// malformed JSON for the two body-accepting routes (rotate, grace) and a
+// non-numeric version for the two version-scoped routes (mark-compromised,
+// grace). Unlike fckRoutes, these bodies/paths would themselves be rejected
+// with a 400 if the authorizer let the request through.
+var fckInvalidPayloadRoutes = []struct {
+	name   string
+	method string
+	path   string
+	body   string
+}{
+	{"rotate-malformed-json", http.MethodPost, "/field-crypto-keys/rotations", `{"compromised":`},
+	{"grace-malformed-json", http.MethodPut, "/field-crypto-keys/1/grace", `{"grace_period_days":`},
+	{"mark-compromised-non-numeric-version", http.MethodPost, "/field-crypto-keys/abc/mark-compromised", ""},
+	{"grace-non-numeric-version", http.MethodPut, "/field-crypto-keys/abc/grace", `{"grace_period_days":null}`},
+}
+
+// TestFieldCryptoKeyRoutes_403_ForbiddenWithInvalidPayload pins
+// authz-before-parsing (followup vHIc): every route in this handler
+// authorizes before it decodes a body or parses {version}, so a denied
+// request must come back 403 even when the payload that never got parsed
+// would itself have failed as a 400. This matters because the sibling
+// handler a maintainer would naturally copy from, AppsHandler.Create
+// (api/httpapi/apps.go), decodes/validates before authorizing — aligning
+// this handler with that precedent would silently turn a 403 into a 400 on
+// malformed input for an unauthorized caller, with every other test in this
+// file still passing.
+func TestFieldCryptoKeyRoutes_403_ForbiddenWithInvalidPayload(t *testing.T) {
+	for _, tc := range fckInvalidPayloadRoutes {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newFCKHarness(t)
+			h.az.err = apiresp.ErrForbidden
+
+			rec := h.do(tc.method, tc.path, tc.body)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("status: got %d, want %d — body: %s", rec.Code, http.StatusForbidden, rec.Body.String())
+			}
+			// Admin-only by construction: "manage" with a nil target is
+			// denied for every actor except one holding a wildcard grant.
+			if h.az.lastAction != "manage" {
+				t.Errorf("authz action: got %q, want %q", h.az.lastAction, "manage")
+			}
+			if h.az.lastTarget != nil {
+				t.Errorf("authz target: got %v, want nil", *h.az.lastTarget)
+			}
+			if len(h.q.keys) != 1 || h.q.activeKey() == nil {
+				t.Errorf("denied request mutated the key table: %+v", h.q.keys)
+			}
+			if len(h.obs.calls) != 0 {
+				t.Errorf("observer dispatched %d times on a denied request", len(h.obs.calls))
+			}
+		})
+	}
+}
+
 // TestFieldCryptoKeyRotate_403_DoesNotReloadCipher pins the one amplification
 // concern this handler owns: Cipher.Reload is unrate-limited, and this
 // handler is the only caller of it, so a denied request must never reach it.
