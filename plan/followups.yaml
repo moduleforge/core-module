@@ -47,16 +47,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'The integration suite pins the compromised half of the per-key failure policy end-to-end against a real database (real field_crypto_keys rows, real RetireActiveFieldCryptoKey, real facade adapter), but never pins the standard half the same way — its only standard-rotation case has a write-back that succeeds. Every test exercising the tolerate-on-failure branch builds its fieldcrypto.KeyRecord by hand in Go with CompromisedAt left nil, so the SQL that actually derives that column (compromised_at = CASE WHEN compromised THEN now() ELSE NULL END in RetireActiveFieldCryptoKey) and the facade adapter''s mapping of it are untested for the false case. An inversion or mis-mapping anywhere on that path would make every ordinary rotation silently adopt compromised-key policy — reads would start 500ing on any transient write-back failure (a read-only replica, a lock timeout, a permission error) while the entire test suite, including the standard integration case, stayed green. Fix: add a fourth sub-case to the standard-rotation integration test reproducing the compromised suite''s competing-row-lock technique against a standard-rotated key, asserting the read succeeds and returns correct plaintext with the stored blob unchanged — the direct counterpart of the existing compromised sub-case at rotating_cipher_integration_test.go:710-743. Found by phase-3 boundary security review (opus-high). Severity: minor, confidence: medium.'
-    - title: 'security-001 (suggestion): request bodies on '
-      id: wXiC
-      date: "2026-08-14"
-      tags:
-        - type:security
-        - plan/phase:admin-rotation-api
-        - plan/slug:fieldcrypto-key-rotation
-        - priority:unspecified
-        - effort:unspecified
-      text: 'security-001 (suggestion): request bodies on the two body-accepting field-crypto-key routes are unbounded, matching every other api/httpapi handler (a package-wide gap). DECIDED: add a local body-size limit to just these two routes now (e.g. http.MaxBytesReader or equivalent), accepting temporary divergence from sibling handlers until a shared router middleware fix lands package-wide. Note in the code/commit that this is a local stopgap pending the package-wide middleware fix (tracked separately as the real long-term fix for all api/httpapi handlers).'
     - title: 'rotate: grace_period_days:0 convergence gap'
       id: LO1V
       date: "2026-08-14"
