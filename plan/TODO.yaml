@@ -95,6 +95,7 @@ phases:
           path: phase-03-rotate-on-read/002-wire-decrypt-call-sites.md
           done: false
           tier: sonnet-high
+          digest: Wired the RotatingCipher from task 001 into all six decrypt call sites (profile.go x2, legal_entity.go x2, natural_person.go, corporation.go); the four Encrypt sites pick it up automatically via field-type change alone. service.New's exported signature untouched — composes one RotatingCipher internally via NewRotatingCipher(cipher, db, nil), shared between NaturalPersonService and CorporationService. LegalEntityService retyped for compile-correctness only. All existing service tests updated via a new testRotatingCipher(t) helper; two new tests added exercising rotation of a blob written under a retired key through the service layer end-to-end. api build/test/lint and repo-root three-subproject build all green. Inline security review found no issues — authorization ordering, entity-ID scoping, no-plaintext-logging invariant all preserved.
           git:
             branch: plan/fieldcrypto-key-rotation-03-002
             commit:
