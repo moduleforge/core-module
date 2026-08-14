@@ -135,7 +135,7 @@ phases:
           done: false
           tier: sonnet-med
           git:
-            branch: null
+            branch: plan/fieldcrypto-key-rotation-04-002
             commit: []
             merge: null
         - number: 3
