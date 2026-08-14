@@ -88,7 +88,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-03-001
             commit:
                 - 971c8e2
-            merge: null
+            merge: beb2d72
         - number: 2
           slug: wire-decrypt-call-sites
           title: Wire Rotation Through Decrypt Call Sites
