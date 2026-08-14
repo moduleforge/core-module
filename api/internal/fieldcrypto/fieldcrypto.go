@@ -363,14 +363,15 @@ func (c *Cipher) openBlob(ctx context.Context, blob []byte) (string, uint32, *ke
 		return "", 0, nil, nil, err
 	}
 
+	now := time.Now()
 	set := c.set.Load()
-	entry := set.usable(version, time.Now())
+	entry := set.usable(version, now)
 	if entry == nil && c.store != nil && c.reloadAllowed() {
 		if rerr := c.reload(ctx); rerr != nil {
 			return "", 0, nil, nil, fmt.Errorf("fieldcrypto: key version %d is not usable and the key-set reload failed: %w", version, rerr)
 		}
 		set = c.set.Load()
-		entry = set.usable(version, time.Now())
+		entry = set.usable(version, now)
 	}
 	if entry == nil {
 		return "", 0, nil, nil, unusableVersionError(set, version)

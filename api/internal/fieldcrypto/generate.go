@@ -76,6 +76,11 @@ func NewFromEnvOrGenerate(ctx context.Context, store KeyStore) (*Cipher, error) 
 			defer zeroBytes(generated)
 			seed = generated
 		}
+		// Re-captured here because the adopted records come from bootstrap's
+		// own InsertInitialKey (or a second LoadUsableKeys on a lost race),
+		// which started after the startedAt taken above — so the snapshot
+		// must not be treated as fresher than what it could have seen.
+		startedAt = time.Now()
 		if records, err = bootstrap(ctx, store, seed); err != nil {
 			return nil, err
 		}
