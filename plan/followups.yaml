@@ -144,3 +144,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: Cipher.Reload is deliberately unrate-limited (bypasses TTL and reloadAllowed per task 001 requirement 4) — correct for phase 2, but it is a one-call-one-DB-query amplification primitive whose only bound will be Phase 4's rotation-handler authz (manage, nil target / wildcard-grant-admin-only). Phase 4's security review should explicitly verify Reload is unreachable without that credential rather than assuming it. Found by phase-2 boundary security review (opus-high).
+    - title: security-001 (followup material, not resolved
+      id: GPRN
+      date: "2026-08-14"
+      tags:
+        - type:ambiguity
+        - plan/phase:rotate-on-read
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: 'security-001 (followup material, not resolved here): verifyStale at api/service/rotating_cipher.go:341 treats any stored key version other than the source version as already-rotated, so a row re-encrypted under a second compromised retired version by a process with a stale key snapshot lets this read succeed while compromised ciphertext remains at rest. Bounded and self-correcting on the next read. A safe refinement would be for fieldcrypto to expose whether an arbitrary version is compromised, letting verifyStale accept only a non-compromised replacement version — this needs new fieldcrypto API surface, not a trivial fix.'
