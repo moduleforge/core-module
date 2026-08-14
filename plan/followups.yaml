@@ -124,3 +124,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'keyStoreAdapter zeroes key material via aliasing on the success path (records[i].KeyBytes shares memory with rows[i].KeyBytes, later zeroed by the cipher), but on a mapping failure (e.g. the negative-version guard) LoadUsableKeys returns nil, discarding both rows and records un-zeroed — asymmetric with the internal package''s reload(), which defers zeroKeyMaterial before calling buildKeySet so a mid-build failure still wipes everything. Best-effort hygiene either way (pgx''s wire buffers hold their own copies), but one corrupt row currently turns the hygiene property off for the whole key set. Fix: wipe rows[i].KeyBytes on the failure path in both LoadUsableKeys and InsertInitialKey before returning an error. Found by phase-2 boundary security review (opus-high), api/fieldcrypto/fieldcrypto.go:65-79. Severity: suggestion, confidence: high.'
+    - title: 'fieldcrypto: MustPersist doc wording drift'
+      id: pfuW
+      date: "2026-08-13"
+      tags:
+        - plan/phase:phase-02-versioned-cipher
+        - plan/slug:fieldcrypto-key-rotation
+        - type:documentation
+        - priority:unspecified
+        - effort:unspecified
+      text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
