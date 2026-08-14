@@ -134,6 +134,7 @@ phases:
           path: phase-04-admin-rotation-api/002-manifest-and-openapi-routes.md
           done: false
           tier: sonnet-med
+          digest: Added coreFieldCryptoKeyHandler service block and its /v1-group route entry to moduleforge.module.yaml, verbatim per design note, cipher block untouched. Documented all four admin rotation routes in api/openapi.fragment.yaml with new request/response schemas and a new Conflict reusable response. key_hex modeled as writeOnly on request schema only, never in any response schema. Both files parse as valid YAML, all task-specified grep checks pass, full make build at repo root succeeds.
           git:
             branch: plan/fieldcrypto-key-rotation-04-002
             commit:
