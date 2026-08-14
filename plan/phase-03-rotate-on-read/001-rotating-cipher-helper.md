@@ -133,3 +133,42 @@ architectural_impact: true
 - After the types, the `blobColumn` descriptors, and `Encrypt`/`DecryptSSN`/`DecryptEIN` compile.
 - After `decryptRotating` and `writeBack` are complete with the happy-path test passing.
 - After `verifyStale` and the two compromised-key tests.
+
+## Status
+
+**succeeded** — 2026-08-13.
+
+Affected files (both new; no existing file under `api/service/` was modified):
+
+- `api/service/rotating_cipher.go`
+- `api/service/rotating_cipher_test.go`
+
+Validation: `cd api && make build`, `make test`, and `make lint` all pass;
+`go test ./service/... -run RotatingCipher -v` passes (11 test functions, covering the five named
+cases plus `Encrypt`, the no-rotation-needed fast path, an absent value, and both columns);
+`go test -race ./service/ -run RotatingCipher` passes. `grep -n "Observe" api/service/rotating_cipher.go`
+returns nothing; `grep -n "lock_timeout"` shows the `SET LOCAL` statement; `git diff --stat` against the
+task's base commit shows exactly the two new files.
+
+Assumptions confirmed against the tree rather than taken on trust: Phase 1's `UpdateNaturalPersonSSNBlob`
+/ `UpdateCorporationEINBlob` exist as `:execrows` queries returning `(int64, error)`; Phase 2 exports
+`DecryptWithRotation`, `Rotation.Needed()`/`MustPersist`, and `BlobVersion`; `txhelper` provides
+`Run(ctx, db, func(ctx, tx) error) error` and the `DB` interface, so the design note's illustrative names
+matched the real ones. The `updated_at` sentence is carried in the file's doc comment.
+
+Decisions made inside the task's scope:
+
+- `writeBack` returns `persisted = false` whenever `txhelper.Run` returns an error, rather than
+  returning the flag the transaction body set. A commit that fails after a matched compare-and-swap
+  would otherwise report a rotation as durably stored when it was rolled back — which the
+  compromised-key branch would then treat as success. `decryptRotating`'s four branches are unchanged.
+- A lost compare-and-swap under a standard key returns a sentinel error (`errStaleCAS`) from the
+  transaction body rather than a nil error with `persisted` false, so the tolerated-miss log line always
+  carries a cause and the `MustPersist` branch can never wrap a nil error.
+- `outcome=stale` is the single label for every tolerated miss (lost CAS, read-only replica, permission
+  error, absent write handle), per the design's three-value outcome vocabulary, with the underlying
+  cause carried in the log line's `error` field.
+- Tests build a store-backed multi-key `Cipher` from a static in-test `fieldcrypto.KeyStore` (version 1
+  retired, optionally compromised; version 2 active), since `NewFromKey` is store-less and never reports
+  a rotation. They reuse `mock_test.go`'s `fakeDB`/`fakeTx` and add a `coredb.Querier` stub that
+  implements only the four queries the write-back can issue.
