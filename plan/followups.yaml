@@ -114,3 +114,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'buildKeySet re-validates most schema invariants (no/two active keys, duplicate version, version 0, wrong key length) but not the one enforced by the field_crypto_keys_retired_only_flags CHECK: that an active (retired_at IS NULL) row must not carry compromised_at or decryptable_until. Not reachable via the shipped SQL today (the CHECK constraint and the retired_at IS NOT NULL guards on the two mutation queries close it), but KeyStore is an interface — a non-DB implementation could violate it, silently producing MustPersist:false for a compromised-yet-active key, or an active key past its own grace deadline. Fix: reject such a record in buildKeySet''s active-record branch with a loud error, mirroring the neighbouring checks. Found by phase-2 boundary security review (opus-high), api/internal/fieldcrypto/fieldcrypto.go:465-491. Severity: suggestion, confidence: high.'
+    - title: 'fieldcrypto adapter: no zero on error path'
+      id: 0DI1
+      date: "2026-08-13"
+      tags:
+        - plan/phase:phase-02-versioned-cipher
+        - plan/slug:fieldcrypto-key-rotation
+        - type:security
+        - priority:unspecified
+        - effort:unspecified
+      text: 'keyStoreAdapter zeroes key material via aliasing on the success path (records[i].KeyBytes shares memory with rows[i].KeyBytes, later zeroed by the cipher), but on a mapping failure (e.g. the negative-version guard) LoadUsableKeys returns nil, discarding both rows and records un-zeroed — asymmetric with the internal package''s reload(), which defers zeroKeyMaterial before calling buildKeySet so a mid-build failure still wipes everything. Best-effort hygiene either way (pgx''s wire buffers hold their own copies), but one corrupt row currently turns the hygiene property off for the whole key set. Fix: wipe rows[i].KeyBytes on the failure path in both LoadUsableKeys and InsertInitialKey before returning an error. Found by phase-2 boundary security review (opus-high), api/fieldcrypto/fieldcrypto.go:65-79. Severity: suggestion, confidence: high.'
