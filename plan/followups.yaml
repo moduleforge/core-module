@@ -56,16 +56,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
-    - title: 'fieldcrypto: MustPersist doc wording drift'
-      id: pfuW
-      date: "2026-08-13"
-      tags:
-        - plan/phase:phase-02-versioned-cipher
-        - plan/slug:fieldcrypto-key-rotation
-        - type:documentation
-        - priority:unspecified
-        - effort:unspecified
-      text: api/internal/fieldcrypto/fieldcrypto.go's package doc states MustPersist means "a caller that cannot durably store the replacement blob must fail the read", dropping plan/overview.md's qualifier "...and the compromised ciphertext is not verifiably already gone". The cipher's derivation is correct either way (the escape hatch is caller-side, owned by Phase 3's rotating-cipher-helper), but the wording should be reconciled before Phase 3 implements the caller so it doesn't implement the stricter reading by accident. Found by phase-2 boundary security review (opus-high).
     - title: 'rotating_cipher: narrow verifyStale check'
       id: 9l49
       date: "2026-08-14"
