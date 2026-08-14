@@ -346,6 +346,161 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  # --------------------------------------------------------------------------
+  # /field-crypto-keys — admin field-encryption-key rotation
+  #
+  # All four routes below authorize as h.az.Authorize(ctx, "manage", nil) —
+  # a nil target, which is wildcard-grant-admin-only per the reference
+  # Authorizer implementation. field_crypto_keys rows are not entities and
+  # carry no owner, so there is no non-admin caller these routes ever admit.
+  # No response schema here ever includes key material (key_bytes); the
+  # inventory and rotation responses carry only versions and lifecycle
+  # timestamps.
+  # --------------------------------------------------------------------------
+  /field-crypto-keys:
+    get:
+      tags: [FieldCryptoKeys]
+      operationId: listFieldCryptoKeys
+      summary: List field-encryption key versions (admin)
+      description: |
+        Returns every field-encryption key version with its lifecycle
+        timestamps, ordered by version. Never returns key material. Requires
+        wildcard-grant admin privileges.
+      responses:
+        "200":
+          description: Field-encryption key inventory.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /field-crypto-keys/rotations:
+    post:
+      tags: [FieldCryptoKeys]
+      operationId: rotateFieldCryptoKey
+      summary: Rotate the active field-encryption key (admin)
+      description: |
+        Retires the current active key and installs a new active key, in a
+        single transaction, then reloads this process's cipher so it
+        converges immediately. When `key_hex` is omitted the server
+        generates 32 cryptographically random bytes; when supplied, the
+        operator's own material is decoded and length-validated exactly as
+        `CORE_FIELD_KEY_HEX` is. When `compromised` is true, the retired key
+        is flagged compromised at rotation time and `grace_period_days` must
+        be omitted or null — any read that still depends on the retired key
+        and cannot re-encrypt away from it will subsequently fail. Requires
+        wildcard-grant admin privileges.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateFieldCryptoKeyRequest"
+      responses:
+        "201":
+          description: Rotation completed; the previous key is retired and a new key is active.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateFieldCryptoKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /field-crypto-keys/{version}/mark-compromised:
+    post:
+      tags: [FieldCryptoKeys]
+      operationId: markFieldCryptoKeyCompromised
+      summary: Flag an already-retired key compromised (admin)
+      description: |
+        Marks a retired key version compromised after the fact, independent
+        of the rotation event that retired it. Idempotent: a repeat call
+        against an already-compromised version returns 200 with the
+        original timestamp unchanged. Requires wildcard-grant admin
+        privileges.
+      parameters:
+        - $ref: "#/components/parameters/FieldCryptoKeyVersion"
+      responses:
+        "200":
+          description: The key version is (now, or already was) flagged compromised.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No key exists at this version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The requested version is the still-active key, which cannot be marked compromised directly — rotate it instead.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /field-crypto-keys/{version}/grace:
+    put:
+      tags: [FieldCryptoKeys]
+      operationId: setFieldCryptoKeyGracePeriod
+      summary: Extend, shorten, or clear a retired key's decrypt window (admin)
+      description: |
+        Sets or clears `decryptable_until` on a retired key version. Send
+        `grace_period_days: null` to clear the deadline (the key then
+        decrypts indefinitely). This is also the only supported way to put a
+        deadline on a compromised key — deliberately, and only after the
+        fact, never as a silent side effect of a rotation. Requires
+        wildcard-grant admin privileges.
+      parameters:
+        - $ref: "#/components/parameters/FieldCryptoKeyVersion"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetFieldCryptoKeyGraceRequest"
+      responses:
+        "200":
+          description: The key version's grace deadline was updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FieldCryptoKeyMetadata"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No key exists at this version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The requested version is the still-active key, which has no grace window to set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 # ---------------------------------------------------------------------------
 # Components
 # ---------------------------------------------------------------------------
@@ -375,6 +530,16 @@ components:
       schema:
         type: string
         format: uuid
+
+    FieldCryptoKeyVersion:
+      name: version
+      in: path
+      required: true
+      description: Key version number (the identity sequence starts at 1).
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
 
   # -------------------------------------------------------------------------
   # Schemas
@@ -649,6 +814,140 @@ components:
           type: string
           description: Replacement label for the service account.
 
+    # -- Field-crypto-key rotation admin API -----------------------------------
+
+    FieldCryptoKeyMetadata:
+      type: object
+      description: |
+        Lifecycle metadata for one field-encryption key version. Never
+        includes key material — `key_bytes` never crosses this boundary.
+      required: [version, created_at, updated_at]
+      properties:
+        version:
+          type: integer
+          format: int64
+          description: Key version number; the identity sequence starts at 1.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: |
+            Last time this row was written, including a re-encrypt-on-read
+            write-back against data encrypted under it. Not a domain
+            modification timestamp.
+        retired_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set once this version is no longer the active key.
+        decryptable_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Absolute deadline after which this retired key stops decrypting.
+            Null means no deadline (the safe default). Always null for the
+            active key.
+        compromised_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Set when this retired key has been flagged compromised, either at
+            rotation time or after the fact. Always null for the active key.
+
+    RotateFieldCryptoKeyRequest:
+      type: object
+      description: |
+        Request to retire the current active key and install a new one.
+        Every field is optional; an empty body performs a standard rotation
+        with server-generated key material and no grace deadline.
+      properties:
+        key_hex:
+          type: string
+          writeOnly: true
+          description: |
+            Operator-supplied replacement key material, hex-encoded and
+            decoded/length-validated exactly as `CORE_FIELD_KEY_HEX` is.
+            Optional; omitted (the recommended default) means the server
+            generates 32 cryptographically random bytes. Write-only: never
+            echoed back in any response.
+        compromised:
+          type: boolean
+          default: false
+          description: |
+            When true, the retired key is flagged compromised at rotation
+            time, forcing decryptable_until to null on it. Rejected together
+            with a non-null grace_period_days (400 invalid_input).
+        grace_period_days:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: |
+            Number of days the retired key remains valid for decryption.
+            Null/omitted means no expiry. Must be omitted or null when
+            compromised is true.
+
+    RetiredFieldCryptoKeySummary:
+      type: object
+      description: The key version just retired by this rotation.
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+        retired_at:
+          type: string
+          format: date-time
+        decryptable_until:
+          type: string
+          format: date-time
+          nullable: true
+        compromised_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ActiveFieldCryptoKeySummary:
+      type: object
+      description: The key version just installed as active by this rotation.
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+
+    RotateFieldCryptoKeyResponse:
+      type: object
+      description: Result of a successful rotation. Never includes key material.
+      required: [retired, active]
+      properties:
+        retired:
+          $ref: "#/components/schemas/RetiredFieldCryptoKeySummary"
+        active:
+          $ref: "#/components/schemas/ActiveFieldCryptoKeySummary"
+
+    SetFieldCryptoKeyGraceRequest:
+      type: object
+      required: [grace_period_days]
+      description: |
+        Request to set or clear a retired key's decrypt-window deadline.
+      properties:
+        grace_period_days:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: |
+            New number of days the key remains valid for decryption, counted
+            from now. Send null to clear the deadline (decrypt indefinitely).
+
   # -------------------------------------------------------------------------
   # Reusable responses
   # -------------------------------------------------------------------------
@@ -677,6 +976,13 @@ components:
 
     NotFound:
       description: The requested entity does not exist or has been archived.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Conflict:
+      description: The request conflicts with the current state of the resource.
       content:
         application/json:
           schema:

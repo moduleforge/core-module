@@ -97,6 +97,35 @@ architectural_impact: true
 - The handler's constructor signature is fixed by the design note. If task 001 deviated from it, the
   manifest is what must be corrected to match the code, not the reverse — flag any such deviation.
 
+## Status
+
+Implementation outcome: **succeeded**. Date: 2026-08-13.
+
+- Added the `coreFieldCryptoKeyHandler` service block to `moduleforge.module.yaml`'s
+  `provides.services`, verbatim per
+  [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#handler-shape-and-wiring), with a
+  comment block in the surrounding style stating the handler's purpose and its
+  wildcard-grant-admin-only routes. The `cipher` service block is byte-for-byte unchanged
+  (confirmed via `git diff moduleforge.module.yaml`).
+- Added the matching route entry (`prefix: /v1`, `handler: coreFieldCryptoKeyHandler`,
+  `register: corehttpapi.RegisterFieldCryptoKeyRoutes`, `scope: authenticated`), registered onto the
+  shared `/v1` group the same way `coreAppsHandler`'s route entry is, immediately following it.
+- Documented the four routes in `api/openapi.fragment.yaml`, following the fragment's existing
+  path-key convention of omitting the `/v1` mount prefix (matching `/entities/...` above them) since
+  the fragment's own header states the mounting path is determined by the consuming service. Added
+  `FieldCryptoKeyMetadata`, `RotateFieldCryptoKeyRequest`, `RetiredFieldCryptoKeySummary`,
+  `ActiveFieldCryptoKeySummary`, `RotateFieldCryptoKeyResponse`, and `SetFieldCryptoKeyGraceRequest`
+  schemas, plus a reusable `Conflict` (409) response alongside the existing `BadRequest`/
+  `Unauthorized`/`Forbidden`/`NotFound` responses. `key_hex` appears only as a `writeOnly` field on
+  `RotateFieldCryptoKeyRequest`; no response schema carries it or any other key material.
+- Confirmed the plan overview's [Deferred and flagged](../overview.md#deferred-and-flagged) section
+  already records this manifest/OpenAPI change under "Composing apps' generated composition roots"
+  and "mfgen" — no gap to flag.
+- Validation: YAML parses for both files; `grep` checks for `coreFieldCryptoKeyHandler`,
+  `field-crypto-keys` (all four paths), and `key_hex` (request-only) all pass; `make build` at the
+  repository root passes.
+- Files touched: `moduleforge.module.yaml`, `api/openapi.fragment.yaml`.
+
 ## References
 
 - [`../notes/rotation-api-shape.md`](../notes/rotation-api-shape.md#handler-shape-and-wiring) — the
