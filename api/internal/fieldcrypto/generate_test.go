@@ -479,6 +479,14 @@ func TestNewFromEnvOrGenerate_RejectsMalformedKeySet(t *testing.T) {
 	corrupt := activeRecord(1, testKey(1))
 	corrupt.KeyBytes = corrupt.KeyBytes[:16]
 
+	compromisedAt := time.Now()
+	activeCompromised := activeRecord(1, testKey(1))
+	activeCompromised.CompromisedAt = &compromisedAt
+
+	deadline := time.Now().Add(time.Hour)
+	activeGraced := activeRecord(1, testKey(1))
+	activeGraced.DecryptableUntil = &deadline
+
 	tests := []struct {
 		name    string
 		records []fieldcrypto.KeyRecord
@@ -517,6 +525,20 @@ func TestNewFromEnvOrGenerate_RejectsMalformedKeySet(t *testing.T) {
 			name:    "all-zero key material",
 			records: []fieldcrypto.KeyRecord{{Version: 1, KeyBytes: make([]byte, 32)}},
 			wantIn:  "all zero bytes",
+		},
+		{
+			// The field_crypto_keys_retired_only_flags CHECK constraint
+			// reserves compromised_at for a retired row; a KeyStore need not
+			// be DB-backed, so buildKeySet re-checks it.
+			name:    "active key with compromised_at set",
+			records: []fieldcrypto.KeyRecord{activeCompromised},
+			wantIn:  "compromised_at",
+		},
+		{
+			// Same constraint, decryptable_until side.
+			name:    "active key with decryptable_until set",
+			records: []fieldcrypto.KeyRecord{activeGraced},
+			wantIn:  "decryptable_until",
 		},
 	}
 	for _, tc := range tests {
