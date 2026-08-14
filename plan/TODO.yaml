@@ -71,7 +71,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-02-002
             commit:
                 - a467939
-            merge: null
+            merge: b0d616e
     - number: 3
       slug: rotate-on-read
       title: Re-Encrypt-On-Read Call Sites
