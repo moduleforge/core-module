@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 
@@ -646,16 +645,28 @@ func fieldCryptoKeyVersionParam(r *http.Request) (int32, *apiresp.FieldError) {
 	return int32(version), nil
 }
 
+// maxGracePeriodDays bounds grace_period_days well inside Postgres
+// timestamptz's range (~year 294277 AD, ~1.07e8 days out). 36500 days
+// (~100 years) is a generous operational ceiling that keeps
+// now() + grace_days * INTERVAL '1 day' — computed in SQL by
+// RetireActiveFieldCryptoKey and SetFieldCryptoKeyDecryptableUntil — far from
+// that overflow, unlike the old math.MaxInt32 bound, which was tight enough
+// only to avoid wrapping to a negative int32 and still let a value through
+// that overflowed timestamptz at the SQL sink (a 500 instead of a 400).
+const maxGracePeriodDays = 36500
+
 // graceDaysParam validates an optional grace period and renders it as the
-// nullable INT the retire and grace queries take. The upper bound is the
-// column's own width: a value past it would wrap to a negative day count and
-// resolve decryptable_until to an instant in the past — a silently expired
-// key rather than the long window the operator asked for.
+// nullable INT the retire and grace queries take. The upper bound keeps the
+// resulting now() + grace_days*1day comfortably inside timestamptz's range;
+// a value past it would either overflow at the SQL sink (a 500) or, for an
+// int32-scale value beyond the column's own width, wrap to a negative day
+// count and resolve decryptable_until to an instant in the past — a silently
+// expired key rather than the long window the operator asked for.
 func graceDaysParam(days *int64) (pgtype.Int4, *apiresp.FieldError) {
 	if days == nil {
 		return pgtype.Int4{}, nil
 	}
-	if *days < 0 || *days > math.MaxInt32 {
+	if *days < 0 || *days > maxGracePeriodDays {
 		return pgtype.Int4{}, &apiresp.FieldError{
 			Field:   "grace_period_days",
 			Code:    "field_crypto_keys.grace_period_days_invalid",

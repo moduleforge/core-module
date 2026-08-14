@@ -925,11 +925,12 @@ components:
           type: integer
           format: int32
           minimum: 0
+          maximum: 36500
           nullable: true
           description: |
-            Number of days the retired key remains valid for decryption.
-            Null/omitted means no expiry. Must be omitted or null when
-            compromised is true.
+            Number of days the retired key remains valid for decryption, up
+            to 36500 days (~100 years). Null/omitted means no expiry. Must
+            be omitted or null when compromised is true.
 
     RetiredFieldCryptoKeySummary:
       type: object
@@ -983,10 +984,12 @@ components:
           type: integer
           format: int32
           minimum: 0
+          maximum: 36500
           nullable: true
           description: |
             New number of days the key remains valid for decryption, counted
-            from now. Send null to clear the deadline (decrypt indefinitely).
+            from now, up to 36500 days (~100 years). Send null to clear the
+            deadline (decrypt indefinitely).
 
   # -------------------------------------------------------------------------
   # Reusable responses
