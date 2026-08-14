@@ -388,6 +388,42 @@ func TestRotatingCipher_CompromisedKeyLostCASAlreadyRotatedSucceeds(t *testing.T
 	requireRotationLog(t, f.sink, slog.LevelDebug, outcomePersisted, "natural_persons.ssn")
 }
 
+// A blob under a compromised key whose compare-and-swap loses to a blob
+// stored under a third, retired, also-compromised version — neither
+// FromVersion nor the active ToVersion. verifyStale must not treat "version
+// differs from FromVersion" as sufficient evidence of a benign race: only a
+// stored version equal to ToVersion is verifiably safe, so this read must
+// fail rather than be reported as already rotated.
+func TestRotatingCipher_CompromisedKeyLostCASDifferentCompromisedVersionFailsRead(t *testing.T) {
+	f := newRotationFixture(t, true, newFakeDB())
+	f.q.ssnRows = 0
+	// A second retired, compromised key version (3), distinct from both
+	// FromVersion (1) and the active ToVersion (2). Its own cipher only needs
+	// to exist long enough to produce a blob carrying that version prefix;
+	// verifyStale decodes the version without decrypting.
+	v3 := newRotationTestCipher(t, fieldcrypto.KeyRecord{Version: 3, KeyBytes: rotationTestKey(0x33)})
+	f.q.storedSSN = rotationEncrypt(t, v3, rotationSSN)
+
+	got, err := f.rc.DecryptSSN(context.Background(), rotationEntityID, f.ssnBlob)
+	if err == nil {
+		t.Fatal("expected the read to fail: the stored blob is under a second compromised version, not the active one")
+	}
+	if got != "" {
+		t.Errorf("plaintext = %q, want %q on a failed read", got, "")
+	}
+	if !errors.Is(err, errStillCompromised) {
+		t.Errorf("error does not wrap errStillCompromised: %v", err)
+	}
+	if f.q.reads != 1 {
+		t.Errorf("verification issued %d read(s), want 1", f.q.reads)
+	}
+
+	rec := requireRotationLog(t, f.sink, slog.LevelError, outcomeError, "natural_persons.ssn")
+	if rec.attrs["compromised"] != true {
+		t.Errorf("compromised = %v, want true", rec.attrs["compromised"])
+	}
+}
+
 // The same lost compare-and-swap under a compromised key, but the stored value
 // was cleared outright: nothing remains under the old key, so the read
 // succeeds.

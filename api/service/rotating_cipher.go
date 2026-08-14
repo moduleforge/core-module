@@ -316,9 +316,11 @@ func (rc *RotatingCipher) writeBack(
 //     COMMITTED an UPDATE blocks on an uncommitted writer and re-evaluates its
 //     predicate rather than returning zero rows, so zero rows always means a
 //     committed change.
-//   - A stored blob still carrying FromVersion after a committed change is not
-//     reachable by any legitimate writer, because every write path encrypts
-//     under the active key. That case is correctly a hard failure.
+//   - Every legitimate write path encrypts under the active key, so a stored
+//     blob is verifiably safe only when its version is ToVersion. Any other
+//     version — FromVersion itself, or a second, also-compromised retired
+//     version — is not reachable by a legitimate writer and is correctly a
+//     hard failure rather than a benign race.
 //
 // It carries one conservative false negative: a caller running at REPEATABLE
 // READ or SERIALIZABLE sees its own snapshot on the re-read and so reports a
@@ -338,8 +340,8 @@ func (rc *RotatingCipher) verifyStale(
 	if err != nil {
 		return fmt.Errorf("%s: decode the stored blob's key version after a lost compare-and-swap: %w", col.name, err)
 	}
-	if version != rot.FromVersion {
-		// Someone else already re-encrypted it away from the compromised key.
+	if version == rot.ToVersion {
+		// Someone else already re-encrypted it onto the active key.
 		return nil
 	}
 	return errStillCompromised
