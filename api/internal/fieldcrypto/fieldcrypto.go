@@ -34,8 +34,9 @@
 //     exactly like an unknown version.
 //   - compromised_at marks a retired key as known-leaked. Decrypting a blob
 //     written under such a key yields a Rotation whose MustPersist is true,
-//     meaning a caller that cannot durably store the replacement blob must
-//     fail the read rather than return the plaintext. That policy is derived
+//     meaning a caller that cannot durably store the replacement blob, and
+//     the compromised ciphertext is not verifiably already gone, must fail
+//     the read rather than return the plaintext. That policy is derived
 //     once, here; no caller reads compromised_at or re-derives it.
 //
 // # Staleness across processes
