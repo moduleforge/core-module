@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: fieldcrypto lacks key-rotation support
-      id: iQt1
-      date: "2026-08-03"
-      tags:
-        - type:enhancement
-        - priority:unspecified
-        - effort:unspecified
-        - cross-repo/origin:mfmanager
-      text: 'api/internal/fieldcrypto/fieldcrypto.go''s Cipher holds exactly one 32-byte key; its own package doc states "Key rotation is out of scope for this package; if rotation is required it must be handled at the call site (e.g. re-encrypt on read when the active key differs from the key that produced the stored blob)" -- but no such call site exists anywhere in the ecosystem today, and stored ciphertext carries no key-version tag by which a second key could ever be introduced. Needed to make CORE_FIELD_KEY_HEX rotation possible: (1) a key-version tag written alongside each stored ciphertext blob, and (2) a re-encrypt-on-read path in fieldcrypto''s call sites that re-encrypts under the currently-active key when the stored version differs from it. Until this exists, a leaked CORE_FIELD_KEY_HEX cannot be retired without a from-scratch migration project. Documented as a permanent limitation, not implemented, in app-mfmanager''s deploy/README.md "Secret generation, loss, and rotation" section.'
     - title: 'Renaming decision worth a second look: colorL'
       id: yA2l
       date: "2026-08-06"
