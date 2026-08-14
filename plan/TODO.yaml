@@ -150,7 +150,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/fieldcrypto-key-rotation-04-003
-            commit: []
+            commit:
+                - eb0480d
             merge: null
     - number: 5
       slug: doc-updates
