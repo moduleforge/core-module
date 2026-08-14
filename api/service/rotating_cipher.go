@@ -207,7 +207,7 @@ func (rc *RotatingCipher) decryptRotating(
 		// the leaked key with nothing recording that it must be repaired, so
 		// the read fails.
 		rc.log.ErrorContext(ctx, "fieldcrypto: rotation away from a compromised key failed",
-			append(rotateLogFields(col, entityID, rot, outcomeError), "error", werr)...)
+			rotateLogFields(col, entityID, rot, outcomeError, "error", werr)...)
 		return "", fmt.Errorf("fieldcrypto: %s: re-encrypt away from compromised key version %d failed: %w",
 			col.name, rot.FromVersion, werr)
 
@@ -217,7 +217,7 @@ func (rc *RotatingCipher) decryptRotating(
 		// read of this row retries the rotation. Log so that a rotation which
 		// is not progressing is observable.
 		rc.log.WarnContext(ctx, "fieldcrypto: rotation write-back skipped",
-			append(rotateLogFields(col, entityID, rot, outcomeStale), "error", werr)...)
+			rotateLogFields(col, entityID, rot, outcomeStale, "error", werr)...)
 		return plaintext, nil
 	}
 }
@@ -348,8 +348,9 @@ func (rc *RotatingCipher) verifyStale(
 // rotateLogFields builds the structured record every rotate-on-read log line
 // carries. It names the column, the row, and the key versions involved, and
 // never the plaintext or either blob.
-func rotateLogFields(col blobColumn, entityID int64, rot fieldcrypto.Rotation, outcome string) []any {
-	return []any{
+func rotateLogFields(col blobColumn, entityID int64, rot fieldcrypto.Rotation, outcome string, extra ...any) []any {
+	fields := make([]any, 0, 16)
+	fields = append(fields,
 		"event", rotateOnReadEvent,
 		"column", col.name,
 		"entity_id", entityID,
@@ -359,5 +360,6 @@ func rotateLogFields(col blobColumn, entityID int64, rot fieldcrypto.Rotation, o
 		// exactly "the source key was compromised".
 		"compromised", rot.MustPersist,
 		"outcome", outcome,
-	}
+	)
+	return append(fields, extra...)
 }
