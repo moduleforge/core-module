@@ -1,14 +1,5 @@
 version: 2
 items:
-    - title: 'Renaming decision worth a second look: colorL'
-      id: yA2l
-      date: "2026-08-06"
-      tags:
-        - type:ambiguity
-        - plan/phase:spacing-token-contract
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Renaming decision worth a second look: colorLightTokens -> lightAndModeIndependentTokens was optional per the task doc but accounts for a visible share of the diff. Trivially revertible if a reviewer wants a minimal diff.'
     - title: 'The mf.text-body collision documented in the '
       id: uzKR
       date: "2026-08-06"
