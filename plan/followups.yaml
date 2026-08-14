@@ -206,16 +206,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'A rotation with compromised:true is the operator asserting the outgoing key has leaked, but post-commit convergence reloads only the process that served the request. Every other process continues encrypting new plaintext under the key just declared compromised for up to the 60s key-set TTL. PARTIALLY RESOLVED: phase 5''s doc-updates task (001-update-architecture-docs) added this convergence-window caveat to AGENTS.md''s Conventions section, covering the operator-runbook half. Remaining scope: the rotation route''s OpenAPI description (api/openapi.fragment.yaml, POST /field-crypto-keys/rotations) still does not mention that a 201 response is not the point at which the compromised key stops being used fleet-wide — add a note there to fully close this out. Small, well-scoped, doc-only. Originally found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys.go:332-343. Severity: minor, confidence: medium.'
-    - title: 'grace_period_days loose bound: 500 not 400'
-      id: Wdku
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-04-admin-rotation-api
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'graceDaysParam''s upper bound is math.MaxInt32 (chosen to avoid wrap-to-negative), but that''s not tight enough at the SQL sink: RetireActiveFieldCryptoKey and SetFieldCryptoKeyDecryptableUntil compute now() + grace_days * INTERVAL ''1 day'', and timestamptz tops out ~year 294277 (~1.07e8 days from now). Any accepted value above that (the range up to 2147483647 is wide open) raises a Postgres datetime overflow (SQLSTATE 22008) matching no apiresp sentinel, surfacing as a 500 with a server-side log entry rather than the 400 the input class deserves. No key material or internal detail reaches the client (admin-only route, apiresp fixes the public 5xx message), so impact is confined to error-class misreporting. Fix: tighten the upper bound to a value that cannot overflow timestamptz — a decade- or century-scale maximum as a named constant — and mirror it as a maximum on grace_period_days in both RotateFieldCryptoKeyRequest and SetFieldCryptoKeyGraceRequest in the OpenAPI fragment. Found by phase-4 boundary security review (opus-high). api/httpapi/field_crypto_keys.go:617-629. Severity: suggestion, confidence: medium.'
     - title: 'field-crypto-keys: full-scan not point query'
       id: b4lw
       date: "2026-08-14"
