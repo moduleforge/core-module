@@ -100,7 +100,7 @@ phases:
             branch: plan/fieldcrypto-key-rotation-03-002
             commit:
                 - 4fc2e58
-            merge: null
+            merge: c05c2bb
         - number: 3
           slug: rotate-on-read-integration-test
           title: Rotate-On-Read Integration Test
