@@ -295,6 +295,10 @@ func (h *FieldCryptoKeyHandler) Rotate(w http.ResponseWriter, r *http.Request) {
 		}
 		activeVersion = active.Version
 		activeCreated = active.CreatedAt
+		// InsertActiveFieldCryptoKey's row also carries the new key's
+		// bytes back; zero this second copy now that the two fields we
+		// need have been read out of it.
+		clear(active.KeyBytes)
 
 		// Read back the retired row's resolved lifecycle timestamps —
 		// retired_at and decryptable_until are computed by the database
