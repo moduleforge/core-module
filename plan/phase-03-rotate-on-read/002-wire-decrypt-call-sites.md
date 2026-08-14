@@ -103,3 +103,35 @@ architectural_impact: true
 - After `profile.go`'s two sites and the variadic parameter change, with in-package callers updated.
 - After `natural_person.go` and `corporation.go` (four decrypt/encrypt sites between them).
 - After `legal_entity.go` and `mock_test.go`, with the full test suite green.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-13
+- **Validation:** `cd api && make build`, `make test`, `make lint` all green; root `make build`
+  (model, api, gui) green; all six documented grep checks pass (no bare `.Decrypt(` in a non-test
+  service file; `fieldcrypto.Cipher` appears only in `service.New`'s parameter list and
+  `rotating_cipher.go`; `git diff` on `service.go` shows no change to `func New(`'s parameter list;
+  no `MustPersist`/`Rotation{` outside `rotating_cipher.go`; `DecryptSSN`/`DecryptEIN` each appear at
+  exactly the six documented call sites plus their `rotating_cipher.go` definitions).
+- **Files touched:** `api/service/service.go`, `api/service/profile.go`, `api/service/natural_person.go`,
+  `api/service/corporation.go`, `api/service/legal_entity.go`, `api/service/mock_test.go`,
+  `api/service/natural_person_test.go`, `api/service/corporation_test.go`, `api/service/tax_id_test.go`.
+- **Assumptions applied:** task 001 had landed with `RotatingCipher` exposing `Encrypt`, `DecryptSSN`,
+  `DecryptEIN`; `NaturalPersonService.GetByEntityUUID` reaches rotation through `profile.go`'s call
+  site 1 by forwarding `s.cipher` to `ResolveProfileByEntityID` — confirmed unchanged by this task.
+- **Decisions:** `service.New` composes exactly one `RotatingCipher` (via `NewRotatingCipher(cipher,
+  db, nil)`) and shares it between `NaturalPersonService` and `CorporationService`, since both read
+  through the same pool-backed write handle and default logger — no per-service instance needed.
+  `LegalEntityService`'s `cipher` field was retyped to `*RotatingCipher` for compile-correctness only,
+  per requirement 7; it remains unconstructed anywhere in the aggregate and received no new behavior,
+  test coverage, or wiring. Added two new service-level rotation tests (`..._RotatesRetiredKey` in
+  `tax_id_test.go`, one per column) per requirement 8, reusing `rotating_cipher_test.go`'s existing
+  `newRotationTestCipher`/`rotationTestKey`/`rotationEncrypt` helpers rather than duplicating them.
+- **Inline security review (review_focus):** applied inline against the diff from the task's start
+  commit; no findings. Authorization ordering at every call site is unchanged (each site's existing
+  `Authorize` call still runs before the profile/decrypt call it always did); `entity_id` threaded
+  into `DecryptSSN`/`DecryptEIN` at every site is the same internal ID the caller already resolved and
+  was authorized against, not new user input; no new sinks, secrets, or logging surface were
+  introduced (`rotating_cipher.go`'s logging, which never logs plaintext or ciphertext, is unchanged
+  by this task).

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/moduleforge/core-api/internal/fieldcrypto"
 	"github.com/moduleforge/core-api/observer"
 )
 
@@ -20,7 +22,7 @@ func TestNaturalPersonService_Create_EncryptsSSN(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -61,7 +63,7 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -86,7 +88,7 @@ func TestNaturalPersonService_Create_NoSSN(t *testing.T) {
 // then decrypt returns the original plaintext.
 func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	svc := &NaturalPersonService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -118,6 +120,51 @@ func TestNaturalPersonService_GetDecryptedSSN_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestNaturalPersonService_GetDecryptedSSN_RotatesRetiredKey verifies that a
+// blob written under a retired (but not compromised) key still decrypts to
+// the correct plaintext through the service method — exercising rotation
+// end-to-end via NaturalPersonService rather than RotatingCipher directly, as
+// rotating_cipher_test.go already does. The write handle is nil, so the
+// write-back is a tolerated miss under standard rotation; the persistence
+// path itself is covered by task 001's unit tests and task 003's integration
+// test.
+func TestNaturalPersonService_GetDecryptedSSN_RotatesRetiredKey(t *testing.T) {
+	q := newMockQuerier()
+	retiredAt := time.Now().Add(-time.Hour)
+	cipher := newRotationTestCipher(t,
+		fieldcrypto.KeyRecord{Version: 1, KeyBytes: rotationTestKey(0x11), RetiredAt: &retiredAt},
+		fieldcrypto.KeyRecord{Version: 2, KeyBytes: rotationTestKey(0x22)},
+	)
+	svc := &NaturalPersonService{
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         NewRotatingCipher(cipher, nil, nil),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
+	}
+
+	entityUUID := q.seedNaturalPerson("Liam", "Moore")
+	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
+
+	// Encrypt directly under the retired key (version 1), standing in for a
+	// blob written before the rotation to version 2.
+	v1 := newRotationTestCipher(t, fieldcrypto.KeyRecord{Version: 1, KeyBytes: rotationTestKey(0x11)})
+	blob := rotationEncrypt(t, v1, "222-33-4444")
+	np := q.naturalPersons[entity.ID]
+	np.Ssn = blob
+	q.naturalPersons[entity.ID] = np
+
+	plaintext, err := svc.GetDecryptedSSN(context.Background(), q, entity.ID)
+	if err != nil {
+		t.Fatalf("GetDecryptedSSN: %v", err)
+	}
+	if plaintext != "222-33-4444" {
+		t.Errorf("GetDecryptedSSN: got %q, want %q", plaintext, "222-33-4444")
+	}
+}
+
 // TestNaturalPersonService_GetDecryptedSSN_Nil verifies that a nil blob returns
 // "" without error.
 func TestNaturalPersonService_GetDecryptedSSN_Nil(t *testing.T) {
@@ -126,7 +173,7 @@ func TestNaturalPersonService_GetDecryptedSSN_Nil(t *testing.T) {
 		db:         newFakeDB(),
 		az:         allowAllAuthz{},
 		obs:        observer.NewObserverGroup(),
-		cipher:     testCipher(t),
+		cipher:     testRotatingCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
 
@@ -151,7 +198,7 @@ func TestNaturalPersonService_Update_SetSSN(t *testing.T) {
 		db:         newFakeDB(),
 		az:         allowAllAuthz{},
 		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
+		cipher:     testRotatingCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
 	entityUUID := q.seedNaturalPerson("Eve", "Foster")
@@ -181,7 +228,7 @@ func TestNaturalPersonService_Update_ClearSSN(t *testing.T) {
 		db:         newFakeDB(),
 		az:         allowAllAuthz{},
 		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
+		cipher:     testRotatingCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
 	entityUUID := q.seedNaturalPerson("Frank", "Green")
@@ -207,7 +254,7 @@ func TestNaturalPersonService_Update_NilSSN(t *testing.T) {
 		db:         newFakeDB(),
 		az:         allowAllAuthz{},
 		obs:        observer.NewObserverGroup(rec),
-		cipher:     testCipher(t),
+		cipher:     testRotatingCipher(t),
 		newQuerier: mockQuerierFactory(q),
 	}
 	entityUUID := q.seedNaturalPerson("Grace", "Hall")
@@ -232,7 +279,7 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
@@ -260,7 +307,7 @@ func TestCorporationService_Create_EncryptsEIN(t *testing.T) {
 // then decrypt returns the original EIN.
 func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	svc := &CorporationService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -290,11 +337,48 @@ func TestCorporationService_GetDecryptedEIN_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestCorporationService_GetDecryptedEIN_RotatesRetiredKey is the corporation
+// equivalent of TestNaturalPersonService_GetDecryptedSSN_RotatesRetiredKey.
+func TestCorporationService_GetDecryptedEIN_RotatesRetiredKey(t *testing.T) {
+	q := newMockQuerier()
+	retiredAt := time.Now().Add(-time.Hour)
+	cipher := newRotationTestCipher(t,
+		fieldcrypto.KeyRecord{Version: 1, KeyBytes: rotationTestKey(0x11), RetiredAt: &retiredAt},
+		fieldcrypto.KeyRecord{Version: 2, KeyBytes: rotationTestKey(0x22)},
+	)
+	svc := &CorporationService{
+		db:             newFakeDB(),
+		az:             allowAllAuthz{},
+		obs:            observer.NewObserverGroup(),
+		cipher:         NewRotatingCipher(cipher, nil, nil),
+		newQuerier:     mockQuerierFactory(q),
+		entityResolver: testEntityResolver(),
+		typeResolver:   testTypeResolver(q),
+	}
+
+	entityUUID := q.seedCorporation("Rotated Corp", nil)
+	entity, _ := q.GetEntityByUUID(context.Background(), entityUUID)
+
+	v1 := newRotationTestCipher(t, fieldcrypto.KeyRecord{Version: 1, KeyBytes: rotationTestKey(0x11)})
+	blob := rotationEncrypt(t, v1, "55-6667777")
+	corp := q.corporations[entity.ID]
+	corp.Ein = blob
+	q.corporations[entity.ID] = corp
+
+	plaintext, err := svc.GetDecryptedEIN(context.Background(), q, entity.ID)
+	if err != nil {
+		t.Fatalf("GetDecryptedEIN: %v", err)
+	}
+	if plaintext != "55-6667777" {
+		t.Errorf("GetDecryptedEIN: got %q, want %q", plaintext, "55-6667777")
+	}
+}
+
 // TestLegalEntityService_GetTaxID_NaturalPerson verifies GetTaxID returns
 // Type="SSN" and the correct plaintext for a natural person entity.
 func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	npSvc := &NaturalPersonService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -334,7 +418,7 @@ func TestLegalEntityService_GetTaxID_NaturalPerson(t *testing.T) {
 // Type="EIN" for a corporation entity.
 func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	corpSvc := &CorporationService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -374,7 +458,7 @@ func TestLegalEntityService_GetTaxID_Corporation(t *testing.T) {
 // LegalEntityTaxID for a non-leaf type (no error).
 func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 	saSvc := &ServiceAccountService{
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
@@ -403,7 +487,7 @@ func TestLegalEntityService_GetTaxID_ServiceAccount(t *testing.T) {
 // TaxID/TaxIDType when a cipher is supplied.
 func TestProfile_TaxIDPopulated(t *testing.T) {
 	q := newMockQuerier()
-	cipher := testCipher(t)
+	cipher := testRotatingCipher(t)
 
 	// Manually insert a natural_person with an encrypted SSN.
 	entityUUID := q.seedNaturalPerson("Ivan", "Jones")
@@ -455,7 +539,7 @@ func TestAuditRedaction_NoPlaintext(t *testing.T) {
 		db:             newFakeDB(),
 		az:             allowAllAuthz{},
 		obs:            observer.NewObserverGroup(rec),
-		cipher:         testCipher(t),
+		cipher:         testRotatingCipher(t),
 		newQuerier:     mockQuerierFactory(q),
 		entityResolver: testEntityResolver(),
 		typeResolver:   testTypeResolver(q),
