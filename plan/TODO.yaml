@@ -85,7 +85,8 @@ phases:
           tier: opus-med
           git:
             branch: plan/fieldcrypto-key-rotation-03-001
-            commit: []
+            commit:
+                - 971c8e2
             merge: null
         - number: 2
           slug: wire-decrypt-call-sites
