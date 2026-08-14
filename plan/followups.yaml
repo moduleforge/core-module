@@ -76,7 +76,7 @@ items:
         - plan/slug:fieldcrypto-key-rotation
         - priority:unspecified
         - effort:unspecified
-      text: 'security-001 (suggestion): request bodies on the two body-accepting routes are unbounded, matching every other api/httpapi handler — package-wide gap, not fixed here to avoid diverging from sibling handlers. Right fix is shared router middleware.'
+      text: 'security-001 (suggestion): request bodies on the two body-accepting field-crypto-key routes are unbounded, matching every other api/httpapi handler (a package-wide gap). DECIDED: add a local body-size limit to just these two routes now (e.g. http.MaxBytesReader or equivalent), accepting temporary divergence from sibling handlers until a shared router middleware fix lands package-wide. Note in the code/commit that this is a local stopgap pending the package-wide middleware fix (tracked separately as the real long-term fix for all api/httpapi handlers).'
     - title: 'rotate: grace_period_days:0 convergence gap'
       id: LO1V
       date: "2026-08-14"
