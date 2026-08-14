@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# shadow-db-lint.sh — apply migrations to an ephemeral Postgres container.
+# shadow-db-lint.sh — apply and revert migrations against an ephemeral
+# Postgres container.
 #
 # Replaces `atlas migrate lint --dev-url …`. Spins up a throwaway Postgres
-# instance, runs every migration in $1 against it, and tears down regardless
-# of outcome. Exit code matches goose's exit code.
+# instance, runs every migration in $1 against it via `goose up`, then rolls
+# every migration back via `goose down-to 0` (exercising each migration's
+# down script), and tears down regardless of outcome. Exit code matches the
+# exit code of whichever goose invocation failed first (up, then down); 0
+# only if both succeed.
 #
 # Usage:  shadow-db-lint.sh <migrations-dir>
 #
@@ -93,12 +97,23 @@ else
   exit 2
 fi
 
-echo "shadow-db-lint: applying $DIR via goose..."
+echo "shadow-db-lint: applying $DIR via goose (up)..."
 goose -dir "$DIR" postgres "$URL" up
 RC=$?
 
-if [[ $RC -eq 0 ]]; then
-  echo "shadow-db-lint: ok"
+if [[ $RC -ne 0 ]]; then
+  echo "shadow-db-lint: goose up failed (exit $RC)" >&2
+  exit $RC
 fi
 
-exit $RC
+echo "shadow-db-lint: reverting $DIR via goose (down)..."
+goose -dir "$DIR" postgres "$URL" down-to 0
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+  echo "shadow-db-lint: goose down failed (exit $RC)" >&2
+  exit $RC
+fi
+
+echo "shadow-db-lint: ok"
+exit 0
