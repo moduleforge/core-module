@@ -97,7 +97,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/fieldcrypto-key-rotation-03-002
-            commit: []
+            commit:
+                - 4fc2e58
             merge: null
         - number: 3
           slug: rotate-on-read-integration-test
