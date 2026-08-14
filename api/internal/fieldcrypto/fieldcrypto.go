@@ -461,8 +461,11 @@ func sealBlob(set *keySet, plaintext string) ([]byte, error) {
 
 // buildKeySet validates records and builds the immutable snapshot. Everything
 // here is boundary validation of data arriving from the key store: a set with
-// no active key, two active keys, a duplicate or zero version, or key material
-// of the wrong length is rejected loudly rather than half-adopted.
+// no active key, two active keys, a duplicate or zero version, an active
+// record carrying compromised_at or decryptable_until (which the
+// field_crypto_keys_retired_only_flags CHECK constraint reserves for retired
+// rows — but a KeyStore need not be backed by that constraint), or key
+// material of the wrong length is rejected loudly rather than half-adopted.
 func buildKeySet(records []KeyRecord, loadedAt time.Time) (*keySet, error) {
 	set := &keySet{byVersion: make(map[uint32]*keyEntry, len(records)), loadedAt: loadedAt}
 	for _, rec := range records {
@@ -481,6 +484,19 @@ func buildKeySet(records []KeyRecord, loadedAt time.Time) (*keySet, error) {
 		if rec.RetiredAt == nil {
 			if set.active != 0 {
 				return nil, fmt.Errorf("fieldcrypto: key store returned two active keys (versions %d and %d)", set.active, rec.Version)
+			}
+			// The field_crypto_keys_retired_only_flags CHECK constraint
+			// reserves compromised_at and decryptable_until for retired rows;
+			// an active row carrying either is a state the DB itself would
+			// refuse, but a KeyStore is not guaranteed to be DB-backed.
+			if rec.CompromisedAt != nil && rec.DecryptableUntil != nil {
+				return nil, fmt.Errorf("fieldcrypto: key store returned active key version %d with both compromised_at and decryptable_until set; those fields apply only to a retired key", rec.Version)
+			}
+			if rec.CompromisedAt != nil {
+				return nil, fmt.Errorf("fieldcrypto: key store returned active key version %d with compromised_at set; that field applies only to a retired key", rec.Version)
+			}
+			if rec.DecryptableUntil != nil {
+				return nil, fmt.Errorf("fieldcrypto: key store returned active key version %d with decryptable_until set; that field applies only to a retired key", rec.Version)
 			}
 			set.active = rec.Version
 		}
