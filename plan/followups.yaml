@@ -36,7 +36,7 @@ items:
         - plan/slug:catalog-readiness
         - priority:unspecified
         - effort:unspecified
-      text: make lint / shadow-db-lint.sh only exercises goose up, never down, for any migration — task doc assumed it also validates Down; verified manually instead. Possible follow-up if down-migration regressions should be caught in CI.
+      text: 'make lint / shadow-db-lint.sh only exercises goose up, never goose down, for any migration — task doc assumed it also validated Down; verified manually instead. DECIDED: add down-migration validation to CI. Implement: extend shadow-db-lint.sh (and/or make lint) to also run goose down for every migration against the shadow DB and fail on error, mirroring the existing goose up validation.'
     - title: 'rotating_cipher: pool 2nd-conn deadlock risk'
       id: 6hKu
       date: "2026-08-14"
