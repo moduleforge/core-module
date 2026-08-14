@@ -37,16 +37,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'make lint / shadow-db-lint.sh only exercises goose up, never goose down, for any migration — task doc assumed it also validated Down; verified manually instead. DECIDED: add down-migration validation to CI. Implement: extend shadow-db-lint.sh (and/or make lint) to also run goose down for every migration against the shadow DB and fail on error, mirroring the existing goose up validation.'
-    - title: 'rotating_cipher: pool 2nd-conn deadlock risk'
-      id: 6hKu
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-03-rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'RotatingCipher.writeBack opens its own transaction on the same pool service.New shares as the base querier. Services.Querier''s own doc comment invites callers to derive a tx-scoped querier via coredb.New(tx) and pass it to GetByEntityUUID, so a caller already holding one pool connection inside its own transaction could trigger a rotating read that blocks acquiring a second connection from the same pool — with every connection held this way, the pool self-deadlocks until request contexts expire. SET LOCAL lock_timeout bounds the lock wait but not the connection-acquisition wait before the transaction begins. Reachability from mod-core itself is not established (mod-core''s own httpapi handlers don''t use this call shape), but out-of-repo composing apps might. DECIDED: wrap the write-back''s txhelper.Run in a context.WithTimeout on the order of the existing 250ms lock timeout, so pool saturation degrades into an ordinary write-back failure the policy branches already handle. Also document on the db field that the handle must not be one a caller may already hold a connection from. Check against mod-users and the composing apps (app-mfmanager, app-mfdemo) at the same time as the already-deferred NewFromEnv compile-break followup, since that followup already requires visiting all three composition roots. Found by phase-3 boundary security review (opus-high). api/service/rotating_cipher.go:248-256.'
     - title: 'rotating_cipher: lock-timeout 500s'
       id: PNVB
       date: "2026-08-14"
