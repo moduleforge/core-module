@@ -284,3 +284,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Rotate, MarkCompromised, and SetGrace each need the lifecycle state of exactly one already-known field_crypto_keys row, but all three resolve it via q.ListFieldCryptoKeyMetadata(ctx) — an unbounded, no-WHERE, ORDER-BY-version scan over every key version ever issued — then linear-scan the Go slice (findFieldCryptoKey) for the one row wanted, instead of a WHERE version = $1 point query against the PRIMARY KEY. field_crypto_keys is designed to grow indefinitely (retired keys never pruned), so every future admin call re-pays a cost that grows with the deployment''s entire rotation history for information a single indexed lookup already has. Task 001''s own status doc calls the single-read choice deliberate (avoids a second query, gives 404/409 off one consistent snapshot, supplies the observer''s before-state) — that rationale justifies reading once, not reading the whole table. Separately for Rotate: RetireActiveFieldCryptoKey''s UPDATE already computes retired_at/decryptable_until/compromised_at for the retiring row but its RETURNING clause discards them, returning only version — so the read-back is re-fetching values the write statement itself already computed. Fix: for Rotate, broaden RetireActiveFieldCryptoKey''s RETURNING clause to include the three columns so the handler builds retiredState directly from the UPDATE''s own result; for MarkCompromised/SetGrace, add a single-row query (e.g. GetFieldCryptoKeyByVersion) and have loadRetiredKey call that instead, preserving the same one-snapshot property while bounding the read. Found by phase-4 boundary efficiency review (sonnet-med). api/httpapi/field_crypto_keys.go (multiple sites), model/queries/field_crypto_keys.sql. Severity: minor, confidence: high.'
+    - title: Followup 8x4a is only partially addressed — t
+      id: Vhhx
+      date: "2026-08-14"
+      tags:
+        - type:ambiguity
+        - plan/phase:doc-updates
+        - plan/slug:fieldcrypto-key-rotation
+        - priority:unspecified
+        - effort:unspecified
+      text: Followup 8x4a is only partially addressed — this task's scope (AGENTS.md, model/README.md, README.md) covers the operator-runbook half, but the followup also asks for a note in the rotation route's OpenAPI description (api/openapi.fragment.yaml), which is out of this task's file scope and was not touched. Manager should decide whether to close 8x4a now or keep it open pending the OpenAPI-description edit.
