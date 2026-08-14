@@ -56,16 +56,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Sandbox-only note: a native non-Docker Postgres on localhost:5432 shadows the shared container in this environment, causing the same pre-existing localhost-resolution issue the already-landed authz/setup integration test also hits. Worked around via CORE_DEV_PG_HOST pointed at the LAN IP for validation only, no source change. Worth awareness if other integration suites on this host need the same workaround.'
-    - title: 'rotating_cipher: narrow verifyStale check'
-      id: 9l49
-      date: "2026-08-14"
-      tags:
-        - plan/phase:phase-03-rotate-on-read
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'verifyStale accepts a lost CAS under a compromised key as benign whenever the re-read blob''s version differs from the source version (`version != rot.FromVersion`), rather than requiring it equal the active version (`version == rot.ToVersion`). A process with a stale-but-within-TTL key snapshot could legitimately write under a second, also-compromised, retired version, and this check would wrongly treat that as "already rotated" — leaving compromised ciphertext at rest with the read reporting success. Bounded and self-correcting (needs two compromised rotations, a writer inside the stale-set window, and a lost CAS on the same row in the same instant; the next read by any non-stale process re-enters the compromised branch), but unpinned by any test in either direction — the one unit test covering this branch seeds the stored blob under the active version, and the integration suite exercises no lost-CAS path at all. Fix: replace `version != rot.FromVersion` with `version == rot.ToVersion` in verifyStale (strictly safer, same benign-race tolerance), and add a unit case seeding storedSSN under a third, retired, compromised version asserting the read fails. Originally flagged (low confidence) by phase-3 task-001''s own inline security review; independently confirmed and confidence raised to medium by the phase-3 boundary security review (opus-high), which found no test distinguishes the two semantics. api/service/rotating_cipher.go:337-345.'
     - title: 'rotating_cipher: pool 2nd-conn deadlock risk'
       id: 6hKu
       date: "2026-08-14"
