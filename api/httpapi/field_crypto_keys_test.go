@@ -675,6 +675,7 @@ func TestFieldCryptoKeyRotate_400_InvalidInput(t *testing.T) {
 		{"key_hex all zero", fmt.Sprintf(`{"key_hex":%q}`, zeroHex), "key_hex"},
 		{"negative grace", `{"grace_period_days":-1}`, "grace_period_days"},
 		{"grace beyond int32", fmt.Sprintf(`{"grace_period_days":%d}`, int64(math.MaxInt32)+1), "grace_period_days"},
+		{"grace beyond tightened max", `{"grace_period_days":40000}`, "grace_period_days"},
 		{"malformed json", `{"compromised":`, ""},
 		{"unknown member", `{"compromize":true}`, ""},
 	}
