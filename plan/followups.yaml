@@ -66,16 +66,6 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'reload() stamps lastLoadAttempt before issuing its query, so a decrypt driven by an already-cancelled request context burns the shared reload rate-limit budget (minReloadInterval) for no useful work — LoadUsableKeys returns ctx.Err() immediately. For the following window, encryptSet''s TTL-driven refresh takes its early-return branch and silently keeps the stale snapshot (no log at all on that branch, unlike the reload-failure branch). This can delay a replica''s convergence onto a rotated key set. Fix: don''t charge a context-cancellation failure against the shared budget (restore lastLoadAttempt on ctx.Err()); log at warn from encryptSet''s early-return branch when the snapshot is past keySetTTL but reload was rate-limited. Found by phase-2 boundary security review (opus-high), api/internal/fieldcrypto/fieldcrypto.go:335-347 and :404-424. Severity: minor, confidence: medium.'
-    - title: 'fieldcrypto: missing retired-flags check'
-      id: pDiP
-      date: "2026-08-13"
-      tags:
-        - plan/phase:phase-02-versioned-cipher
-        - plan/slug:fieldcrypto-key-rotation
-        - type:security
-        - priority:unspecified
-        - effort:unspecified
-      text: 'buildKeySet re-validates most schema invariants (no/two active keys, duplicate version, version 0, wrong key length) but not the one enforced by the field_crypto_keys_retired_only_flags CHECK: that an active (retired_at IS NULL) row must not carry compromised_at or decryptable_until. Not reachable via the shipped SQL today (the CHECK constraint and the retired_at IS NOT NULL guards on the two mutation queries close it), but KeyStore is an interface — a non-DB implementation could violate it, silently producing MustPersist:false for a compromised-yet-active key, or an active key past its own grace deadline. Fix: reject such a record in buildKeySet''s active-record branch with a loud error, mirroring the neighbouring checks. Found by phase-2 boundary security review (opus-high), api/internal/fieldcrypto/fieldcrypto.go:465-491. Severity: suggestion, confidence: high.'
     - title: 'fieldcrypto adapter: no zero on error path'
       id: 0DI1
       date: "2026-08-13"
