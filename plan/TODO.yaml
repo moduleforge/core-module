@@ -146,7 +146,7 @@ phases:
           slug: rotation-endpoint-integration-test
           title: Rotation Endpoint Concurrency Integration Test
           path: phase-04-admin-rotation-api/003-rotation-endpoint-integration-test.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: 'Added api/httpapi/field_crypto_keys_integration_test.go, a build-tagged integration suite proving the rotation endpoint''s concurrency claim against real Postgres, following the TestMain/host-resolution/shadow-DB-reset pattern of the three existing sibling suites. Drives the real FieldCryptoKeyHandler over chi through httptest. Five tests: sequential happy path; headline concurrent-rotation race (exactly one 201, one 409, one active key, exactly one new row); unique-key_bytes 409 rejection; compromised-rotation effect on retired row; compromised+grace 400 rejected before any transaction runs. Key engineering finding: a plain channel-synchronized goroutine launch does not force genuine DB-level contention; the gatekeeper row-lock technique makes the race deterministic. All validation checks pass including a -race run of the concurrency test.'
           git:
