@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: authenticated-check-primitives
       title: Authenticated Check Primitives
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-effective-actor-accessor
+          title: Add Effective Actor Accessor
+          path: phase-01-authenticated-check-primitives/001-add-effective-actor-accessor.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
