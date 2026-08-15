@@ -40,7 +40,7 @@ phases:
           slug: update-architecture-docs
           title: Update Architecture Docs
           path: phase-02-doc-updates/001-update-architecture-docs.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Reviewed mod-core's docs against Phase 01's two public-API additions. AGENTS.md and README.md already accurate, no edit needed. docs/architecture.md and docs/*-spec.md confirmed absent, neither created. Drafted two concrete amendments to the canonical docs-mf-standards submodule doc (Authorizer interface section, Operation context section) but did NOT commit into that submodule or bump mod-core's pointer, per hard constraint — drafted text reported for manager routing. No api/ source file touched; Authorizer interface confirmed byte-identical.
           git:
