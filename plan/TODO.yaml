@@ -13,6 +13,7 @@ phases:
           path: phase-01-authenticated-check-primitives/001-add-effective-actor-accessor.md
           done: false
           tier: sonnet-med
+          digest: Added exported EffectiveActorEntityID(ctx) (int64, bool) to api/opctx/opctx.go implementing sudo-first-then-actor policy. Extended package doc. Added TestEffectiveActorEntityID with four subtests. Updated AGENTS.md opctx/ row. No pre-existing signatures changed. All validation checks pass including module-wide make test.
           git:
             branch: plan/require-authenticated-01-001
             commit:
