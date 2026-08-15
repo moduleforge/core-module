@@ -30,7 +30,7 @@ phases:
             branch: plan/require-authenticated-01-002
             commit:
                 - d373479
-            merge: null
+            merge: c35e0865ba5cb56de948ba237654c15d71246b25
     - number: 2
       slug: doc-updates
       title: Documentation Updates
