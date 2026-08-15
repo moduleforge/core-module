@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: authenticated-check-primitives
       title: Authenticated Check Primitives
+      diff_base: 7a51bee5ae61f6aa5c0b3b0a8006c01cef0d7a4f
       tasks:
         - number: 1
           slug: add-effective-actor-accessor
