@@ -12,7 +12,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/moduleforge/core-api/apiresp"
 	"github.com/moduleforge/core-api/authz"
+	"github.com/moduleforge/core-api/opctx"
 )
 
 // stubAuthorizer is a minimal, outside-the-package implementation of authz.Authorizer.
@@ -61,4 +63,39 @@ func TestAuthorizerWithNilTarget(t *testing.T) {
 	if err := a.Authorize(context.Background(), "create", nil); err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
+}
+
+// TestRequireAuthenticated covers the three effective-actor states
+// RequireAuthenticated must distinguish.
+func TestRequireAuthenticated(t *testing.T) {
+	t.Run("sudo actor set", func(t *testing.T) {
+		ctx := opctx.WithActor(context.Background(), 1)
+		ctx = opctx.WithSudoActor(ctx, 2)
+
+		if err := authz.RequireAuthenticated(ctx); err != nil {
+			t.Fatalf("expected nil error, got: %v", err)
+		}
+	})
+
+	t.Run("real actor only", func(t *testing.T) {
+		ctx := opctx.WithActor(context.Background(), 1)
+
+		if err := authz.RequireAuthenticated(ctx); err != nil {
+			t.Fatalf("expected nil error, got: %v", err)
+		}
+	})
+
+	t.Run("neither set", func(t *testing.T) {
+		err := authz.RequireAuthenticated(context.Background())
+
+		if err == nil {
+			t.Fatal("expected non-nil error, got nil")
+		}
+		if !errors.Is(err, apiresp.ErrUnauthenticated) {
+			t.Fatalf("expected apiresp.ErrUnauthenticated, got: %v", err)
+		}
+		if errors.Is(err, apiresp.ErrForbidden) {
+			t.Fatalf("expected error not to match apiresp.ErrForbidden, got: %v", err)
+		}
+	})
 }

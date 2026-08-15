@@ -17,6 +17,12 @@
 // Action and target are NOT context values; they are explicit parameters on
 // Authorize and Observe because they differ per service call and context values
 // survive call boundaries poorly when they are method-specific.
+//
+// EffectiveActorEntityID is a derived accessor over ActorEntityID and
+// SudoActorEntityID, not a fourth context value: it stores nothing and adds
+// no context key. It resolves the sudo-first-then-actor policy — when an
+// admin has assumed another user's identity, the assumed identity is the
+// one relevant to callers deciding who is currently acting.
 package opctx
 
 import "context"
@@ -63,6 +69,17 @@ func ActorEntityID(ctx context.Context) (int64, bool) {
 func SudoActorEntityID(ctx context.Context) (int64, bool) {
 	id, ok := ctx.Value(sudoActorEntityIDKey).(int64)
 	return id, ok
+}
+
+// EffectiveActorEntityID returns the entity ID that should be used for policy
+// checks: the sudo-actor's entity ID when an admin is impersonating another
+// user, since the admin is acting as that user, otherwise the authenticated
+// actor's entity ID. Returns 0, false if neither is set.
+func EffectiveActorEntityID(ctx context.Context) (int64, bool) {
+	if id, ok := SudoActorEntityID(ctx); ok {
+		return id, true
+	}
+	return ActorEntityID(ctx)
 }
 
 // RequestID returns the request correlation ID from ctx, or "" if not set.

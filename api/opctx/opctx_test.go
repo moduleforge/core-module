@@ -95,6 +95,53 @@ func TestRequestID(t *testing.T) {
 	})
 }
 
+// TestEffectiveActorEntityID verifies the sudo-first-then-actor policy.
+func TestEffectiveActorEntityID(t *testing.T) {
+	t.Run("sudo set", func(t *testing.T) {
+		ctx := opctx.WithActor(context.Background(), 1)
+		ctx = opctx.WithSudoActor(ctx, 2)
+		id, ok := opctx.EffectiveActorEntityID(ctx)
+		if !ok {
+			t.Fatal("expected ok=true, got false")
+		}
+		if id != 2 {
+			t.Fatalf("expected sudo-actor 2, got %d", id)
+		}
+	})
+
+	t.Run("sudo set, no real actor", func(t *testing.T) {
+		ctx := opctx.WithSudoActor(context.Background(), 99)
+		id, ok := opctx.EffectiveActorEntityID(ctx)
+		if !ok {
+			t.Fatal("expected ok=true, got false")
+		}
+		if id != 99 {
+			t.Fatalf("expected sudo-actor 99, got %d", id)
+		}
+	})
+
+	t.Run("real actor only", func(t *testing.T) {
+		ctx := opctx.WithActor(context.Background(), 42)
+		id, ok := opctx.EffectiveActorEntityID(ctx)
+		if !ok {
+			t.Fatal("expected ok=true, got false")
+		}
+		if id != 42 {
+			t.Fatalf("expected actor 42, got %d", id)
+		}
+	})
+
+	t.Run("neither set", func(t *testing.T) {
+		id, ok := opctx.EffectiveActorEntityID(context.Background())
+		if ok {
+			t.Fatal("expected ok=false, got true")
+		}
+		if id != 0 {
+			t.Fatalf("expected 0, got %d", id)
+		}
+	})
+}
+
 // TestKeysDoNotCollide confirms that setting one key does not affect the others.
 func TestKeysDoNotCollide(t *testing.T) {
 	ctx := context.Background()
