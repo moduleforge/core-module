@@ -27,7 +27,8 @@ phases:
           tier: sonnet-med
           git:
             branch: plan/require-authenticated-01-002
-            commit: []
+            commit:
+                - d373479
             merge: null
     - number: 2
       slug: doc-updates
