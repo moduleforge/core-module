@@ -18,7 +18,7 @@ phases:
             branch: plan/require-authenticated-01-001
             commit:
                 - 5cbe3d8
-            merge: null
+            merge: 681554fbba66d8c10d5b0fb2f6576c154311beab
         - number: 2
           slug: add-require-authenticated
           title: Add Require Authenticated
