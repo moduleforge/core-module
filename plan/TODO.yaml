@@ -1,0 +1,8 @@
+slug: require-authenticated
+version: 1
+title: ""
+phases:
+    - number: 1
+      slug: authenticated-check-primitives
+      title: Authenticated Check Primitives
+      tasks: []
