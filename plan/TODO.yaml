@@ -23,7 +23,7 @@ phases:
           slug: add-require-authenticated
           title: Add Require Authenticated
           path: phase-01-authenticated-check-primitives/002-add-require-authenticated.md
-          done: false
+          done: true
           tier: sonnet-med
           digest: Added the free function authz.RequireAuthenticated(ctx) error to api/authz/authz.go, delegating to opctx.EffectiveActorEntityID and returning the bare apiresp.ErrUnauthenticated sentinel when no effective actor is present, nil otherwise. Deliberately a free function, not an interface method, so no Authorizer implementer needs to change. Package doc extended; AGENTS.md authz/ row updated. Added TestRequireAuthenticated with three subtests asserting the exact sentinel. All validation checks pass including module-wide make test and make lint.
           git:
