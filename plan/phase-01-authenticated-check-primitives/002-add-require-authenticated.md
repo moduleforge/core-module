@@ -199,3 +199,53 @@ architectural_impact: true
   (the import-cycle gate).
 - After adding `TestRequireAuthenticated` and `go test ./authz/...` passes.
 - After updating the `authz/` row in `AGENTS.md`.
+
+## Status
+
+**Outcome:** succeeded — 2026-08-15.
+
+Added `RequireAuthenticated(ctx context.Context) error` to
+`api/authz/authz.go`, placed after both the `Authorizer` and `OpResolver`
+interface declarations, delegating to `opctx.EffectiveActorEntityID` (task
+001) and returning the bare `apiresp.ErrUnauthenticated` sentinel when no
+effective actor is present. The `authz`, `apiresp`, and `opctx` imports were
+added as specified; no import cycle resulted. The package doc comment was
+amended to describe the package as defining the `Authorizer`/`OpResolver`
+contracts plus the new contract-adjacent free function, while preserving the
+"Authorizer is intentionally narrow: one method" claim and the existing
+explanation of why `operation`/`target` are explicit parameters. The
+`Authorizer` and `OpResolver` interface declarations were not touched.
+
+Added `TestRequireAuthenticated` to `api/authz/authz_test.go` (package
+`authz_test`) with three subtests: sudo actor set, real actor only, and
+neither set. The failure subtest asserts `errors.Is(err,
+apiresp.ErrUnauthenticated)` and also asserts `!errors.Is(err,
+apiresp.ErrForbidden)`. All three pre-existing tests and the
+`stubAuthorizer`/compile-time-assertion regression guard remain unchanged.
+
+Updated the `authz/` row of AGENTS.md's "Key types and packages" table to
+name `RequireAuthenticated` and its rationale for being a free function
+rather than an `Authorizer` method. The `opctx/` row was already corrected by
+task 001.
+
+**Validation:** all checks in `## Validation` passed — `gofmt -l authz`
+(clean), `go vet ./authz/...` (clean), `go build ./...` (clean, confirming no
+import cycle), `go test ./authz/...` (`TestRequireAuthenticated` and the
+three pre-existing tests all pass), `make test` (module-wide `go test ./...`,
+all packages pass), `make lint` (clean), the `git diff` interface-line check
+(no `Authorize(ctx ...)` or `SatisfiedBy(slug ...)` lines appear as modified),
+`grep -rn "errors.New" api/authz/` (no new sentinel in non-test files),
+`grep -rn "RequireAuthenticated" api/` (hits only in `authz.go` and
+`authz_test.go`), `git diff --stat` (exactly three files:
+`api/authz/authz.go`, `api/authz/authz_test.go`, `AGENTS.md`), and the
+`stubAuthorizer` compile-time assertion is present and the package builds.
+
+**Affected source files:**
+- `api/authz/authz.go`
+- `api/authz/authz_test.go`
+- `AGENTS.md`
+
+No `## Assumptions` were overridden; all four listed assumptions held as
+stated (task 001 landed, dependencies were already installed in this
+worktree, `docs/mf-standards/` was not read, pre-existing tests passed before
+this task began).
