@@ -1,9 +1,10 @@
 // Package authz defines the Authorizer interface consumed by all service
-// methods in the system.
+// methods in the system, plus RequireAuthenticated, a contract-adjacent
+// authentication-only helper that needs no implementation.
 //
 // Authorizer is intentionally narrow: one method, called pre-op, on every
 // operation including reads. The implementation is consumer-supplied; this
-// package defines only the contract.
+// package defines the contract, plus RequireAuthenticated below.
 //
 // The acting user's identity is resolved from ctx by the implementation using
 // the opctx package (ActorEntityID, SudoActorEntityID). operation and target
@@ -15,7 +16,12 @@
 // "not authenticated" to 401 and "authenticated but not allowed" to 403.
 package authz
 
-import "context"
+import (
+	"context"
+
+	"github.com/moduleforge/core-api/apiresp"
+	"github.com/moduleforge/core-api/opctx"
+)
 
 // Authorizer gates every operation in the system. A single Authorizer
 // implementation is wired per application at the composition root; peer modules
@@ -57,4 +63,20 @@ type Authorizer interface {
 // constructor that issues list queries.
 type OpResolver interface {
 	SatisfiedBy(slug string) ([]int32, error)
+}
+
+// RequireAuthenticated is an authentication-only check — it answers "is there
+// an effective actor on this context at all?", not "may this actor perform
+// this operation?"; the latter question stays with Authorizer.Authorize. It
+// resolves the effective actor via opctx.EffectiveActorEntityID, so a
+// sudo-assumed identity counts as authenticated. It returns
+// apiresp.ErrUnauthenticated — which HTTP handlers map to 401 — when no
+// effective actor is present, and nil otherwise. It is a free function rather
+// than an Authorizer method so callers need no Authorizer instance and no
+// existing implementation needs to change.
+func RequireAuthenticated(ctx context.Context) error {
+	if _, ok := opctx.EffectiveActorEntityID(ctx); !ok {
+		return apiresp.ErrUnauthenticated
+	}
+	return nil
 }
