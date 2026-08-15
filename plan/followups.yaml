@@ -1,12 +1,2 @@
 version: 2
-items:
-    - title: Cross-repo doc amendment awaiting explicit ma
-      id: qxLX
-      date: "2026-08-15"
-      tags:
-        - type:ambiguity
-        - plan/phase:doc-updates
-        - plan/slug:require-authenticated
-        - priority:unspecified
-        - effort:unspecified
-      text: 'Cross-repo doc amendment awaiting explicit manager/user authorization before being applied to the docs-mf-standards repository (architecture/authorization-design.md) — NOT committed anywhere by this task. Drafted amendment: (a) new bullet in "The Authorizer interface" section documenting RequireAuthenticated as a free function distinct from Authorize; (b) new paragraph in "Operation context (opctx)" section documenting opctx.EffectiveActorEntityID as the canonical sudo-first-then-actor accessor. Full verbatim text is in this task''s structured report.'
+items: []
