@@ -44,5 +44,6 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/require-authenticated-02-001
-            commit: []
+            commit:
+                - 24e556f
             merge: null
