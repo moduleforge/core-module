@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-require-authenticated
+          title: Add Require Authenticated
+          path: phase-01-authenticated-check-primitives/002-add-require-authenticated.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
