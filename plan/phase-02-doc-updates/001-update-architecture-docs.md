@@ -140,3 +140,52 @@ Record this in the report; do not create either file as part of this task.
 6. Do **not** commit into the submodule or bump the submodule pointer without
    explicit manager direction. Report the drafted amendment verbatim as a
    flagged item instead, naming the target repository and file.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-15
+- **Validation summary:** All `## Validation` checks passed.
+  - `docs/architecture.md` and `docs/*-spec.md` confirmed absent
+    (`ls docs/architecture.md` → No such file or directory; `ls docs/*-spec.md`
+    → No such file or directory; `ls docs/` → `mf-standards` only). Neither
+    file was created.
+  - `grep -n "EffectiveActorEntityID\|RequireAuthenticated" AGENTS.md` shows
+    both rows present and accurate against the shipped code (`opctx/` row
+    names `EffectiveActorEntityID`; `authz/` row names `RequireAuthenticated`
+    and no longer claims the package "defines only the contracts"). No edit
+    needed — Phase 01 tasks 001/002 already landed both corrections
+    accurately.
+  - `git diff --stat -- api/` is empty — no source file under `api/` was
+    modified by this task.
+  - `grep -n "Authorize(ctx context.Context, operation string, target \*int64) error" api/authz/authz.go`
+    matches at line 50 — the `Authorizer` interface is confirmed unchanged
+    from its pre-plan form.
+  - `README.md`'s "Go API library" bullet ("authorization and
+    operation-context contracts") reviewed and found still accurate — not
+    misleading against the two new primitives. No edit made, per the task
+    doc's own anticipated no-change outcome.
+  - `docs/mf-standards/architecture/authorization-design.md` read from the
+    main checkout
+    (`/Users/zane/playground/moduleforge/mod-core/docs/mf-standards/architecture/authorization-design.md`,
+    read-only). Amendments drafted for the `Authorizer` interface and
+    Operation context (`opctx`) sections but **not applied** — that file is a
+    git submodule (`docs-mf-standards`) backed by a separate repository; per
+    `## Assumptions`/`## Procedure`, no cross-repo commit or submodule
+    pointer bump was performed without explicit manager direction. The
+    verbatim drafted amendment is reported in the structured report's
+    `flagged_for_manager` field for the manager to route.
+- **Files reviewed (per-file disposition):**
+  - `AGENTS.md` — reviewed, no change needed (both rows already accurate).
+  - `README.md` — reviewed, no change needed (bullet still accurate).
+  - `docs/mf-standards/architecture/authorization-design.md` — blocked on
+    manager direction; amendment drafted and reported, not applied (submodule
+    boundary).
+- **Affected source files:** none in `mod-core` proper. Only this task
+  document was updated.
+- **Assumptions applied:** Phase 01 has fully landed and merged into this
+  worktree's base; both new symbols (`opctx.EffectiveActorEntityID`,
+  `authz.RequireAuthenticated`) exist and are exercised by the review above.
+  `docs/mf-standards/` was confirmed empty in this task worktree; the
+  canonical doc was read instead from the main checkout as instructed, and
+  not modified.
