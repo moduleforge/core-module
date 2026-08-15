@@ -144,3 +144,25 @@ architectural_impact: true
    `go build ./...` and `make test` from `api/`.
 6. Update the `opctx/` row in `AGENTS.md`.
 7. Run the `git diff --stat` and `grep` checks from `## Validation`.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-15
+- **Validation summary:** `gofmt -l opctx` printed nothing; `go vet ./opctx/...`
+  clean; `go test ./opctx/...` passed (all pre-existing tests plus the new
+  `TestEffectiveActorEntityID` with its four subtests); `go build ./...`
+  succeeded; `make test` (module-wide `go test ./...`) passed across all 13
+  packages. `git diff --stat` showed exactly the three expected files
+  (`AGENTS.md`, `api/opctx/opctx.go`, `api/opctx/opctx_test.go`). The six
+  pre-existing accessor/setter signatures in `api/opctx/opctx.go` are
+  unchanged. `EffectiveActorEntityID` appears only in
+  `api/opctx/opctx.go` and `api/opctx/opctx_test.go` under `api/`.
+- **Affected source files:**
+  - `api/opctx/opctx.go`
+  - `api/opctx/opctx_test.go`
+  - `AGENTS.md`
+- **Assumptions applied:** Go dependencies were already resolvable in this
+  checkout (no network download was needed); `docs/mf-standards/` was not
+  read, consistent with the task's assumption that it is an uninitialized
+  submodule.
