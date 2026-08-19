@@ -26,3 +26,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 3
+          slug: wire-display-registry-in-manifest
+          title: Wire Display Registry In Manifest
+          path: phase-01-display-name-endpoint/003-wire-display-registry-in-manifest.md
+          done: false
+          tier: sonnet-med
+          git:
+            branch: null
+            commit: []
+            merge: null
