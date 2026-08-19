@@ -16,3 +16,13 @@ phases:
             branch: null
             commit: []
             merge: null
+        - number: 2
+          slug: add-display-name-endpoint
+          title: Add Display Name Endpoint
+          path: phase-01-display-name-endpoint/002-add-display-name-endpoint.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
