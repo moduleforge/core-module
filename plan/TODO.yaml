@@ -5,4 +5,14 @@ phases:
     - number: 1
       slug: display-name-endpoint
       title: Display Name Endpoint
-      tasks: []
+      tasks:
+        - number: 1
+          slug: add-display-service
+          title: Add Display Service
+          path: phase-01-display-name-endpoint/001-add-display-service.md
+          done: false
+          tier: sonnet-high
+          git:
+            branch: null
+            commit: []
+            merge: null
