@@ -30,3 +30,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: 'Informational: task doc 004''s scope description of docs/architecture/ was stale (described it as pre-existing with only a CLAUDE.md; it did not exist in this worktree). Not a blocker — directory and doc created as required. Phase 1 is now complete so no other task doc is affected.'
+    - title: 'Informational: no docs/architecture.md parent'
+      id: SO31
+      date: "2026-08-24"
+      tags:
+        - type:ambiguity
+        - plan/phase:display-name-endpoint
+        - plan/slug:entity-display-name
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Informational: no docs/architecture.md parent index exists; new topic doc is reachable via direct links from README.md/AGENTS.md so this is not a compliance gap, just a note that a future task could add the fuller structure.'
