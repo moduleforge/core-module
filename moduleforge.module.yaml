@@ -38,12 +38,14 @@ provides:
       constructor: entity.NewResolver
       args: []
 
-    # cipher loads the AES-256-GCM field encryption key from
-    # CORE_FIELD_KEY_HEX, or — when unset — fetches-or-generates a durable
-    # key from the field_crypto_keys table (added in migration 0017; see
-    # api/internal/fieldcrypto.NewFromEnvOrGenerate). CORE_FIELD_KEY_HEX set
-    # explicitly always wins, identical to the prior NewFromEnv-only
-    # behavior.
+    # cipher loads the usable AES-256-GCM key set from the field_crypto_keys
+    # table (added in migration 0017; see api/internal/fieldcrypto.NewFromEnvOrGenerate).
+    # On an empty table it bootstraps the first key from CORE_FIELD_KEY_HEX
+    # when set, otherwise from freshly generated random bytes.
+    # CORE_FIELD_KEY_HEX is a first-boot-only bootstrap seed, not an ongoing
+    # supply mechanism: on every later boot its bytes must either match the
+    # active key exactly (proceeds silently) or construction fails loudly —
+    # it never silently overrides an already-persisted key.
     - name: cipher
       type: "*fieldcrypto.Cipher"
       constructor: fieldcrypto.NewFromEnvOrGenerate
