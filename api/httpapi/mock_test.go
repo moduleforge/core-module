@@ -126,6 +126,22 @@ func (f *fakeServiceAccountService) UpdateByEntityUUID(_ context.Context, _ core
 
 var _ service.ServiceAccountServicer = (*fakeServiceAccountService)(nil)
 
+// fakeDisplayService is a fake service.DisplayServicer for handler-level
+// display_test.go tests that don't need the real resolve/authorize/render
+// chain (the end-to-end test in display_test.go wires a real
+// service.DisplayService instead).
+type fakeDisplayService struct {
+	name      string
+	available bool
+	err       error
+}
+
+func (f *fakeDisplayService) RenderField(_ context.Context, _ coredb.Querier, _ uuid.UUID, _ string) (string, bool, error) {
+	return f.name, f.available, f.err
+}
+
+var _ service.DisplayServicer = (*fakeDisplayService)(nil)
+
 // buildTestDeps constructs a Deps with the given service overrides.
 func buildTestDeps(
 	entity *fakeEntityService,
@@ -151,6 +167,22 @@ func buildTestDeps(
 		Services: svcs,
 		Logger:   noopLogger(),
 	}
+}
+
+// buildTestDepsWithDisplay is buildTestDeps plus a Display service override,
+// added as a sibling helper (rather than a new buildTestDeps parameter) so
+// none of the package's many existing buildTestDeps(...) call sites need to
+// change. Used by display_test.go to exercise getDisplayName.
+func buildTestDepsWithDisplay(
+	entity *fakeEntityService,
+	np *fakeNaturalPersonService,
+	corp *fakeCorporationService,
+	sa *fakeServiceAccountService,
+	dsp service.DisplayServicer,
+) Deps {
+	d := buildTestDeps(entity, np, corp, sa)
+	d.Display = dsp
+	return d
 }
 
 // noopLogger returns a slog.Logger that discards all output.
