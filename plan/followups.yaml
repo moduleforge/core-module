@@ -10,3 +10,13 @@ items:
         - priority:unspecified
         - effort:unspecified
       text: moduleforge.module.yaml's `cipher` service comment describes the old "CORE_FIELD_KEY_HEX set explicitly always wins" behavior, which AGENTS.md documents as replaced by fail-loudly-on-mismatch (CORE_FIELD_KEY_HEX is now a first-boot-only bootstrap seed; a later mismatch fails construction rather than silently taking precedence). Flagged incidentally by the entity-display-name planning pass; not touched by that plan (out of scope). Worth a small doc-comment fix to reconcile the manifest comment with current behavior.
+    - title: Pending cross-repo doc amendment (route to do
+      id: JQT8
+      date: "2026-08-24"
+      tags:
+        - type:ambiguity
+        - plan/phase:display-name-endpoint
+        - plan/slug:entity-display-name
+        - priority:unspecified
+        - effort:unspecified
+      text: 'Pending cross-repo doc amendment (route to docs-mf-standards), followup type documentation, qxLX-precedent shape: Cross-repo doc amendment awaiting explicit manager/user authorization before being applied to the docs-mf-standards repository (architecture/entity-typing.md, Display-rendering pattern section) — NOT committed anywhere by this task. Verbatim drafted addition: ''HTTP exposure. The display-rendering pattern described above is reachable over HTTP via mod-core''s GET /v1/entities/{uuid}/display-name endpoint. The endpoint requires the same real read authorization on the target entity as any other single-entity read in mod-core''s API. A readable entity whose type has no renderer registered in the current deployment — the expected steady state for an entity type owned by a module not composed into that deployment — renders as display_name: null with a 200, its documented graceful-fallback contract, never as an error. See mod-core''s own docs/architecture/display-name-http.md for the full endpoint contract, how a composed application wires the shared display registry, and how a downstream module registers a renderer for its own entity type.'''
