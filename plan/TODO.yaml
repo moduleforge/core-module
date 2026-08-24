@@ -54,7 +54,7 @@ phases:
             branch: plan/entity-display-name-01-004
             commit:
                 - 7f71bbb
-            merge: null
+            merge: 085fc32f9d3e3f9481a4ef2c69b0cd69b25d76b5
     - number: 2
       slug: doc-updates
       title: Documentation Updates
