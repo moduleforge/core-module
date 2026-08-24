@@ -51,7 +51,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/entity-display-name-01-004
-            commit: []
+            commit:
+                - 7f71bbb
             merge: null
     - number: 2
       slug: doc-updates
