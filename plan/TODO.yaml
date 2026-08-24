@@ -30,7 +30,7 @@ phases:
             branch: plan/entity-display-name-01-002
             commit:
                 - df223e8
-            merge: null
+            merge: bdf6ef869b166f90348657519831358a4e29a662
         - number: 3
           slug: wire-display-registry-in-manifest
           title: Wire Display Registry In Manifest
