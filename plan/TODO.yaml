@@ -11,7 +11,7 @@ phases:
           slug: add-display-service
           title: Add Display Service
           path: phase-01-display-name-endpoint/001-add-display-service.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: 'Implemented api/service/display.go: NewDisplayRegistry, DisplayServicer/DisplayService, RenderField mirroring EntityService.GetByUUID resolve-then-authorize sequence, nil-registry tolerance and ErrRendererNotRegistered handling after the authz gate. Added 8 tests covering all cases. Full validation green.'
           git:
