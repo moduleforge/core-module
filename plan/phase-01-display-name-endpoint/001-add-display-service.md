@@ -178,3 +178,39 @@ architectural_impact: true
 - After `NewDisplayRegistry` plus the `DisplayServicer`/`DisplayService` skeleton compiles.
 - After `RenderField`'s full behaviour is implemented.
 - After the test file passes.
+
+## Status
+
+**Outcome:** succeeded — 2026-08-24.
+
+Implemented `api/service/display.go` (`NewDisplayRegistry`, `DisplayServicer`,
+`DisplayService`, `NewDisplayService`, `RenderField`) and
+`api/service/display_test.go` (8 new tests). `api/service/display_builtins.go`
+and `api/service/service.go` are unmodified.
+
+Validation:
+
+- `cd api && go build ./...` — passed.
+- `cd api && make test` (`go test ./...`) — passed, all packages including the
+  new `api/service/display_test.go` (8/8 tests).
+- `cd api && make lint` (`go vet ./...` + gofmt) — passed.
+- `git diff --stat` (task diff) names only `api/service/display.go` and
+  `api/service/display_test.go` — confirmed.
+- `service.New`'s signature unchanged — confirmed via diff against
+  `api/service/service.go`.
+- `grep -rn "httpapi" api/service/display.go` returns nothing — confirmed
+  (reworded a doc comment from "httpapi handlers" to "HTTP handlers" to avoid
+  the literal substring while keeping the same meaning).
+- `grep -n "RequireAuthenticated" api/service/display.go` returns nothing —
+  confirmed.
+- `RenderField`'s first two statements (resolve, then
+  `s.az.Authorize(ctx, "read", &internalID)`) match `EntityService.GetByUUID`'s
+  shape in `api/service/entity.go`, each returning the error unmodified.
+
+No `## Assumptions` section was present in this task doc, so none were relied
+on beyond what `## Requirements` states directly.
+
+Affected source files (repo-relative, inside `api/`):
+
+- `api/service/display.go`
+- `api/service/display_test.go`
