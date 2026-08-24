@@ -82,3 +82,58 @@ task 004 does.
 - The four Phase 1 task documents listed above.
 - `plan/notes/docs-ownership-constraint.md` — the submodule rule and the `qxLX` precedent for a
   drafted cross-repo amendment.
+
+## Status
+
+**Outcome:** no_changes_needed — 2026-08-24.
+
+Reviewed all five named files against the landed Phase 1 implementation (`api/service/display.go`,
+`api/httpapi/display.go`, `api/httpapi/router.go`) and found every claim already accurate — no
+stale sections. This is expected: Phase 1 task 004 wrote the doc/OpenAPI/README/AGENTS.md content
+directly against the shipped code (not against the plan) in the same session, and task 003 kept
+`AGENTS.md`'s `display/`/`service/`/`httpapi/` rows current when it wired the manifest. Per file:
+
+- `AGENTS.md` — `display/`, `service/`, `httpapi/` rows and the `mountFromModule` narrative all
+  confirmed accurate; no Conventions-section change needed (no exception to "authorization checked
+  first" was introduced). No edit.
+- `docs/architecture/display-name-http.md` — cross-checked field names (`uuid`, `display_name`),
+  status codes (200/400/401/403, no 404), constructor names (`NewDisplayRegistry`,
+  `NewDisplayService`, `NewDepsWithDisplay`), and manifest entry names (`displayRegistry`,
+  `displayService`, `coreDeps`) against `api/service/display.go`, `api/httpapi/display.go`,
+  `api/httpapi/router.go`, and `moduleforge.module.yaml` — all match. No edit.
+- `README.md` — link to the new architecture doc present and resolves. No edit.
+- `api/openapi.fragment.yaml` — `getEntityDisplayName` path entry's schema, examples, and error
+  responses match the handler exactly. No edit.
+- `moduleforge.module.yaml` — `displayRegistry`/`displayService` entries and the `coreDeps`
+  three-argument constructor switch match the actual Go signatures (grep-confirmed against
+  `api/service/display.go` and `api/httpapi/router.go`). No edit.
+
+`docs/mf-standards/` review: the submodule is not checked out in this worktree (uninitialized), so
+`entity-typing.md` and `api-response-design.md` were read read-only from the main checkout at
+`/Users/zane/playground/moduleforge/mod-core/docs/mf-standards/` for conformance cross-checking
+only — never written. `entity-typing.md`'s "Display-rendering pattern" section still has no mention
+of the HTTP endpoint, confirming task 004's drafted-but-unapplied amendment remains pending and
+unapplied, exactly as expected; this review surfaced no *further* amendment need beyond what task
+004 already drafted, so no new draft text was produced and no new followup is being raised — the
+existing `qxLX`-shaped followup task 004 flagged for the manager still stands unchanged.
+`api-response-design.md`'s reserved core `error.code` set was cross-checked against the endpoint's
+actual status/error mapping (401/403/400, no new top-level code) — conforms.
+
+Validation:
+
+- All five files read and confirmed accurate (no updates required) — per-file notes above.
+- Every statement cross-checked against source (`api/service/display.go`, `api/httpapi/display.go`,
+  `api/httpapi/router.go`, `moduleforge.module.yaml`) via grep/read, not against plan documents.
+- `git status --porcelain docs/mf-standards` — empty (no modification; submodule not even checked
+  out in this worktree).
+- No documents were changed, so the link-chain-reachability check is unaffected; `README.md`'s link
+  to `docs/architecture/display-name-http.md` was re-confirmed as resolving.
+- No new/further cross-repo amendment was drafted (none was needed); the existing task-004 draft and
+  its followup remain the only pending item.
+- `cd api && make test` — passed (all 13 packages, including `service` and `httpapi`).
+- `cd api && make lint` — passed (`go vet ./...`, no findings).
+
+No `## Assumptions` section was present on this task doc, so none were relied on beyond what
+`## Requirements` states directly.
+
+Affected files: none (no source or doc edits made; this status note is the only change).
