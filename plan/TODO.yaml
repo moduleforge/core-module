@@ -15,7 +15,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/entity-display-name-01-001
-            commit: []
+            commit:
+                - 2cf384d
             merge: null
         - number: 2
           slug: add-display-name-endpoint
