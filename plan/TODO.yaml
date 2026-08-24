@@ -23,7 +23,7 @@ phases:
           slug: add-display-name-endpoint
           title: Add Display Name Endpoint
           path: phase-01-display-name-endpoint/002-add-display-name-endpoint.md
-          done: false
+          done: true
           tier: sonnet-high
           digest: Implemented GET /entities/{uuid}/display-name in api/httpapi. Deps gained nil-safe Display field and additive NewDepsWithDisplay constructor; NewDeps unchanged. getDisplayName handler mirrors getEntity's thin shape (401/400/nil-Display 200-null/RenderField passthrough). Tests cover all cases incl. end-to-end real-router wiring for three builtin types, no-renderer-null case, and masked-403 case. go build/make test/make lint all green.
           git:
