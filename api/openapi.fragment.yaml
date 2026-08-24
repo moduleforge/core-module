@@ -347,6 +347,72 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   # --------------------------------------------------------------------------
+  # /entities/{uuid}/display-name — human-readable name for any entity
+  # --------------------------------------------------------------------------
+  /entities/{uuid}/display-name:
+    get:
+      tags: [Entities]
+      operationId: getEntityDisplayName
+      summary: Resolve an entity's human-readable display name
+      description: |
+        Renders a human-readable display name for the entity identified by
+        `uuid`, via whatever renderer is registered for that entity's type.
+
+        This operation requires the same real **`"read"` authorization on the
+        target entity** as every other single-entity read in this API —
+        merely holding the UUID entitles a caller to nothing. A UUID that
+        does not exist and a UUID the caller is not authorized to read are
+        deliberately indistinguishable: both return `403`, exactly as
+        `GET /entities/{uuid}` already behaves. There is no `404` for this
+        operation — existence is deliberately not disclosed.
+
+        `display_name` is `null` — with a `200`, never an error status —
+        only when the entity resolved and the caller is authorized to read
+        it but no value can be rendered: no renderer is registered for that
+        entity's type, or the deployment wires no display registry at all. A
+        client should fall back to rendering the raw UUID in this case.
+      parameters:
+        - $ref: "#/components/parameters/EntityUUID"
+      responses:
+        "200":
+          description: |
+            Display name resolved, or the graceful-unavailable null form.
+            Both shapes always include both fields.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uuid, display_name]
+                properties:
+                  uuid:
+                    type: string
+                    format: uuid
+                    description: Stable external identifier of the resolved entity.
+                  display_name:
+                    type: string
+                    nullable: true
+                    description: |
+                      Human-readable display name, or null when the entity is
+                      readable but no renderer produced a value.
+              examples:
+                rendered:
+                  summary: A renderer produced a value
+                  value:
+                    uuid: "0f5ecb1e-df1a-4b0a-9c2e-6f6f6a6b0e11"
+                    display_name: "Ada Lovelace"
+                unavailable:
+                  summary: No renderer registered for this type, or no registry wired
+                  value:
+                    uuid: "0f5ecb1e-df1a-4b0a-9c2e-6f6f6a6b0e11"
+                    display_name: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # --------------------------------------------------------------------------
   # /field-crypto-keys — admin field-encryption-key rotation
   #
   # All four routes below authorize as h.az.Authorize(ctx, "manage", nil) —

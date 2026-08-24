@@ -147,3 +147,45 @@ architectural_impact: true
 - After the new architecture doc.
 - After the `README.md` / `AGENTS.md` links.
 - After the drafted amendment and its followup are recorded.
+
+## Status
+
+**Outcome:** succeeded. Date: 2026-08-24.
+
+- Added `GET /entities/{uuid}/display-name` (`operationId: getEntityDisplayName`) to
+  `api/openapi.fragment.yaml`: nullable `display_name` via `nullable: true` (OpenAPI 3.0.3-correct,
+  not a 3.1 type union), rendered/unavailable examples, `400`/`401`/`403` via the fragment's
+  existing shared error components, no `404`. Verified all `$ref`s resolve within the fragment and
+  the document parses as valid YAML.
+- Created `docs/architecture/display-name-http.md` covering the endpoint contract, the
+  authorization/masking rationale, mfgen composition wiring (`displayRegistry` → `displayService` →
+  `coreDeps`), the downstream-module renderer-registration pattern, the mfgen reachability caveat
+  (service-arg form as primary/spec-covered; `hooks:`/`startupHooks:` called out as a real but
+  manifest-spec-undocumented mfgen capability, re-confirmed directly against
+  `mfgen/internal/schema/{module,app}.go` and `mfgen/internal/resolver/reachability.go`), and the
+  peer-module response-enrichment note (not a direct client call to this endpoint).
+- Linked the new doc from `README.md` (alongside the `AGENTS.md` / `manifest-spec.md` pointers) and
+  from `AGENTS.md`'s `display/` and `httpapi/` package rows (extended, not restated — task 003 had
+  already updated those rows).
+- Cross-checked the documented shapes against `api/httpapi/display.go` and `display_test.go`
+  directly (field names `uuid`/`display_name`, status-code mapping in `apiresp/writer.go`) rather
+  than against this task document.
+- Drafted (did **not** apply, stage, or commit) an amendment to `docs-mf-standards`'
+  `architecture/entity-typing.md` "Display-rendering pattern" section, per the
+  [documentation ownership constraint](../notes/docs-ownership-constraint.md). Verbatim text is in
+  the task's structured report and mirrored at
+  `/private/tmp/claude-502/-Users-zane-playground/61ac74a3-a09a-4a6f-8451-08f77249aa60/scratchpad/entity-typing-amendment-draft.md`
+  (outside this worktree). A `documentation`-type followup describing the pending cross-repo
+  amendment — in the `qxLX`-precedent shape — is recorded in the structured report's
+  `flagged_for_manager` for the manager to add to `plan/followups.yaml`; this task did not edit
+  `followups.yaml` itself.
+- Validation: `api/openapi.fragment.yaml` YAML-parses and all `$ref`s resolve (passed); nullable
+  encoding correct (passed); architecture doc exists, opens with `## Purpose and scope`, linked
+  from `README.md` with a resolving repo-relative path (passed); `grep -rn "display-name"` across
+  all four files shows one consistent path spelling (passed); `git status --porcelain
+  docs/mf-standards` is empty and `git diff --stat` (checkpoint commits) names only the four
+  in-scope files (passed); documented shapes cross-checked against `api/httpapi/display.go` /
+  `display_test.go` (passed); `cd api && make test` and `cd api && make lint` both pass.
+- Files touched: `api/openapi.fragment.yaml`, `docs/architecture/display-name-http.md`,
+  `README.md`, `AGENTS.md`, plus this task document's own `## Status` update. Nothing under
+  `docs/mf-standards/` was read-written, staged, or committed.
