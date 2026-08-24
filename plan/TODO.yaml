@@ -66,6 +66,7 @@ phases:
           path: phase-02-doc-updates/001-update-architecture-docs.md
           done: false
           tier: sonnet-high
+          digest: 'Pure reconciliation/verification pass with no code or doc changes required: AGENTS.md, docs/architecture/display-name-http.md, README.md, api/openapi.fragment.yaml, and moduleforge.module.yaml already accurately describe the landed Phase 1 work (task 004 wrote docs directly against shipped code). Verified every claim by grep/read against actual source. Cross-checked conformance against read-only docs/mf-standards submodule without touching it. No further cross-repo amendment needed beyond task 004''s existing draft. make test/make lint pass.'
           git:
             branch: plan/entity-display-name-02-001
             commit:
