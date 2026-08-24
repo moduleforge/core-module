@@ -42,7 +42,7 @@ phases:
             branch: plan/entity-display-name-01-003
             commit:
                 - 9293b83
-            merge: null
+            merge: bd03c8b539ef5a66b85cf77ef3e52e24a0142a76
         - number: 4
           slug: document-display-name-surface
           title: Document Display Name Surface
