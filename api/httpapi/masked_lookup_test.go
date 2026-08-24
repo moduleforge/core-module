@@ -57,16 +57,41 @@ func TestGetEntity_MaskedMiss_Returns403Forbidden(t *testing.T) {
 // --- minimal stub Querier ---
 //
 // stubQuerier implements coredb.Querier with controllable GetEntityByUUID
-// behaviour. All other methods are no-ops; they are never invoked on the
-// masked-miss code path this test exercises. Mirrors the shape of
-// api/entity/resolver_test.go's resolverStubQuerier, which lives in package
-// entity_test and cannot be imported directly here.
+// behaviour, plus optional seeded entities for tests that need a UUID to
+// resolve all the way through to a rendered sub-type field (e.g.
+// display_test.go's end-to-end test). All other methods are no-ops beyond
+// the seeded lookups; nothing else is invoked on the code paths these tests
+// exercise. Mirrors the shape of api/entity/resolver_test.go's
+// resolverStubQuerier, which lives in package entity_test and cannot be
+// imported directly here.
 type stubQuerier struct {
 	getEntityErr error
+
+	// entitiesByUUID/entitiesByID seed GetEntityByUUID/GetEntityByID for a
+	// test that routes a UUID all the way to a rendered field. Nil (the
+	// zero value used by every pre-existing test) preserves the original
+	// always-zero-row, nil-error behaviour; a non-nil, populated map reports
+	// pgx.ErrNoRows for any key absent from it.
+	entitiesByUUID map[uuid.UUID]coredb.GetEntityByUUIDRow
+	entitiesByID   map[int64]coredb.GetEntityByIDRow
+
+	naturalPersonsByEntityID  map[int64]coredb.GetNaturalPersonByEntityIDRow
+	corporationsByEntityID    map[int64]coredb.GetCorporationByEntityIDRow
+	serviceAccountsByEntityID map[int64]coredb.ServiceAccount
 }
 
-func (s *stubQuerier) GetEntityByUUID(_ context.Context, _ uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
-	return coredb.GetEntityByUUIDRow{}, s.getEntityErr
+func (s *stubQuerier) GetEntityByUUID(_ context.Context, u uuid.UUID) (coredb.GetEntityByUUIDRow, error) {
+	if s.getEntityErr != nil {
+		return coredb.GetEntityByUUIDRow{}, s.getEntityErr
+	}
+	if s.entitiesByUUID == nil {
+		return coredb.GetEntityByUUIDRow{}, nil
+	}
+	row, ok := s.entitiesByUUID[u]
+	if !ok {
+		return coredb.GetEntityByUUIDRow{}, pgx.ErrNoRows
+	}
+	return row, nil
 }
 
 func (s *stubQuerier) ArchiveEntity(_ context.Context, _ uuid.UUID) error { return nil }
@@ -94,11 +119,25 @@ func (s *stubQuerier) GetAppBySlug(_ context.Context, _ string) (coredb.GetAppBy
 func (s *stubQuerier) GetAppByUUID(_ context.Context, _ uuid.UUID) (coredb.GetAppByUUIDRow, error) {
 	return coredb.GetAppByUUIDRow{}, nil
 }
-func (s *stubQuerier) GetCorporationByEntityID(_ context.Context, _ int64) (coredb.GetCorporationByEntityIDRow, error) {
-	return coredb.GetCorporationByEntityIDRow{}, nil
+func (s *stubQuerier) GetCorporationByEntityID(_ context.Context, id int64) (coredb.GetCorporationByEntityIDRow, error) {
+	if s.corporationsByEntityID == nil {
+		return coredb.GetCorporationByEntityIDRow{}, nil
+	}
+	row, ok := s.corporationsByEntityID[id]
+	if !ok {
+		return coredb.GetCorporationByEntityIDRow{}, pgx.ErrNoRows
+	}
+	return row, nil
 }
-func (s *stubQuerier) GetEntityByID(_ context.Context, _ int64) (coredb.GetEntityByIDRow, error) {
-	return coredb.GetEntityByIDRow{}, nil
+func (s *stubQuerier) GetEntityByID(_ context.Context, id int64) (coredb.GetEntityByIDRow, error) {
+	if s.entitiesByID == nil {
+		return coredb.GetEntityByIDRow{}, nil
+	}
+	row, ok := s.entitiesByID[id]
+	if !ok {
+		return coredb.GetEntityByIDRow{}, pgx.ErrNoRows
+	}
+	return row, nil
 }
 func (s *stubQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (coredb.GetFieldCryptoKeyByVersionRow, error) {
 	return coredb.GetFieldCryptoKeyByVersionRow{}, nil
@@ -106,11 +145,25 @@ func (s *stubQuerier) GetFieldCryptoKeyByVersion(_ context.Context, _ int32) (co
 func (s *stubQuerier) GetLegalEntityByEntityID(_ context.Context, _ int64) (int64, error) {
 	return 0, nil
 }
-func (s *stubQuerier) GetNaturalPersonByEntityID(_ context.Context, _ int64) (coredb.GetNaturalPersonByEntityIDRow, error) {
-	return coredb.GetNaturalPersonByEntityIDRow{}, nil
+func (s *stubQuerier) GetNaturalPersonByEntityID(_ context.Context, id int64) (coredb.GetNaturalPersonByEntityIDRow, error) {
+	if s.naturalPersonsByEntityID == nil {
+		return coredb.GetNaturalPersonByEntityIDRow{}, nil
+	}
+	row, ok := s.naturalPersonsByEntityID[id]
+	if !ok {
+		return coredb.GetNaturalPersonByEntityIDRow{}, pgx.ErrNoRows
+	}
+	return row, nil
 }
-func (s *stubQuerier) GetServiceAccountByEntityID(_ context.Context, _ int64) (coredb.ServiceAccount, error) {
-	return coredb.ServiceAccount{}, nil
+func (s *stubQuerier) GetServiceAccountByEntityID(_ context.Context, id int64) (coredb.ServiceAccount, error) {
+	if s.serviceAccountsByEntityID == nil {
+		return coredb.ServiceAccount{}, nil
+	}
+	row, ok := s.serviceAccountsByEntityID[id]
+	if !ok {
+		return coredb.ServiceAccount{}, pgx.ErrNoRows
+	}
+	return row, nil
 }
 func (s *stubQuerier) GetTypeByID(_ context.Context, _ int64) (coredb.Type, error) {
 	return coredb.Type{}, nil
