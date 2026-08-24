@@ -26,8 +26,8 @@ func NewDisplayRegistry(q coredb.Querier) *display.Registry {
 	return reg
 }
 
-// DisplayServicer defines the display-rendering operation available to
-// httpapi handlers.
+// DisplayServicer defines the display-rendering operation available to HTTP
+// handlers.
 type DisplayServicer interface {
 	// RenderField resolves entityUUID, authorizes "read" on the resulting
 	// entity, then renders fieldName through the service's registry.
