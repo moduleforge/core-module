@@ -38,7 +38,7 @@ phases:
           done: false
           tier: sonnet-med
           git:
-            branch: null
+            branch: plan/entity-display-name-01-003
             commit: []
             merge: null
         - number: 4
