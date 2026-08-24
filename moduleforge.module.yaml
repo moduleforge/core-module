@@ -72,14 +72,44 @@ provides:
       args:
         - service:coreServices
 
+    # displayRegistry is the single shared *display.Registry every module's
+    # renderer registration targets. NewDisplayRegistry both builds the
+    # registry and registers mod-core's own builtin renderers (natural_person,
+    # corporation, service_account) as a side effect of construction — the
+    # manifest spec's provides.services[] section explicitly sanctions a
+    # side-effecting constructor, citing this module's own
+    # fieldcrypto.NewFromEnvOrGenerate as the shipped precedent.
+    - name: displayRegistry
+      type: "*display.Registry"
+      constructor: coreservice.NewDisplayRegistry
+      args:
+        - queries:coredb
+
+    # displayService resolves and authorizes the target entity, then
+    # dispatches through displayRegistry to render its human-readable name.
+    # Backs GET /v1/entities/{uuid}/display-name (see coreDeps below). Arg
+    # order matches coreservice.NewDisplayService's signature: reg, az,
+    # entityResolver.
+    - name: displayService
+      type: "*coreservice.DisplayService"
+      constructor: coreservice.NewDisplayService
+      args:
+        - service:displayRegistry
+        - service:authorizer
+        - service:entityResolver
+
     # coreDeps carries the external dependencies for the core httpapi router.
-    # Requires coreServices (entity CRUD) and logger (structured logging).
+    # Requires coreServices (entity CRUD), logger (structured logging), and
+    # displayService (display-name rendering). A composing app that omits
+    # displayService can still call the two-argument corehttpapi.NewDeps
+    # directly — it simply gets the graceful display_name: null behaviour.
     - name: coreDeps
       type: "corehttpapi.Deps"
-      constructor: corehttpapi.NewDeps
+      constructor: corehttpapi.NewDepsWithDisplay
       args:
-        - service:coreServices   # *coreservice.Services
-        - infra:logger           # *slog.Logger — from app manifest
+        - service:coreServices    # *coreservice.Services
+        - infra:logger            # *slog.Logger — from app manifest
+        - service:displayService  # *coreservice.DisplayService
 
     # noopObserver is a MutationObserver that does nothing.
     - name: noopObserver
