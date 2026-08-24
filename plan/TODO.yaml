@@ -27,7 +27,8 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/entity-display-name-01-002
-            commit: []
+            commit:
+                - df223e8
             merge: null
         - number: 3
           slug: wire-display-registry-in-manifest
