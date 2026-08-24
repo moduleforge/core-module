@@ -114,3 +114,42 @@ architectural_impact: true
 - After the `coreDeps` constructor switch.
 - After the mfgen read-only reachability verification.
 - After the `AGENTS.md` row updates.
+
+## Status
+
+- **Outcome:** succeeded
+- **Date:** 2026-08-24
+- **Summary:** Added `displayRegistry` (`coreservice.NewDisplayRegistry`, args `queries:coredb`)
+  and `displayService` (`coreservice.NewDisplayService`, args `service:displayRegistry`,
+  `service:authorizer`, `service:entityResolver`) as new `provides.services` entries in
+  `moduleforge.module.yaml`, and switched `coreDeps`'s constructor to
+  `corehttpapi.NewDepsWithDisplay` with `service:displayService` appended as the third arg.
+  Updated the `display/`, `service/`, and `httpapi/` rows in `AGENTS.md` per the task's
+  requirement 4.
+- **mfgen reachability verification (read-only, requirement 3):** confirmed against
+  `/Users/zane/playground/moduleforge/mfgen/internal/resolver/reachability.go` and
+  `graph.go` (no edits made under that path). `coreDeps` is pinned reachable via
+  `reachability.go`'s route-arg pinning (`pinArgList` over `route.Args`, since the `/v1`
+  `mountFromModule: corehttpapi.NewRouter` route takes `service:coreDeps`). `graph.go`'s
+  `drawEdges` records a dependency edge from `coreDeps` to `displayService` (its
+  `service:displayService` arg) and from `displayService` to `displayRegistry` (its
+  `service:displayRegistry` arg); `reachability.go`'s reverse-topological-order BFS then
+  marks both as reachable via `g.Deps`, so both are emitted into the generated `main.go`.
+  Topological order is satisfiable: `displayRegistry` (needs only `queries:coredb`) before
+  `displayService` (needs `displayRegistry`, `authorizer`, `entityResolver` — all already
+  provided) before `coreDeps`. Neither `coreservice.NewDisplayRegistry` nor
+  `coreservice.NewDisplayService` returns an error (confirmed against their signatures in
+  `api/service/display.go`), so no `returnsError: true` flag is needed on either entry.
+- **Validation:** `moduleforge.module.yaml` parses as valid YAML (`python3 -c
+  "import yaml,sys;yaml.safe_load(open('moduleforge.module.yaml'))"` — passed). Every
+  `constructor:`/`args:` entry added was cross-checked by grep against
+  `api/service/display.go` and `api/httpapi/router.go`'s actual signatures. `service:
+  displayRegistry` and `service:entityResolver` each resolve to exactly one
+  `provides.services[].name` (no duplicates — confirmed by grep). `coreDeps`'s arg list
+  (`service:coreServices`, `infra:logger`, `service:displayService`) matches
+  `corehttpapi.NewDepsWithDisplay`'s parameter order exactly. `git diff --stat` names only
+  `moduleforge.module.yaml` and `AGENTS.md` — nothing under
+  `/Users/zane/playground/moduleforge/mfgen` or `docs/mf-standards/` was touched. `cd api &&
+  make test` and `cd api && make lint` both pass (no Go source changes were made; run as a
+  regression guard per the task).
+- **Affected files:** `moduleforge.module.yaml`, `AGENTS.md`.
