@@ -1,15 +1,5 @@
 version: 2
 items:
-    - title: Stale cipher-key comment in module.yaml
-      id: yoUt
-      date: "2026-08-19"
-      tags:
-        - type:ambiguity
-        - plan/phase:display-name-endpoint
-        - plan/slug:entity-display-name
-        - priority:unspecified
-        - effort:unspecified
-      text: moduleforge.module.yaml's `cipher` service comment describes the old "CORE_FIELD_KEY_HEX set explicitly always wins" behavior, which AGENTS.md documents as replaced by fail-loudly-on-mismatch (CORE_FIELD_KEY_HEX is now a first-boot-only bootstrap seed; a later mismatch fails construction rather than silently taking precedence). Flagged incidentally by the entity-display-name planning pass; not touched by that plan (out of scope). Worth a small doc-comment fix to reconcile the manifest comment with current behavior.
     - title: 'Informational: task doc 004''s scope descripti'
       id: mSR8
       date: "2026-08-24"
