@@ -5,6 +5,7 @@ phases:
     - number: 1
       slug: display-name-endpoint
       title: Display Name Endpoint
+      diff_base: f87d45a378a5f345d012f1cc94cd69306db9d554
       tasks:
         - number: 1
           slug: add-display-service
