@@ -39,7 +39,8 @@ phases:
           tier: sonnet-med
           git:
             branch: plan/entity-display-name-01-003
-            commit: []
+            commit:
+                - 9293b83
             merge: null
         - number: 4
           slug: document-display-name-surface
