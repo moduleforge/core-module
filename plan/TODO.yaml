@@ -18,7 +18,7 @@ phases:
             branch: plan/entity-display-name-01-001
             commit:
                 - 2cf384d
-            merge: null
+            merge: 6dfac45394af341bc885ebf5e7632e64fb0d86b3
         - number: 2
           slug: add-display-name-endpoint
           title: Add Display Name Endpoint
