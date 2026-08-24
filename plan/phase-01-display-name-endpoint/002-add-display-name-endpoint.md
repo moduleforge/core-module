@@ -167,3 +167,48 @@ architectural_impact: true
 - After the handler is implemented.
 - After the fake-service handler tests pass.
 - After the end-to-end real-registry test passes.
+
+## Status
+
+**Outcome:** succeeded — 2026-08-24.
+
+Implemented exactly the scope described above, entirely within `api/httpapi`:
+
+- `api/httpapi/router.go` — added `Deps.Display service.DisplayServicer` (nil-safe), left `NewDeps`
+  byte-for-byte unchanged, added the additive `NewDepsWithDisplay(svcs, logger, dsp) Deps`
+  constructor, and registered `r.Get("/{uuid}/display-name", h.getDisplayName)` inside the existing
+  `/entities` route group next to `r.Get("/{uuid}", ...)`, with the load-bearing "why not a second
+  `Register*Routes` entry" rationale captured in a code comment.
+- `api/httpapi/display.go` (new) — `getDisplayName` handler mirroring `getEntity`'s thin-handler
+  shape: 401 pre-flight actor check, UUID parse (400 on failure), nil-`Display` graceful-fallback
+  (200/null), `RenderField` call with untouched error passthrough, `200` via `apiresp.WriteJSON` with
+  a named `displayNameResponse{UUID uuid.UUID; DisplayName *string}` struct (never a bare map) so
+  `display_name` serializes as JSON `null`, not omitted, when unavailable.
+- `api/httpapi/mock_test.go` — added `fakeDisplayService` (implements `service.DisplayServicer`) and
+  a sibling helper `buildTestDepsWithDisplay(entity, np, corp, sa, dsp) Deps` that wraps the
+  pre-existing `buildTestDeps` and sets `.Display`; none of the ~34 pre-existing `buildTestDeps(...)`
+  call sites needed to change.
+- `api/httpapi/masked_lookup_test.go` — extended `stubQuerier` with optional seed maps
+  (`entitiesByUUID`, `entitiesByID`, `naturalPersonsByEntityID`, `corporationsByEntityID`,
+  `serviceAccountsByEntityID`); nil maps (the zero value every pre-existing test uses) preserve the
+  original always-zero-row/nil-error behaviour byte-for-byte, so `TestGetEntity_MaskedMiss_Returns403Forbidden`
+  is unaffected. A populated map now reports `pgx.ErrNoRows` for any key absent from it, which the
+  new end-to-end test's masked-403 sub-test relies on.
+- `api/httpapi/display_test.go` (new) — all tests listed in `## Requirements` §4, including the
+  end-to-end sub-tests (real `service.NewDisplayRegistry`, real `service.NewDisplayService`, real
+  `NewDepsWithDisplay`/`NewRouter`) for `natural_person`/`corporation`/`service_account`, the
+  no-registered-renderer null case, and the masked-403 case for an unseeded UUID.
+
+**Validation:** `cd api && go build ./...`, `cd api && make test` (all packages, including the full
+new `display_test.go` suite), and `cd api && make lint` (`go vet` + `gofmt -l`) all pass. Confirmed
+`grep -n "func NewDeps(" api/httpapi/router.go` still shows the original two-argument signature, and
+`handlers_test.go`, `handlers_extra_test.go`, `apps_test.go` are untouched (only `masked_lookup_test.go`
+and `mock_test.go` were extended, both explicitly anticipated by `## Requirements` §4, with no
+`buildTestDeps` signature change). No response body in the new code carries an internal entity ID.
+
+**Assumptions relied on:** none beyond what `## Requirements` and the referenced design note already
+state; no `## Assumptions` section was present on this task doc.
+
+Affected files (repo-relative to `api/`, all under `httpapi/` except `router.go`'s parent):
+`api/httpapi/router.go`, `api/httpapi/display.go`, `api/httpapi/display_test.go`,
+`api/httpapi/mock_test.go`, `api/httpapi/masked_lookup_test.go`.
