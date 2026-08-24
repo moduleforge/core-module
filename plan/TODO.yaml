@@ -37,6 +37,7 @@ phases:
           path: phase-01-display-name-endpoint/003-wire-display-registry-in-manifest.md
           done: false
           tier: sonnet-med
+          digest: Declared displayRegistry and displayService as new provides.services entries in moduleforge.module.yaml matching task 001 constructor signatures, switched coreDeps to three-arg NewDepsWithDisplay. Verified reachability/topological order read-only against mfgen. Updated AGENTS.md display/service/httpapi rows. make test/make lint green, no Go source touched.
           git:
             branch: plan/entity-display-name-01-003
             commit:
