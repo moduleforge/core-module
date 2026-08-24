@@ -4,9 +4,10 @@
 
 Add the service-layer half of the display-name HTTP surface: a constructor that builds a
 `display.Registry` with mod-core's builtin renderers already registered, and a service type whose
-one method turns a public entity UUID into a rendered display string — authenticating first,
-resolving the UUID, dispatching through the registry, and reporting "no renderer for this entity's
-type" as a normal, non-error outcome rather than an error.
+one method turns a public entity UUID into a rendered display string — resolving the UUID,
+authorizing `"read"` on the resulting entity exactly as every other single-entity read in mod-core
+does, dispatching through the registry, and reporting "no renderer for this entity's type" as a
+normal, non-error outcome rather than an error.
 
 Scope is `api/` only: one new source file (`api/service/display.go`) and one new test file
 (`api/service/display_test.go`). No HTTP wiring, no manifest change, no documentation beyond Go doc
@@ -48,25 +49,42 @@ The `bool` is `available` — `true` when a renderer produced a value, `false` w
 be produced for an expected, non-error reason. Constructor:
 
 ```go
-func NewDisplayService(reg *display.Registry, entityResolver *entity.Resolver) *DisplayService
+func NewDisplayService(reg *display.Registry, az authz.Authorizer, entityResolver *entity.Resolver) *DisplayService
 ```
+
+`az` is stored as a struct field named `az`, mirroring `EntityService`'s `az authz.Authorizer`
+field. The parameter order puts the authorizer ahead of the resolver, matching `service.New`'s own
+ordering (`... service:authorizer ... service:entityResolver ...`), so task 003's manifest args read
+`service:displayRegistry`, `service:authorizer`, `service:entityResolver`.
 
 `RenderField` behaviour, in order:
 
-1. **Authenticate first.** Call `authz.RequireAuthenticated(ctx)`; on error return
-   `("", false, err)`. This is the *only* authorization gate — deliberately **not**
-   `az.Authorize(ctx, "read", &id)`. Carry a code comment explaining why, in the terms of
-   [the design note](../notes/display-http-surface-design.md#authorization-decision): the caller is
-   resolving an entity UUID it already holds as a reference in another module's data and generally
-   cannot read that entity's profile; `authz.RequireAuthenticated` was added to `api/authz/authz.go`
-   for exactly this authentication-only case and this is its first production call site. Keep the
-   gate to a single, clearly-marked statement so tightening it later is a one-line change.
-2. **Nil-registry tolerance.** If the receiver's registry is `nil`, return `("", false, nil)`. A
-   deployment that wires no registry is a valid state, not a failure.
-3. **Resolve the UUID.** Call `entityResolver.Resolve(ctx, q, entityUUID, "entity")`. On
-   `apiresp.ErrForbidden` or `apiresp.ErrNotFound` (checked with `errors.Is`) return
-   `("", false, nil)` — an unknown UUID is reported as unavailable, not as an error, so the endpoint
-   cannot be used as an existence oracle. Any other error is returned as-is (wrapped with context).
+1. **Resolve the UUID.** Call `entityResolver.Resolve(ctx, q, entityUUID, "entity")`; on error
+   return `("", false, err)` — **propagated verbatim, not wrapped, not special-cased, not collapsed
+   into an "unavailable" result.** The resolver's default policy already masks a missing UUID as
+   `apiresp.ErrForbidden`, and `api/entity/resolver.go`'s sentinels are aliased directly onto the
+   `apiresp` sentinels, so `apiresp.WriteError` classifies it correctly with zero translation code
+   at this call site. That is the settled precedent — see
+   [`plan-summary-masked-lookup-403.md`](../plan-summary-masked-lookup-403.md), "Alias fix at the
+   source, not a translation shim".
+2. **Authorize the read.** Call `s.az.Authorize(ctx, "read", &internalID)`; on error return
+   `("", false, err)` — again propagated as-is. This is the real authorization gate: this endpoint
+   requires the same `"read"` authorization on the target entity as every other single-entity read
+   in mod-core, and holding a UUID entitles a caller to nothing.
+
+   Steps 1 and 2 together must be byte-for-byte the shape `EntityService.GetByUUID` and
+   `EntityService.ResolveProfile` already use in `api/service/entity.go` — copy that pattern rather
+   than inventing anything. Note there is deliberately **no** separate `authz.RequireAuthenticated`
+   call: `Authorizer` implementations are contractually required to return
+   `apiresp.ErrUnauthenticated` themselves when no effective actor is present (`api/authz/authz.go`,
+   `Authorizer` doc comment), which is exactly why `GetByUUID` needs no such call either. 401-vs-403
+   falls out of `Authorize` alone. `authz.RequireAuthenticated` remains an available but unused
+   helper in `api/authz/authz.go` for some future genuinely authentication-only case — do not use
+   it here, and do not remove it.
+3. **Nil-registry tolerance.** *After* both checks above have passed: if the receiver's registry is
+   `nil`, return `("", false, nil)`. A deployment that wires no registry is a valid state, not a
+   failure. The nil check comes after authorization, not before, so the "unavailable" outcome is
+   never reachable without a successful read authorization.
 4. **Render.** Call `reg.Render(ctx, nil, internalID, fieldName)` — `nil` transaction; the registry
    and every builtin renderer already handle a nil tx by falling back to the base querier. When the
    error wraps `display.ErrRendererNotRegistered` (check with `errors.Is`) return `("", false, nil)`.
@@ -75,6 +93,10 @@ func NewDisplayService(reg *display.Registry, entityResolver *entity.Resolver) *
    `service_account` whose label is empty) returns `("", true, nil)` — `available` reflects whether a
    renderer ran, not whether the string is non-empty.
 
+So `available == false` with a `nil` error now means exactly one thing: **the entity exists and the
+caller may read it, but nothing can render it** (no renderer for its type, or no registry wired).
+It no longer means "unknown or unauthorized entity" — that is a real, propagated error.
+
 `RenderField` takes `fieldName` rather than hard-coding `display.FieldName` so a future
 `/description` route needs no service change. It must not import anything from `api/httpapi`.
 
@@ -82,21 +104,34 @@ func NewDisplayService(reg *display.Registry, entityResolver *entity.Resolver) *
 
 `api/service/display_test.go`, in the existing `package service` test convention for this directory
 (check `api/service/entity_test.go` and reuse `api/service/mock_test.go`'s existing querier/resolver
-fakes rather than adding parallel ones where they fit):
+fakes — `allowAllAuthz{}`, `denyAllAuthz{err: ...}`, `testEntityResolver()`, `mockQuerier` — rather
+than adding parallel ones where they fit):
 
-- Resolved value for a `natural_person` through a real `NewDisplayRegistry` over a fake `Querier` —
-  asserts `("Ada Lovelace", true, nil)`-shaped output and proves `RegisterBuiltins` really ran.
+- Resolved value for a `natural_person` through a real `NewDisplayRegistry` over a fake `Querier`,
+  with `allowAllAuthz{}` — asserts `("Ada Lovelace", true, nil)`-shaped output and proves
+  `RegisterBuiltins` really ran.
 - The same for `corporation` and `service_account`, so all three builtins are covered here at the
   service layer.
 - Not-registered: an entity whose `FundamentalTypeSlug` is a type no renderer is wired for (e.g.
   `"user_account"`) → `("", false, nil)`, **and** assert the returned error is nil rather than merely
   non-fatal.
-- Unknown UUID (resolver returns `pgx.ErrNoRows` from the fake querier) → `("", false, nil)`.
-- Unauthenticated context (no actor, no sudo actor) → error satisfying
-  `errors.Is(err, apiresp.ErrUnauthenticated)`, and `available` false.
-- Nil registry → `("", false, nil)` with no panic.
+- **Masked miss propagates.** An unseeded/random UUID (resolver hits `pgx.ErrNoRows` from the fake
+  querier) → a non-nil error, asserted the same way `TestEntityService_GetByUUID_NotFound` asserts
+  it in `api/service/entity_test.go`: `errors.Is(err, entity.ErrForbidden)` **and**
+  `errors.Is(err, ErrForbidden)` (so the error is `apiresp`-classifiable as 403). It must **not**
+  return `("", false, nil)` — an unknown UUID is an error now, not an "unavailable" result.
+- **Authorization denial propagates.** A service built with `denyAllAuthz{err: authzErr}` over a
+  seeded, resolvable entity → `errors.Is(err, authzErr)`, mirroring
+  `TestEntityService_GetByUUID_AuthzDenied`. Assert `available` is false and the returned string is
+  empty, but the error — not the `available` flag — is what carries the refusal.
+- Nil registry (with an allow-all authorizer and a resolvable entity) → `("", false, nil)` with no
+  panic.
 - Genuine render failure (a renderer registered on a hand-built registry that returns an error) →
   non-nil error that does **not** satisfy `errors.Is(err, display.ErrRendererNotRegistered)`.
+
+There is deliberately no "unauthenticated context" case at this layer: the 401 comes from the
+injected `Authorizer` implementation, which is a test fake here, so unauthenticated behaviour is
+covered by the authorization-denial case above plus the handler-layer 401 test in task 002.
 
 ## Validation
 
@@ -107,8 +142,12 @@ fakes rather than adding parallel ones where they fit):
   `api/service/display.go` and `api/service/display_test.go`.
 - `service.New`'s signature is unchanged — grep confirms no edit to `api/service/service.go`.
 - `grep -rn "httpapi" api/service/display.go` returns nothing (no layering inversion).
-- The authentication-only gate is a single statement carrying the explanatory comment required
-  above; confirm by reading the finished method.
+- `grep -n "RequireAuthenticated" api/service/display.go` returns nothing — this service does not
+  use it; `api/authz/authz.go` still defines it, unchanged.
+- `RenderField`'s first two statements are the resolve + `s.az.Authorize(ctx, "read", &internalID)`
+  pair, each returning the error unmodified; confirm by reading the finished method side by side
+  with `EntityService.GetByUUID` in `api/service/entity.go`. Neither error is wrapped, translated,
+  or converted into an `available == false` result.
 
 ## Metadata
 
@@ -120,9 +159,17 @@ architectural_impact: true
   closed error-code set, and the full authorization rationale this task implements.
 - `api/display/registry.go` — `Registry`, `FieldRenderer`, `FieldName`, `ErrRendererNotRegistered`.
 - `api/service/display_builtins.go` — `RegisterBuiltins`, unchanged by this task.
-- `api/service/entity.go` — the interface + struct + compile-time-assertion shape to follow.
+- `api/service/entity.go` — the interface + struct + compile-time-assertion shape to follow, and
+  `GetByUUID` / `ResolveProfile`: the exact resolve-then-`Authorize("read")` sequence to copy.
+- `api/service/entity_test.go` — `TestEntityService_GetByUUID_NotFound` and
+  `TestEntityService_GetByUUID_AuthzDenied`: the assertion style the new propagation tests mirror.
 - `api/entity/resolver.go` — `Resolve` and its `apiresp`-aliased sentinels.
-- `api/authz/authz.go` — `RequireAuthenticated` and its stated purpose.
+- [`plan-summary-masked-lookup-403.md`](../plan-summary-masked-lookup-403.md) — why resolver errors
+  are propagated as-is rather than translated at the call site.
+- `api/authz/authz.go` — the `Authorizer` interface contract (implementations return a
+  distinguishable `apiresp.ErrUnauthenticated` for "no actor", which is why no separate
+  authentication call is needed). `RequireAuthenticated` lives here too but is **not** used by this
+  task.
 - `AGENTS.md` "Conventions" — authorization checked first in every service method; internal IDs never
   leave the service layer.
 

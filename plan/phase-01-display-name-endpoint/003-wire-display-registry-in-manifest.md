@@ -26,9 +26,13 @@ Following the existing entries' formatting and comment style in `moduleforge.mod
   mod-core's own `fieldcrypto.NewFromEnvOrGenerate` as the shipped precedent.
 - **The display service** — type `*coreservice.DisplayService` (match whatever task 001 actually
   exported; use the concrete type, as the other entries do), constructor
-  `coreservice.NewDisplayService`, args `service:displayRegistry` then `service:entityResolver`, in
-  the order task 001's constructor declares. `entityResolver` is already a provided service in this
-  manifest — do not add a second one.
+  `coreservice.NewDisplayService`, args `service:displayRegistry`, then `service:authorizer`, then
+  `service:entityResolver` — in the order task 001's constructor declares
+  (`NewDisplayService(reg *display.Registry, az authz.Authorizer, entityResolver *entity.Resolver)`).
+  `service:authorizer` is the same existing arg-source `coreServices` and every other authz-consuming
+  entry in this manifest already uses (see the `coreServices` / `naturalPersonService`-adjacent
+  entries) — do not add a second authorizer entry. `entityResolver` is likewise already a provided
+  service in this manifest — do not add a second one.
 
 Use the `coreservice` / `corehttpapi` import aliases the existing entries already use; introduce no
 new alias.
@@ -68,9 +72,11 @@ rather than guessing at a manifest shape that will not generate.
 - The `display/` package row: note that a composing app obtains the shared registry via
   `coreservice.NewDisplayRegistry` and that mod-core's manifest provides it as `displayRegistry`.
 - The `service/` row: mention the display service alongside the existing four servicers.
-- The `httpapi/` row: mention `GET /v1/entities/{uuid}/display-name`, its authentication-only rule,
-  and that it answers `200` with `display_name: null` rather than an error when no renderer is
-  registered for the entity's type.
+- The `httpapi/` row: mention `GET /v1/entities/{uuid}/display-name`, that it requires the same
+  real `"read"` authorization on the target entity as every other single-entity read (masked `403`
+  for a nonexistent or unauthorized UUID), and that it answers `200` with `display_name: null`
+  rather than an error when the entity resolved and is readable but no renderer is registered for
+  its type.
 - Keep each addition to the existing terse row style; do not restructure the tables.
 
 ## Validation

@@ -52,15 +52,22 @@ New file `api/httpapi/display.go`, following `api/httpapi/entities.go`'s `getEnt
 (thin handler: parse, one service call, shape response):
 
 1. If `opctx.ActorEntityID(r.Context())` reports no actor, `apiresp.WriteError(w, r, apiresp.ErrUnauthenticated)`
-   and return — mirroring `getEntity`'s first lines. (The service re-checks via
-   `authz.RequireAuthenticated`; both layers checking matches the existing pattern.)
+   and return — mirroring `getEntity`'s first lines. This is the same pre-existing handler-layer
+   convention every other entity handler follows, kept for consistency; it is a cheap short-circuit,
+   **not** the authorization gate. The real gate is the service's
+   `az.Authorize(ctx, "read", &internalID)` call (task 001), which also produces the 401 on its own
+   when no effective actor is present.
 2. Parse `chi.URLParam(r, "uuid")` with `uuid.Parse`; on error
    `apiresp.WriteError(w, r, apiresp.ErrInvalidInput)` (400) and return.
 3. If `h.d.Display` is nil, write the unavailable body (below) with `200` and return — no panic, no
-   500. A deployment with no registry wired is a valid state.
+   500. A deployment with no display service wired is a valid state, and that response is constant
+   across every UUID, so it discloses nothing about any entity.
 4. Otherwise call
    `h.d.Display.RenderField(r.Context(), h.d.Services.Querier(), entityUUID, display.FieldName)`.
-   On a non-nil error, `apiresp.WriteError(w, r, err)` and return.
+   On a non-nil error, `apiresp.WriteError(w, r, err)` and return — pass the service's error through
+   untouched. It is already an `apiresp`-classifiable sentinel in the cases that matter (`403` for
+   a masked miss or an authorization denial, `401` for no effective actor); do **not** inspect,
+   translate, or downgrade it into a `200`/`null` body.
 5. Write `200` via `apiresp.WriteJSON` with the body below.
 
 Response body — a small named struct with explicit JSON tags, not a bare map (`display_name` must
@@ -74,14 +81,19 @@ serialize as JSON `null`, not be omitted, when unavailable; use `*string`):
 { "uuid": "<the requested uuid>", "display_name": null }
 ```
 
-The unavailable body is returned identically for: no renderer registered for the entity's type, no
-registry wired into this deployment, and a UUID naming no entity. Do **not** add `kind`,
-`fundamental_type_slug`, or any other field — it would leak type or existence information about an
-entity the caller may not be able to read, and it could not be produced for the unknown-UUID case.
-Never include an internal entity ID (`AGENTS.md` Conventions).
+The unavailable body is returned for exactly two cases: no renderer is registered for the (resolved,
+readable) entity's type, and no display service/registry is wired into this deployment. A UUID
+naming no entity is **not** one of them — that is a `403`, produced by the service's resolve step
+and indistinguishable from an authorization denial. Do **not** add `kind`, `fundamental_type_slug`,
+or any other field: this endpoint answers one question, and a caller authorized to read the entity
+can already get its type from `GET /entities/{uuid}`; omitting it also keeps the body shape
+identical in both cases. Never include an internal entity ID (`AGENTS.md` Conventions).
 
-Carry a doc comment on the handler stating the authentication-only authorization rule and that the
-`200`/`null` shape is the deliberate graceful-fallback contract, not a missing error case.
+Carry a doc comment on the handler stating that the endpoint requires real `"read"` authorization on
+the target entity — the same gate as every other single-entity read, with the same masked `403` for
+a nonexistent or unauthorized UUID — and that the `200`/`null` shape is the deliberate
+graceful-fallback contract for a readable entity with no registered renderer, not a missing error
+case.
 
 ### 4. Tests
 
@@ -99,12 +111,24 @@ existing call). Add a fake `DisplayServicer` alongside the existing `fake*Servic
 - `400` for a non-UUID path segment.
 - `500` when the fake service returns an unmapped error, with the body carrying
   `error.code == "internal_error"` and no raw error text.
+- `403` when the fake service returns an error satisfying `errors.Is(err, apiresp.ErrForbidden)` —
+  the handler passes it through `apiresp.WriteError` untouched, exactly like the `500` case, just
+  with a different sentinel. This proves the handler never downgrades a real authorization/masked-miss
+  error into the `200`/null shape.
 - **End-to-end**: following `api/httpapi/masked_lookup_test.go`'s precedent of wiring real
   collaborators rather than fakes, build a real registry via `service.NewDisplayRegistry(stubQuerier)`,
-  a real `service.NewDisplayService(reg, entity.NewResolver())`, a real router via
-  `NewDepsWithDisplay`, and assert the rendered name for `natural_person`, `corporation`, and
-  `service_account`, plus the null body for an entity whose `FundamentalTypeSlug` is a type with no
-  registered renderer. Reuse or extend that file's `stubQuerier` rather than writing a third one.
+  a real `service.NewDisplayService(reg, &stubAuthorizer{}, entity.NewResolver())` — reusing that
+  file's package-local, always-allow `stubAuthorizer` — and a real router via `NewDepsWithDisplay`,
+  then assert:
+  - the rendered name for `natural_person`, `corporation`, and `service_account`;
+  - the null body for an entity whose `FundamentalTypeSlug` is a type with no registered renderer
+    (still using `stubAuthorizer`, so the request reaches the renderer-not-found path rather than
+    being stopped by authorization);
+  - **and**, mirroring `TestGetEntity_MaskedMiss_Returns403Forbidden` exactly, a `403` for a random/
+    unseeded UUID against the same real chain — proving the resolver's masked-403 propagates through
+    this endpoint too, not just through `getEntity`.
+
+  Reuse or extend `masked_lookup_test.go`'s `stubQuerier` rather than writing a third one.
 
 ## Validation
 

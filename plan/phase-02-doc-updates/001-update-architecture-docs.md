@@ -24,9 +24,9 @@ with no data-model, cloud-topology, or frontend dimension.
 All four carry `architectural_impact: true`:
 
 - `plan/phase-01-display-name-endpoint/001-add-display-service.md` — new service component
-  (`DisplayService`) and the registry constructor; first production call site of
-  `authz.RequireAuthenticated`, an authentication-only authorization rule distinct from every other
-  service method in the module.
+  (`DisplayService`) and the registry constructor; gates on real `"read"` authorization via
+  `az.Authorize`, the same pattern every other service method in the module already uses (no new
+  or exceptional authorization rule was introduced).
 - `plan/phase-01-display-name-endpoint/002-add-display-name-endpoint.md` — new public HTTP route
   `GET /v1/entities/{uuid}/display-name`; new exported field and constructor on `httpapi.Deps`.
 - `plan/phase-01-display-name-endpoint/003-wire-display-registry-in-manifest.md` — two new nodes in
@@ -42,10 +42,10 @@ architecture-level documents are the module manifest, `AGENTS.md`, and the submo
 mf-standards set. Review each of the following and update only where the shipped change made it
 stale or incomplete:
 
-- `AGENTS.md` — the `display/`, `service/`, and `httpapi/` package rows, the `mountFromModule`
-  narrative, and the Conventions section (does the authentication-only rule warrant a convention-level
-  note alongside "Authorization is checked first in every service method"? It is an exception to it,
-  and should be visible there or explicitly cross-referenced).
+- `AGENTS.md` — the `display/`, `service/`, and `httpapi/` package rows and the `mountFromModule`
+  narrative. No Conventions-section update is expected here: the display service follows
+  "Authorization is checked first in every service method" exactly like every other service, rather
+  than introducing an exception to it.
 - `docs/architecture/display-name-http.md` — created in Phase 1 task 004; verify it matches what
   actually shipped (field names, status codes, constructor names, manifest entry names).
 - `README.md` — the documentation links.

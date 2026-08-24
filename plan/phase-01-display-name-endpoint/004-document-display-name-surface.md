@@ -27,15 +27,19 @@ new inline copies). It must document:
   (string, **nullable**), both always present. Include the two examples — a rendered name and a
   `null`.
 - A description stating plainly that `display_name` is `null` — with a `200`, never an error status —
-  when no renderer is registered for that entity's type, when the deployment wires no registry, or
-  when the UUID names no entity; and that a client should fall back to rendering the raw UUID.
-- `400` (`invalid_input`, malformed UUID) and `401` (`unauthenticated`) responses, referencing the
-  same error components the fragment's other operations use.
-- An explicit note that this operation requires **authentication only** — it does not require read
-  access to the referenced entity — because its purpose is resolving an entity UUID a caller already
-  holds as a reference in another module's data.
+  only when the entity resolved and the caller is authorized to read it but no value can be
+  rendered: no renderer is registered for that entity's type, or the deployment wires no registry.
+  A client should fall back to rendering the raw UUID in this case.
+- `400` (`invalid_input`, malformed UUID), `401` (`unauthenticated`), and `403` (`forbidden`)
+  responses, referencing the same error components the fragment's other operations use.
+- An explicit note that this operation requires the same real **`"read"` authorization on the
+  target entity** as every other single-entity read in this API — merely holding the UUID entitles
+  a caller to nothing. A UUID that does not exist and a UUID the caller is not authorized to read
+  are deliberately indistinguishable, both returning `403`, exactly as `GET /entities/{uuid}`
+  already behaves.
 
-Do not add `403` or `404`: existence is deliberately not disclosed.
+Do not add `404`: existence is deliberately not disclosed — a nonexistent UUID and an unauthorized
+one both collapse into the same `403`.
 
 ### 2. New mod-core-owned architecture doc
 
@@ -44,11 +48,14 @@ a `CLAUDE.md`). It opens with `## Purpose and scope` per the project documentati
 covers, in prose:
 
 - **The endpoint contract** — path, method, both response shapes, status codes, and the
-  authentication-only authorization rule with the rationale from
-  [the design note](../notes/display-http-surface-design.md#authorization-decision). State explicitly
-  that "no renderer registered" is an expected steady state (an entity type owned by a module absent
-  from this deployment), which is why it is a `200` and not an error — and that the top-level
-  `error.code` set is closed, so no new code could have been minted for it.
+  real `"read"`-authorization rule with the rationale from
+  [the design note](../notes/display-http-surface-design.md#authorization-decision): the same
+  resolve-then-`Authorize("read")` gate as every other single-entity read, producing an
+  indistinguishable masked `403` for a nonexistent or unauthorized UUID. State explicitly that
+  "no renderer registered" (for an entity the caller *can* read) is an expected steady state (an
+  entity type owned by a module absent from this deployment), which is why it is a `200` and not an
+  error — and that the top-level `error.code` set is closed, so no new code could have been minted
+  for it.
 - **How the registry is wired in a composed app** — mfgen constructs one shared `*display.Registry`
   from mod-core's `displayRegistry` manifest entry (constructor `coreservice.NewDisplayRegistry`,
   which registers mod-core's `natural_person` / `corporation` / `service_account` builtins), threads
@@ -68,9 +75,14 @@ covers, in prose:
   the doc mentions mfgen's `hooks:` / `startupHooks:` fields, re-confirm them against the mfgen
   source first and mark them as an mfgen capability not currently described in
   `docs/mf-standards/manifest-spec.md`, rather than presenting them as spec-sanctioned.
-- **What is deliberately not here** — mod-users' own renderer, mod-workflows' GUI client call, and
-  the composing app itself are all separate future work; this document describes the contract they
-  will build against.
+- **What is deliberately not here** — mod-users' own renderer and the composing app itself are
+  separate future work; this document describes the contract they will build against. Note also
+  that a peer module wanting to show a related entity's display name to a caller who cannot
+  necessarily read that entity directly (e.g. mod-workflows rendering an assignee name) should
+  resolve it server-side and include it in its own already-authorized read response, rather than
+  having its GUI call this endpoint directly with a bare UUID — this endpoint still requires real
+  read authorization on the target entity, so a direct call only succeeds when the caller already
+  has that. That enrichment pattern is future mod-workflows work, tracked separately.
 
 Link the design note's substance into the doc as prose — do not link to `plan/` paths, which are torn
 down when the plan completes.
