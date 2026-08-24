@@ -49,6 +49,7 @@ phases:
           path: phase-01-display-name-endpoint/004-document-display-name-surface.md
           done: false
           tier: sonnet-high
+          digest: 'Documented the display-name HTTP surface: added GET /entities/{uuid}/display-name to api/openapi.fragment.yaml, wrote docs/architecture/display-name-http.md covering endpoint contract, mfgen wiring chain, downstream renderer-registration pattern, and peer-module response-enrichment note. Linked from README.md and AGENTS.md. Drafted but did not apply a docs-mf-standards entity-typing.md amendment per submodule ownership constraint (qxLX precedent). make test/make lint green; docs/mf-standards untouched.'
           git:
             branch: plan/entity-display-name-01-004
             commit:
