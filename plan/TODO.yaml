@@ -68,5 +68,6 @@ phases:
           tier: sonnet-high
           git:
             branch: plan/entity-display-name-02-001
-            commit: []
+            commit:
+                - 1f5a4fa
             merge: null
